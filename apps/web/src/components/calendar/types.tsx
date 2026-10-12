@@ -30,6 +30,7 @@ export interface CalendarEvent {
   acceptedUserIds?: string[];
   pendingUserIds?: string[];
   declinedUserIds?: string[];
+  notificationsEnabledUserIds?: string[];
   invitees?: { email: string; displayName?: string; status?: string }[];
   hostEmail?: string;
   hostDisplayName?: string;

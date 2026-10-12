@@ -314,6 +314,18 @@ export const calendarApi = baseApi.injectEndpoints({
       }),
       invalidatesTags: ["CalendarEvent", "CalendarRsvp", "Notification"],
     }),
+
+    toggleCalendarNotification: builder.mutation<
+      { code: number; success: boolean; notificationsEnabled: boolean; event: CalendarEvent },
+      { id: string; enabled?: boolean }
+    >({
+      query: ({ id, enabled }) => ({
+        url: `/calendar/${id}/notification`,
+        method: "PATCH",
+        data: { enabled },
+      }),
+      invalidatesTags: ["CalendarEvent"],
+    }),
   }),
   overrideExisting: true,
 });
@@ -332,6 +344,7 @@ export const {
   useUpdateCalendarRsvpMutation,
   useInviteCalendarMembersMutation,
   useLeaveCalendarEventMutation,
+  useToggleCalendarNotificationMutation,
 } = calendarApi;
 
 

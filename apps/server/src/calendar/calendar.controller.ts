@@ -21,6 +21,7 @@ import { UpdateRsvpDto } from "./dto/update-rsvp.dto";
 import { GetEventsDto } from "./dto/get-events.dto";
 import { RestoreOccurrenceDto } from "./dto/restore-occurrence.dto";
 import { InviteUsersDto } from "./dto/invite-users.dto";
+import { ToggleNotificationDto } from "./dto/toggle-notification.dto";
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -147,6 +148,19 @@ export class CalendarController {
     @Param("id") eventId: string,
   ) {
     return this.calendarService.leaveEvent(req.user.id, eventId);
+  }
+
+  @Patch(":id/notification")
+  async toggleNotification(
+    @Req() req: AuthenticatedRequest,
+    @Param("id") eventId: string,
+    @Body() body: ToggleNotificationDto,
+  ) {
+    return this.calendarService.toggleNotification(
+      req.user.id,
+      eventId,
+      body?.enabled,
+    );
   }
 }
 

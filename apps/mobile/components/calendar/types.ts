@@ -22,6 +22,7 @@ export interface CalendarEvent {
   acceptedUserIds?: string[];
   pendingUserIds?: string[];
   declinedUserIds?: string[];
+  notificationsEnabledUserIds?: string[];
   // Assignment specific fields
   eventType?: "meeting" | "assignment";
   assignmentId?: string;

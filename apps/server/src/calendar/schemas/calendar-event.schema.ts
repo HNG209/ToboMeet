@@ -59,6 +59,9 @@ export class CalendarEvent {
   @Prop({ type: [String], default: [] })
   declinedUserIds: string[]; // Đã từ chối
 
+  @Prop({ type: [String], default: [] })
+  notificationsEnabledUserIds: string[]; // Danh sách userId đã bật thông báo cho lịch này
+
   @Prop({ type: Boolean, default: false })
   isRecurring: boolean; // Cờ đánh dấu là sự kiện lặp
 
@@ -73,3 +76,4 @@ CalendarEventSchema.index({ roomId: 1, channelId: 1 });
 CalendarEventSchema.index({ acceptedUserIds: 1, startDate: 1 });
 CalendarEventSchema.index({ hostId: 1, startDate: 1 });
 CalendarEventSchema.index({ pendingUserIds: 1 });
+CalendarEventSchema.index({ notificationsEnabledUserIds: 1 });

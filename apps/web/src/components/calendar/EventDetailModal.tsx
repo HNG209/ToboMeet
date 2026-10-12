@@ -5,7 +5,6 @@ import { useTranslations } from "next-intl";
 import {
   X,
   Video,
-  MessageSquare,
   Clock,
   Paperclip,
   Pencil,
@@ -18,13 +17,17 @@ import {
   UserPlus,
   LogOut,
   RefreshCw,
+  Bell,
+  BellOff,
 } from "lucide-react";
 import { CalendarEvent, RsvpMember } from "./types";
 import {
   useRestoreCalendarOccurrenceMutation,
   useLeaveCalendarEventMutation,
+  useToggleCalendarNotificationMutation,
 } from "@/lib/redux/api/calendarApi";
 import InviteMembersModal from "./InviteMembersModal";
+import ToggleNotificationConfirmModal from "./ToggleNotificationConfirmModal";
 import { toast } from "sonner";
 
 interface EventDetailModalProps {
@@ -58,12 +61,23 @@ export default function EventDetailModal({
   const [restoreCalendarOccurrence] = useRestoreCalendarOccurrenceMutation();
   const [leaveCalendarEvent, { isLoading: isLeaving }] =
     useLeaveCalendarEventMutation();
+  const [toggleCalendarNotification, { isLoading: isTogglingNotification }] =
+    useToggleCalendarNotificationMutation();
   const [restoringDate, setRestoringDate] = useState<string | null>(null);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showNotificationConfirmModal, setShowNotificationConfirmModal] =
+    useState(false);
   const [exceptions, setExceptions] = useState<string[]>(
     event?.recurrenceExceptions || [],
   );
+  const [notificationsEnabledUsers, setNotificationsEnabledUsers] = useState<
+    string[] | undefined
+  >(event?.notificationsEnabledUserIds);
+
+  useEffect(() => {
+    setNotificationsEnabledUsers(event?.notificationsEnabledUserIds);
+  }, [event?.notificationsEnabledUserIds]);
 
   useEffect(() => {
     setExceptions(event?.recurrenceExceptions || []);
@@ -73,6 +87,7 @@ export default function EventDetailModal({
     if (!isOpen) {
       setIsInviteModalOpen(false);
       setShowLeaveConfirm(false);
+      setShowNotificationConfirmModal(false);
     }
   }, [isOpen]);
 
@@ -302,6 +317,56 @@ export default function EventDetailModal({
     }
   };
 
+  const myId = currentSupabaseId || currentUserId;
+  const isNotificationEnabled =
+    notificationsEnabledUsers !== undefined
+      ? Boolean(myId && notificationsEnabledUsers.includes(myId))
+      : Boolean(
+          isHost ||
+            (rsvpList && rsvpList.some((r) => r.userId === myId)) ||
+            (event.acceptedUserIds && myId && event.acceptedUserIds.includes(myId)) ||
+            (event.pendingUserIds && myId && event.pendingUserIds.includes(myId)),
+        );
+
+  const handleConfirmToggleNotification = async () => {
+    if (!event?._id) return;
+    try {
+      const targetState = !isNotificationEnabled;
+      const res = await toggleCalendarNotification({
+        id: event._id,
+        enabled: targetState,
+      }).unwrap();
+
+      if (res?.event?.notificationsEnabledUserIds) {
+        setNotificationsEnabledUsers(res.event.notificationsEnabledUserIds);
+      } else {
+        setNotificationsEnabledUsers((prev) => {
+          const currentArr =
+            prev ??
+            (myId
+              ? [
+                  ...(isHost ? [event.hostId] : []),
+                  ...(event.acceptedUserIds || []),
+                ]
+              : []);
+          return targetState
+            ? Array.from(new Set([...currentArr, myId!]))
+            : currentArr.filter((id) => id !== myId);
+        });
+      }
+
+      toast.success(
+        targetState
+          ? t("toasts.notification_enabled_success")
+          : t("toasts.notification_disabled_success"),
+      );
+      setShowNotificationConfirmModal(false);
+    } catch (err) {
+      console.error("Lỗi cập nhật thông báo:", err);
+      toast.error(t("toasts.notification_toggle_error"));
+    }
+  };
+
   return (
     <div
       onClick={onClose}
@@ -339,27 +404,43 @@ export default function EventDetailModal({
 
             {/* Microsoft Teams style Action Buttons */}
             {(isChannelMeeting || Boolean(event.meetingCode) || hasRsvp || isHost) && (
-              <div className="flex items-center gap-2 mt-3">
-                <button
-                  onClick={() => {
-                    if (!isChannelMeeting) {
-                      onJoinMeeting(event.meetingCode || "");
-                    } else {
-                      window.location.href = `/${locale}/room/${event.roomId}?channel=${event.channelId}`;
-                    }
-                  }}
-                  className="bg-brand-500 hover:bg-brand-600 active:scale-[0.98] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-                >
-                  <Video className="w-4 h-4" />
-                  <span>{t("detail_modal.join")}</span>
-                </button>
+              <div className="flex items-center justify-between gap-2 mt-3">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (!isChannelMeeting) {
+                        onJoinMeeting(event.meetingCode || "");
+                      } else {
+                        window.location.href = `/${locale}/room/${event.roomId}?channel=${event.channelId}`;
+                      }
+                    }}
+                    className="bg-brand-500 hover:bg-brand-600 active:scale-[0.98] text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+                  >
+                    <Video className="w-4 h-4" />
+                    <span>{t("detail_modal.join")}</span>
+                  </button>
+                </div>
 
+                {/* Biểu tượng thông báo (đang bật hoặc đang tắt) ở bên còn lại của cụm nút */}
                 <button
-                  onClick={() => { }}
-                  className="flex items-center gap-1.5 px-4 py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition-colors"
+                  type="button"
+                  onClick={() => setShowNotificationConfirmModal(true)}
+                  title={
+                    isNotificationEnabled
+                      ? t("detail_modal.notification_enabled_tooltip")
+                      : t("detail_modal.notification_disabled_tooltip")
+                  }
+                  className={`p-2 rounded-xl border transition-all flex items-center justify-center cursor-pointer shadow-xs ${
+                    isNotificationEnabled
+                      ? "border-indigo-200 bg-indigo-50/80 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-700"
+                      : "border-slate-200 bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+                  }`}
                 >
-                  <MessageSquare className="w-4 h-4 text-slate-400" />
-                  <span>{t("detail_modal.chat")}</span>
+                  {isNotificationEnabled ? (
+                    <Bell className="w-4 h-4 text-indigo-600" />
+                  ) : (
+                    <BellOff className="w-4 h-4 text-slate-400" />
+                  )}
                 </button>
               </div>
             )}
@@ -713,6 +794,17 @@ export default function EventDetailModal({
               .map((m) => m.email)
               .filter(Boolean) as string[]),
           ]}
+        />
+      )}
+
+      {showNotificationConfirmModal && event && (
+        <ToggleNotificationConfirmModal
+          isOpen={showNotificationConfirmModal}
+          onClose={() => setShowNotificationConfirmModal(false)}
+          onConfirm={handleConfirmToggleNotification}
+          isCurrentlyEnabled={isNotificationEnabled}
+          eventTitle={event.title}
+          isLoading={isTogglingNotification}
         />
       )}
     </div>

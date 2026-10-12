@@ -11,4 +11,6 @@ export { default as ChannelEventModal } from "./ChannelEventModal";
 export { default as ChannelMeetingModal } from "./ChannelEventModal";
 export { default as InviteCalendarModal } from "./InviteCalendarModal";
 export { default as DeleteEventConfirmModal } from "./DeleteEventConfirmModal";
+export { default as ToggleNotificationConfirmModal } from "./ToggleNotificationConfirmModal";
 export { default as DateTimePickerJS } from "./DateTimePickerJS";
+

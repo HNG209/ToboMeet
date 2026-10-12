@@ -43,9 +43,9 @@ export default function MonthView({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col h-full min-h-[600px]">
+    <div className="bg-white border-t border-slate-200 flex flex-col h-full flex-1">
       {/* Month Grid Header — Cố định khi cuộn xuống */}
-      <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/95 backdrop-blur-xs h-10 items-center text-center text-xs font-bold text-slate-500 sticky top-0 z-30 rounded-t-2xl shadow-xs">
+      <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/95 backdrop-blur-xs h-10 items-center text-center text-xs font-bold text-slate-500 sticky top-0 z-30 shadow-xs">
         {monthGridDays.map((d) => (
           <div key={d}>{d}</div>
         ))}

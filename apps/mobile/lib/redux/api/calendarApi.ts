@@ -302,6 +302,17 @@ export const calendarApi = baseApi.injectEndpoints({
       }),
       providesTags: ["CalendarEvent"],
     }),
+    toggleCalendarNotification: builder.mutation<
+      { code: number; success: boolean; notificationsEnabled: boolean; event: any },
+      { id: string; enabled?: boolean }
+    >({
+      query: ({ id, enabled }) => ({
+        url: `/calendar/${id}/notification`,
+        method: "PATCH",
+        data: { enabled },
+      }),
+      invalidatesTags: ["CalendarEvent"],
+    }),
   }),
 });
 
@@ -319,5 +330,6 @@ export const {
   useUpdateCalendarRsvpMutation,
   useSearchCalendarEventsQuery,
   useLazySearchCalendarEventsQuery,
+  useToggleCalendarNotificationMutation,
 } = calendarApi;
 

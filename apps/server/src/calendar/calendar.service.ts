@@ -168,6 +168,9 @@ export class CalendarService {
       recurrenceEndDate,
       acceptedUserIds,
       pendingUserIds: isChannelMeeting ? [] : inviteeUserIds,
+      notificationsEnabledUserIds: Array.from(
+        new Set([userId, ...acceptedUserIds, ...inviteeUserIds]),
+      ),
     });
 
     // Gửi thông báo lời mời cho những người được mời riêng lẻ (không gửi thông báo riêng cho thành viên kênh nếu là cuộc họp kênh)
@@ -1138,7 +1141,10 @@ export class CalendarService {
     const updatedEvent = await this.calendarEventModel.findByIdAndUpdate(
       eventId,
       {
-        $addToSet: { pendingUserIds: { $each: newInviteeIds } },
+        $addToSet: {
+          pendingUserIds: { $each: newInviteeIds },
+          notificationsEnabledUserIds: { $each: newInviteeIds },
+        },
         $pull: { declinedUserIds: { $in: newInviteeIds } },
       },
       { new: true },
@@ -1236,6 +1242,7 @@ export class CalendarService {
           acceptedUserIds: { $in: removeList },
           pendingUserIds: { $in: removeList },
           declinedUserIds: { $in: removeList },
+          notificationsEnabledUserIds: { $in: removeList },
         },
       },
       { new: true },
@@ -1350,28 +1357,34 @@ export class CalendarService {
     if (!isCanceled) {
       // Tập hợp danh sách người dùng nhận thông báo
       const declinedSet = new Set(event.declinedUserIds || []);
-      const targetUserIds = Array.from(
-        new Set([
-          event.hostId,
-          ...(event.acceptedUserIds || []),
-          ...(event.pendingUserIds || []),
-        ]),
-      ).filter((uid) => uid && !declinedSet.has(uid));
 
-      // Gửi thông báo CALENDAR_START tới tất cả người dùng
-      this.eventEmitter.emit("notification.calendar_start", {
-        userIds: targetUserIds,
-        referenceId: event._id.toString(),
-        metadata: {
-          eventId: event._id.toString(),
-          title: event.title,
-          meetingCode: event.meetingCode,
-          startDate: event.startDate,
-          roomId: event.roomId,
-          channelId: event.channelId,
-          roomType: event.roomType,
-        },
-      });
+      // Lấy danh sách người dùng đã bật thông báo cho lịch này
+      // Đối với sự kiện cũ chưa có trường này, mặc định gồm host + accepted + pending
+      const enabledList = event.notificationsEnabledUserIds ?? [
+        event.hostId,
+        ...(event.acceptedUserIds || []),
+        ...(event.pendingUserIds || []),
+      ];
+
+      const targetUserIds = Array.from(new Set(enabledList))
+        .filter((uid) => uid && !declinedSet.has(uid));
+
+      if (targetUserIds.length > 0) {
+        // Gửi thông báo CALENDAR_START tới các người dùng đã bật thông báo
+        this.eventEmitter.emit("notification.calendar_start", {
+          userIds: targetUserIds,
+          referenceId: event._id.toString(),
+          metadata: {
+            eventId: event._id.toString(),
+            title: event.title,
+            meetingCode: event.meetingCode,
+            startDate: event.startDate,
+            roomId: event.roomId,
+            channelId: event.channelId,
+            roomType: event.roomType,
+          },
+        });
+      }
     }
 
     // Nếu không phải sự kiện lặp hoặc không có luật RRULE, kết thúc
@@ -1452,6 +1465,70 @@ export class CalendarService {
         err,
       );
     }
+  }
+
+  /**
+   * Bật hoặc tắt thông báo sự kiện cho một người dùng cụ thể
+   */
+  async toggleNotification(
+    userId: string,
+    eventId: string,
+    enabled?: boolean,
+  ) {
+    const event = await this.calendarEventModel.findById(eventId).exec();
+    if (!event) {
+      throw new AppException(ErrorCode.CALENDAR_EVENT_NOT_FOUND);
+    }
+
+    // Nếu trường notificationsEnabledUserIds chưa khởi tạo (sự kiện cũ), mặc định gồm host + accepted + pending
+    const currentList = event.notificationsEnabledUserIds ?? [
+      event.hostId,
+      ...(event.acceptedUserIds || []),
+      ...(event.pendingUserIds || []),
+    ];
+
+    const isCurrentlyEnabled = currentList.includes(userId);
+    const targetEnabled = enabled !== undefined ? enabled : !isCurrentlyEnabled;
+
+    let updatedList: string[];
+    if (targetEnabled) {
+      updatedList = Array.from(new Set([...currentList, userId]));
+    } else {
+      updatedList = currentList.filter((id) => id !== userId);
+    }
+
+    event.notificationsEnabledUserIds = updatedList;
+    await event.save();
+
+    // Lấy thông tin host để trả về đầy đủ format cho FE
+    const hostUser = await this.userModel
+      .findOne({ supabaseId: event.hostId })
+      .select("email displayName avatarUrl")
+      .exec();
+
+    const eventWithHost = {
+      ...event.toObject(),
+      hostEmail: hostUser?.email || "",
+      hostDisplayName:
+        hostUser?.displayName || hostUser?.email?.split("@")[0] || "",
+      hostAvatarUrl: hostUser?.avatarUrl || "",
+    };
+
+    // Bắn socket cập nhật cho user
+    this.appGateway.server
+      .to(`user_${userId}`)
+      .emit("calendar_event_updated", {
+        eventId: event._id.toString(),
+        updateType: "all",
+        event: eventWithHost,
+      });
+
+    return {
+      code: 200,
+      success: true,
+      notificationsEnabled: targetEnabled,
+      event: eventWithHost,
+    };
   }
 }
 

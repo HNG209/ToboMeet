@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Modal,
   View,
@@ -15,10 +15,12 @@ import { useRouter } from "expo-router";
 import {
   useGetCalendarRsvpQuery,
   useLeaveCalendarEventMutation,
+  useToggleCalendarNotificationMutation,
 } from "../../lib/redux/api/calendarApi";
 import { useGetMeQuery } from "../../lib/redux/features/users/usersApi";
 import InviteCalendarModal from "./InviteCalendarModal";
 import DeleteEventConfirmModal from "./DeleteEventConfirmModal";
+import ToggleNotificationConfirmModal from "./ToggleNotificationConfirmModal";
 import { CalendarEvent } from "./types";
 
 interface Props {
@@ -47,9 +49,28 @@ export default function EventDetailModal({
   const { data: currentUser } = useGetMeQuery();
   const [inviteModalVisible, setInviteModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [notificationModalVisible, setNotificationModalVisible] =
+    useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [leaveCalendarEvent, { isLoading: isLeaving }] =
     useLeaveCalendarEventMutation();
+  const [toggleCalendarNotification, { isLoading: isTogglingNotification }] =
+    useToggleCalendarNotificationMutation();
+  const [notificationsEnabledUsers, setNotificationsEnabledUsers] = useState<
+    string[] | undefined
+  >(event?.notificationsEnabledUserIds);
+
+  useEffect(() => {
+    setNotificationsEnabledUsers(event?.notificationsEnabledUserIds);
+  }, [event?.notificationsEnabledUserIds]);
+
+  useEffect(() => {
+    if (!visible) {
+      setInviteModalVisible(false);
+      setDeleteModalVisible(false);
+      setNotificationModalVisible(false);
+    }
+  }, [visible]);
 
   const { data: rsvpData } = useGetCalendarRsvpQuery(event?._id ?? "", {
     skip: !visible || !event?._id || event?.eventType === "assignment",
@@ -390,6 +411,74 @@ export default function EventDetailModal({
     }
   };
 
+  const isNotificationEnabled =
+    notificationsEnabledUsers !== undefined
+      ? Boolean(
+          currentUserId && notificationsEnabledUsers.includes(currentUserId)
+        )
+      : Boolean(
+          isHost ||
+            (activeInvitees &&
+              activeInvitees.some((r: any) => r.userId === currentUserId)) ||
+            (event.acceptedUserIds &&
+              currentUserId &&
+              event.acceptedUserIds.includes(currentUserId)) ||
+            (event.pendingUserIds &&
+              currentUserId &&
+              event.pendingUserIds.includes(currentUserId))
+        );
+
+  const handleConfirmToggleNotification = async () => {
+    if (!event?._id) return;
+    try {
+      const targetState = !isNotificationEnabled;
+      const res = await toggleCalendarNotification({
+        id: event._id,
+        enabled: targetState,
+      }).unwrap();
+
+      if (res?.event?.notificationsEnabledUserIds) {
+        setNotificationsEnabledUsers(res.event.notificationsEnabledUserIds);
+      } else {
+        setNotificationsEnabledUsers((prev) => {
+          const currentArr =
+            prev ??
+            (currentUserId
+              ? [
+                  ...(isHost && event.hostId ? [event.hostId] : []),
+                  ...(event.acceptedUserIds || []),
+                ]
+              : []);
+          return targetState
+            ? Array.from(new Set([...currentArr, currentUserId!]))
+            : currentArr.filter((id) => id !== currentUserId);
+        });
+      }
+
+      Alert.alert(
+        isVi ? "Thành công" : "Success",
+        targetState
+          ? (isVi
+              ? "Đã bật thông báo cho sự kiện này"
+              : "Notifications enabled for this event")
+          : (isVi
+              ? "Đã tắt thông báo cho sự kiện này"
+              : "Notifications disabled for this event")
+      );
+      setNotificationModalVisible(false);
+      onRefresh?.();
+    } catch (err: any) {
+      Alert.alert(
+        isVi ? "Lỗi" : "Error",
+        err?.data?.message ||
+          err?.message ||
+          (isVi
+            ? "Không thể cập nhật thông báo"
+            : "Failed to update notification settings")
+      );
+    }
+  };
+
   return (
     <>
       <Modal
@@ -453,30 +542,40 @@ export default function EventDetailModal({
                 </View>
               )}
 
-              {/* Join & Chat Actions under Title */}
-              {showJoin && (
-                <View className="flex-row gap-3 my-2">
-                  <TouchableOpacity
-                    onPress={() => {
-                      onClose();
-                      onJoin(event.meetingCode!);
-                    }}
-                    className="flex-1 bg-blue-600 py-3 px-4 rounded-xl flex-row items-center justify-center gap-2 active:bg-blue-700"
-                  >
-                    <Feather name="video" size={16} color="#FFFFFF" />
-                    <Text className="text-white font-bold text-sm">
-                      {t("calendar.join", { defaultValue: "Tham gia" })}
-                    </Text>
-                  </TouchableOpacity>
+              {/* Join & Notification Actions under Title */}
+              {(showJoin || hasInvitees || isHost) && (
+                <View className="flex-row items-center gap-3 my-2">
+                  {showJoin ? (
+                    <TouchableOpacity
+                      onPress={() => {
+                        onClose();
+                        onJoin(event.meetingCode!);
+                      }}
+                      className="flex-1 bg-blue-600 py-3 px-4 rounded-xl flex-row items-center justify-center gap-2 active:bg-blue-700 shadow-sm"
+                    >
+                      <Feather name="video" size={16} color="#FFFFFF" />
+                      <Text className="text-white font-bold text-sm">
+                        {t("calendar.join", { defaultValue: "Tham gia" })}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View className="flex-1" />
+                  )}
 
+                  {/* Nút bật/tắt thông báo */}
                   <TouchableOpacity
-                    onPress={() => {}}
-                    className="py-3 px-4 border border-slate-200 rounded-xl flex-row items-center justify-center gap-2 active:bg-slate-50"
+                    onPress={() => setNotificationModalVisible(true)}
+                    className={`py-3 px-3.5 rounded-xl border flex-row items-center justify-center ${
+                      isNotificationEnabled
+                        ? "bg-indigo-50 border-indigo-200"
+                        : "bg-slate-50 border-slate-200"
+                    }`}
                   >
-                    <Feather name="message-square" size={16} color="#475569" />
-                    <Text className="text-slate-700 font-semibold text-sm">
-                      {t("calendar.chat", { defaultValue: "Trò chuyện" })}
-                    </Text>
+                    <Feather
+                      name={isNotificationEnabled ? "bell" : "bell-off"}
+                      size={18}
+                      color={isNotificationEnabled ? "#4F46E5" : "#94A3B8"}
+                    />
                   </TouchableOpacity>
                 </View>
               )}
@@ -740,6 +839,20 @@ export default function EventDetailModal({
           onSuccess={() => {
             onRefresh?.();
           }}
+        />
+      )}
+
+      {/* Notification Toggle Confirm Modal */}
+      {notificationModalVisible && (
+        <ToggleNotificationConfirmModal
+          visible={notificationModalVisible}
+          onClose={() =>
+            !isTogglingNotification && setNotificationModalVisible(false)
+          }
+          onConfirm={handleConfirmToggleNotification}
+          isCurrentlyEnabled={isNotificationEnabled}
+          eventTitle={event.title}
+          isLoading={isTogglingNotification}
         />
       )}
     </>

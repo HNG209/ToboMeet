@@ -1279,6 +1279,17 @@
       "cancel": "Hủy",
       "confirm": "Xác nhận"
     },
+    "notification_modal": {
+      "turn_off_title": "Tắt thông báo lịch họp",
+      "turn_off_subtitle": "Xác nhận tắt thông báo cho sự kiện này",
+      "turn_off_prompt": "Bạn có chắc chắn muốn tắt thông báo cho sự kiện \"{{title}}\"? Bạn sẽ không nhận được chuông hoặc thông báo nhắc nhở khi đến giờ cuộc họp.",
+      "turn_off_confirm": "Tắt thông báo",
+      "turn_on_title": "Bật thông báo lịch họp",
+      "turn_on_subtitle": "Xác nhận bật thông báo cho sự kiện này",
+      "turn_on_prompt": "Bạn có muốn bật lại thông báo cho sự kiện \"{{title}}\"? Hệ thống sẽ tự động gửi thông báo nhắc nhở cho bạn ngay khi sự kiện bắt đầu.",
+      "turn_on_confirm": "Bật thông báo",
+      "cancel": "Hủy"
+    },
     "toasts": {
       "delete_single_success": "Đã hủy sự kiện này thành công!",
       "delete_all_success": "Đã hủy chuỗi sự kiện thành công!",

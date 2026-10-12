@@ -2237,6 +2237,8 @@
       "recurring_badge": "Recurring Event",
       "join": "Join",
       "chat": "Chat",
+      "notification_enabled_tooltip": "Notifications enabled (click to mute)",
+      "notification_disabled_tooltip": "Notifications muted (click to enable)",
       "attachments": "Attachments",
       "cancelled_dates_title": "Cancelled Dates in Series",
       "dates_count": "{count} dates",
@@ -2302,6 +2304,17 @@
       "cancel": "Cancel",
       "confirm": "Confirm"
     },
+    "notification_modal": {
+      "turn_off_title": "Turn Off Event Notifications",
+      "turn_off_subtitle": "Confirm muting reminders for this event",
+      "turn_off_prompt": "Are you sure you want to turn off notifications for \"{title}\"? You will not receive reminders when this event starts.",
+      "turn_off_confirm": "Turn off",
+      "turn_on_title": "Turn On Event Notifications",
+      "turn_on_subtitle": "Confirm enabling reminders for this event",
+      "turn_on_prompt": "Do you want to turn on notifications for \"{title}\"? You will receive a reminder notification as soon as the event starts.",
+      "turn_on_confirm": "Turn on",
+      "cancel": "Cancel"
+    },
     "rich_editor": {
       "delete_image_title": "Delete image",
       "uploading": "Uploading file...",
@@ -2326,7 +2339,10 @@
     "toasts": {
       "delete_single_success": "Successfully cancelled this event!",
       "delete_all_success": "Successfully cancelled event series!",
-      "delete_error": "Failed to delete event. Please try again!"
+      "delete_error": "Failed to delete event. Please try again!",
+      "notification_enabled_success": "Event notifications turned on!",
+      "notification_disabled_success": "Event notifications turned off!",
+      "notification_toggle_error": "Failed to update notification settings. Please try again!"
     }
   }
 }

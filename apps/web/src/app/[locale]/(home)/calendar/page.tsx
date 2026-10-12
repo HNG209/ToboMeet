@@ -320,7 +320,7 @@ function CalendarContent() {
       />
 
       {/* ── Main Calendar Workspace ── */}
-      <div className="flex-1 flex overflow-hidden min-h-0 relative bg-slate-50 p-6">
+      <div className="flex-1 flex overflow-hidden min-h-0 relative bg-white">
         {/* Left Sidebar */}
         {sidebarOpen && (
           <CalendarSidebar
@@ -332,35 +332,39 @@ function CalendarContent() {
         )}
 
         {/* Calendar View Area */}
-        <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <main className="flex-1 flex flex-col overflow-hidden min-w-0 bg-white">
           <div
             ref={calendarGridRef}
-            className="flex-1 overflow-auto px-6 relative"
+            className="flex-1 overflow-hidden relative flex flex-col"
           >
             {view === "agenda" ? (
-              <YearView
-                locale={locale}
-                currentDate={currentDate}
-                events={events}
-                onSelectDate={(cellDate) => {
-                  setCurrentDate(cellDate);
-                  setView("day");
-                }}
-              />
+              <div className="flex-1 overflow-auto p-6 bg-slate-50/50">
+                <YearView
+                  locale={locale}
+                  currentDate={currentDate}
+                  events={events}
+                  onSelectDate={(cellDate) => {
+                    setCurrentDate(cellDate);
+                    setView("day");
+                  }}
+                />
+              </div>
             ) : view === "month" ? (
-              <MonthView
-                locale={locale}
-                currentDate={currentDate}
-                filteredEvents={filteredEvents}
-                onSelectDate={(cellDate) => {
-                  setCurrentDate(cellDate);
-                  setView("day");
-                }}
-                onSelectEvent={(ev) => {
-                  setSelectedEvent(ev);
-                  setShowDetailPopup(true);
-                }}
-              />
+              <div className="flex-1 overflow-hidden h-full flex flex-col">
+                <MonthView
+                  locale={locale}
+                  currentDate={currentDate}
+                  filteredEvents={filteredEvents}
+                  onSelectDate={(cellDate) => {
+                    setCurrentDate(cellDate);
+                    setView("day");
+                  }}
+                  onSelectEvent={(ev) => {
+                    setSelectedEvent(ev);
+                    setShowDetailPopup(true);
+                  }}
+                />
+              </div>
             ) : (
               <TimeGridView
                 locale={locale}

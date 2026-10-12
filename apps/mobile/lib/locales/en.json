@@ -1277,6 +1277,17 @@
       "cancel": "Cancel",
       "confirm": "Confirm"
     },
+    "notification_modal": {
+      "turn_off_title": "Turn Off Meeting Notifications",
+      "turn_off_subtitle": "Confirm disabling notifications for this event",
+      "turn_off_prompt": "Are you sure you want to turn off notifications for event \"{{title}}\"? You will not receive reminders when the meeting starts.",
+      "turn_off_confirm": "Turn Off",
+      "turn_on_title": "Turn On Meeting Notifications",
+      "turn_on_subtitle": "Confirm enabling notifications for this event",
+      "turn_on_prompt": "Do you want to enable notifications for event \"{{title}}\"? You will receive reminder alerts when the event starts.",
+      "turn_on_confirm": "Turn On",
+      "cancel": "Cancel"
+    },
     "toasts": {
       "delete_single_success": "Successfully cancelled this event!",
       "delete_all_success": "Successfully cancelled event series!",

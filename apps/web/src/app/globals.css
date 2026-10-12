@@ -206,10 +206,25 @@ h1, h2, h3 { letter-spacing: -0.035em; }
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar          { width: 6px; }
+::-webkit-scrollbar          { width: 6px; height: 8px; }
 ::-webkit-scrollbar-track    { background: transparent; }
-::-webkit-scrollbar-thumb    { background: var(--color-slate-200); border-radius: 3px; }
+::-webkit-scrollbar-thumb    { background: var(--color-slate-200); border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--color-slate-300); }
+
+.custom-horizontal-scrollbar::-webkit-scrollbar {
+  height: 8px;
+}
+.custom-horizontal-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+.custom-horizontal-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.custom-horizontal-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
 
 /* ─── Misc Utilities ─────────────────────────────────────────────────────────── */
 .border-subtle { border: 1px solid var(--color-slate-200); }
