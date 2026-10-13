@@ -11,6 +11,7 @@ import CreateRoomDialog from "@/components/dashboard/CreateRoomDialog";
 import { useNotificationCacheManager } from "@/hooks/useNotificationCacheManager";
 import { useGetMeQuery } from "@/lib/redux/api/usersApi";
 import StoreProvider from "@/lib/redux/StoreProvider";
+import ToboAgentChat from "@/components/ai-agent/ToboAgentChat";
 
 // Context để các trang con (children) gọi lệnh mở Modal dùng chung
 interface HomeContextType {
@@ -187,6 +188,9 @@ function HomeLayoutInner({
         {showSettingsDialog && (
           <SettingsDialog onClose={() => setShowSettingsDialog(false)} />
         )}
+
+        {/* ── Tobo AI Agent floating chat widget (chỉ hiển thị trong (home)) ── */}
+        <ToboAgentChat />
       </div>
     </HomeContext.Provider>
   );

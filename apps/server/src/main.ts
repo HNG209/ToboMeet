@@ -7,6 +7,7 @@ import * as express from "express";
 import * as path from "path";
 
 async function bootstrap() {
+  console.log("🚀 Starting Nest application bootstrap...");
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
   });

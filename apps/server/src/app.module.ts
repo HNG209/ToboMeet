@@ -16,6 +16,7 @@ import { AssignmentsModule } from "./assignments/assignments.module";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { BullModule } from "@nestjs/bullmq";
 import { SchedulerClientModule } from "./scheduler-client/scheduler-client.module";
+import { AiAgentModule } from "./ai-agent/ai-agent.module";
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { SchedulerClientModule } from "./scheduler-client/scheduler-client.modul
     NewsFeedModule,
     ChannelFilesModule,
     AssignmentsModule,
+    AiAgentModule,
   ],
 })
 export class AppModule { }

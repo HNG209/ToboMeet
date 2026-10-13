@@ -2344,5 +2344,35 @@
       "notification_disabled_success": "Event notifications turned off!",
       "notification_toggle_error": "Failed to update notification settings. Please try again!"
     }
+  },
+  "ai_agent": {
+    "open_assistant": "Open Tobo AI Assistant",
+    "tooltip": "Tobo AI Agent",
+    "drag_hint": "Drag to move • Click to open",
+    "title": "Tobo AI Agent",
+    "badge_beta": "Beta",
+    "subtitle": "Calendar & Meeting Assistant",
+    "clear_history": "Clear conversation",
+    "minimize": "Minimize",
+    "welcome_title": "Hello! How can I help you?",
+    "welcome_desc": "I am ToboMeet's AI Assistant. You can ask me to check your calendar availability or schedule new meetings.",
+    "quick_prompts": "Quick suggestions",
+    "prompt_today_label": "How is my schedule today?",
+    "prompt_today_text": "Do I have any meetings today?",
+    "prompt_free_label": "Am I free at 10 AM tomorrow?",
+    "prompt_free_text": "Am I free at 10:00 AM tomorrow?",
+    "prompt_create_label": "Create meeting at 9 AM tomorrow",
+    "prompt_create_text": "Create a meeting named 'Team Sync' tomorrow at 9:00 AM for 1 hour",
+    "thinking": "Tobo Agent is thinking...",
+    "input_placeholder": "Ask about schedule or create a meeting...",
+    "send": "Send message",
+    "input_hint": "Press Enter to send • Shift+Enter for new line",
+    "tool_created": "Created: \"{title}\"",
+    "tool_create_failed": "Failed to create event",
+    "tool_checking_calendar": "Checking calendar",
+    "tool_searching_calendar": "Searching calendar",
+    "calendar_free": "Calendar is free",
+    "calendar_busy": "{count} events found",
+    "error_connection": "Sorry, failed to connect to Tobo Agent. Please try again later."
   }
 }
