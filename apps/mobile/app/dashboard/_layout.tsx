@@ -1,6 +1,6 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { Feather } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { View } from "react-native";
 import { useGetMeQuery } from "../../lib/redux/features/users/usersApi";
 import { useNotificationCacheManager } from "../../hooks/useNotificationCacheManager";
@@ -54,7 +54,18 @@ export default function DashboardLayout() {
         }}
       />
 
-      {/* Tab 3: Thông báo (MỚI) */}
+      {/* Tab 3: AI Agent */}
+      <Tabs.Screen
+        name="agent"
+        options={{
+          title: t("dashboard.tab_agent"),
+          tabBarIcon: ({ color, size }) => (
+            <MaterialCommunityIcons name="robot" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* Tab 4: Thông báo (MỚI) */}
       <Tabs.Screen
         name="notifications"
         listeners={{

@@ -100,6 +100,7 @@
     "create_team": "Tạo phòng",
     "tab_rooms": "Nhóm",
     "tab_calendar": "Lịch",
+    "tab_agent": "Tobo Agent",
     "tab_notification": "Thông báo",
     "tab_settings": "Cài đặt",
     "room_code_placeholder": "Nhập mã phòng",
@@ -1309,5 +1310,37 @@
         "in_progress": "Đang thực hiện"
       }
     }
+  },
+  "ai_agent": {
+    "open_assistant": "Mở trợ lý Tobo AI",
+    "tooltip": "Tobo AI Agent",
+    "title": "Tobo AI Agent",
+    "badge_beta": "Beta",
+    "subtitle": "Trợ lý lịch & cuộc họp",
+    "clear_history": "Xóa đoạn hội thoại",
+    "clear_history_title": "Xóa lịch sử trò chuyện",
+    "clear_history_confirm": "Bạn có chắc chắn muốn xóa toàn bộ lịch sử trò chuyện với Tobo Agent?",
+    "clear_history_cancel": "Hủy",
+    "clear_history_ok": "Xóa",
+    "welcome_title": "Xin chào! Tôi có thể giúp gì cho bạn?",
+    "welcome_desc": "Tôi là trợ lý AI của ToboMeet. Bạn có thể hỏi xem lịch của mình có đang trống không hoặc nhờ tôi tạo lịch họp mới.",
+    "quick_prompts": "Gợi ý nhanh",
+    "prompt_today_label": "Lịch hôm nay của tôi thế nào?",
+    "prompt_today_text": "Hôm nay tôi có lịch họp gì không?",
+    "prompt_free_label": "Ngày mai tôi có rảnh lúc 10h không?",
+    "prompt_free_text": "Ngày mai lúc 10:00 tôi có rảnh không?",
+    "prompt_create_label": "Tạo lịch họp 9h sáng mai",
+    "prompt_create_text": "Tạo cho tôi một cuộc họp 'Họp công việc' vào lúc 9h sáng mai trong 1 tiếng",
+    "thinking": "Tobo Agent đang xử lý...",
+    "input_placeholder": "Hỏi về lịch hoặc yêu cầu tạo lịch mới...",
+    "send": "Gửi",
+    "tool_created": "Đã tạo: \"{{title}}\"",
+    "tool_create_failed": "Tạo lịch không thành công",
+    "tool_checking_calendar": "Kiểm tra lịch biểu",
+    "tool_searching_calendar": "Tìm kiếm lịch",
+    "calendar_free": "Lịch đang trống",
+    "calendar_busy": "Có {{count}} sự kiện",
+    "error_connection": "Rất tiếc, đã có lỗi kết nối tới Tobo Agent. Vui lòng thử lại sau.",
+    "disclaimer": "Tobo AI có thể có nhầm lẫn. Vui lòng kiểm tra lại thông tin quan trọng."
   }
 }
