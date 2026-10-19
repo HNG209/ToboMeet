@@ -60,5 +60,45 @@ services:
       - ./apps/whiteboard/data:/app/data
     restart: unless-stopped
 
+  # 5. SCHEDULER SERVICE (NestJS cron / BullMQ scheduler)
+  scheduler:
+    build:
+      context: ./apps/scheduler
+      dockerfile: Dockerfile
+    container_name: scheduler-dev
+    ports:
+      - "2909:2909"
+    environment:
+      - PORT=2909
+      - NODE_ENV=production
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - ./apps/scheduler/.env
+    depends_on:
+      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  # 6. LIVEKIT AGENT (Python STT transcription worker)
+  livekit-agent:
+    build:
+      context: ./apps/livekit-agent
+      dockerfile: Dockerfile
+    container_name: livekit-agent-dev
+    environment:
+      - LIVEKIT_URL=ws://livekit:7880
+    env_file:
+      - ./apps/livekit-agent/.env
+    volumes:
+      # Mount thư mục transcripts ra máy thật
+      - ./apps/livekit-agent/transcripts:/app/transcripts
+    depends_on:
+      - livekit
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
 volumes:
   redis_data:
