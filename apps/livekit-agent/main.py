@@ -26,6 +26,8 @@ TRANSCRIPT_DIR.mkdir(exist_ok=True)
 
 server = AgentServer(
     initialize_process_timeout=60.0,
+    load_threshold=float("inf"),
+    num_idle_processes=1,
 )
 
 

@@ -92,6 +92,8 @@ services:
     env_file:
       - ./apps/livekit-agent/.env
     volumes:
+      # Mount file mã nguồn chính để tiện thay đổi mà không cần rebuild
+      - ./apps/livekit-agent/main.py:/app/main.py
       # Mount thư mục transcripts ra máy thật
       - ./apps/livekit-agent/transcripts:/app/transcripts
     depends_on:
