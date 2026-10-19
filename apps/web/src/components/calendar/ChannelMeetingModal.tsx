@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { X, ChevronDown, Search, RefreshCw } from "lucide-react";
-import TeamsRichEditor from "@/components/calendar/TeamsRichEditor";
 
 import { useGetMyRoomsQuery } from "@/lib/redux/api/roomsApi";
 import { useCreateCalendarEventMutation } from "@/lib/redux/api/calendarApi";
@@ -35,8 +34,7 @@ export default function ChannelMeetingModal({
 
   // Form states
   const [cmTitle, setCmTitle] = useState("");
-  const cmDescRef = useRef("");
-  const [cmEditorResetKey, setCmEditorResetKey] = useState(0);
+  const [cmDesc, setCmDesc] = useState("");
   const [cmStartDate, setCmStartDate] = useState("");
   const [cmEndDate, setCmEndDate] = useState("");
   const [cmRecurrence, setCmRecurrence] = useState("NONE");
@@ -60,8 +58,7 @@ export default function ChannelMeetingModal({
 
   const resetChannelMeetingForm = () => {
     setCmTitle("");
-    cmDescRef.current = "";
-    setCmEditorResetKey((prev) => prev + 1);
+    setCmDesc("");
     setCmStartDate("");
     setCmEndDate("");
     setCmRecurrence("NONE");
@@ -145,7 +142,7 @@ export default function ChannelMeetingModal({
     try {
       const payload: any = {
         title: cmTitle,
-        description: cmDescRef.current,
+        description: cmDesc.trim(),
         startDate: cmStartDate,
         endDate: cmEndDate,
         roomType: "channel_meeting",
@@ -527,14 +524,12 @@ export default function ChannelMeetingModal({
               <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2.5">
                 {t("create_modal.description")}
               </label>
-              <TeamsRichEditor
-                value={cmDescRef.current}
-                onChange={(html) => {
-                  cmDescRef.current = html;
-                }}
-                resetKey={cmEditorResetKey}
-                locale={locale}
+              <textarea
+                value={cmDesc}
+                onChange={(e) => setCmDesc(e.target.value)}
                 placeholder={t("create_modal.description_placeholder")}
+                rows={4}
+                className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all resize-none"
               />
             </div>
           </div>

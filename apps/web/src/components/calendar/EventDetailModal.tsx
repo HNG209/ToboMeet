@@ -467,22 +467,17 @@ export default function EventDetailModal({
                     files = JSON.parse(decodeURIComponent(match[1]));
                   } catch (e) { }
                 }
-                const isHtmlEmpty = (htmlStr: string) => {
-                  if (!htmlStr) return true;
-                  const text = htmlStr
-                    .replace(/<[^>]*>/g, "")
-                    .replace(/&nbsp;/g, "")
-                    .trim();
-                  return text === "";
-                };
+                const cleanText = cleanHtml
+                  .replace(/<[^>]*>/g, "")
+                  .replace(/&nbsp;/g, " ")
+                  .trim();
 
                 return (
                   <div className="mt-2 space-y-3">
-                    {!isHtmlEmpty(cleanHtml) && (
-                      <div
-                        className="text-sm bg-slate-50 p-3 rounded-xl border border-slate-100 text-slate-500 rich-text-display prose prose-slate max-w-none"
-                        dangerouslySetInnerHTML={{ __html: cleanHtml }}
-                      />
+                    {cleanText.length > 0 && (
+                      <div className="text-sm bg-slate-50 p-3 rounded-xl border border-slate-100 text-slate-600 whitespace-pre-wrap leading-relaxed">
+                        {cleanText}
+                      </div>
                     )}
                     {files.length > 0 && (
                       <div className="space-y-1">

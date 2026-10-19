@@ -24,6 +24,7 @@ import {
   AssignmentSubmissionDocument,
 } from "../assignments/schemas/submission.schema";
 import { SchedulerClientService } from "../scheduler-client/scheduler-client.service";
+import { VectorDbService } from "../vector-db/vector-db.service";
 
 @Injectable()
 export class CalendarService {
@@ -44,6 +45,7 @@ export class CalendarService {
     private readonly meetingsService: MeetingsService,
     private readonly eventEmitter: EventEmitter2,
     private readonly schedulerClientService: SchedulerClientService,
+    private readonly vectorDbService: VectorDbService,
   ) { }
 
   /**
@@ -172,6 +174,19 @@ export class CalendarService {
         new Set([userId, ...acceptedUserIds, ...inviteeUserIds]),
       ),
     });
+
+    // Đồng bộ vector lên Pinecone
+    try {
+      await this.vectorDbService.upsertEventVector(
+        event._id.toString(),
+        event.title,
+        event.description,
+        userId,
+        event.acceptedUserIds || [],
+      );
+    } catch (err: any) {
+      this.logger.warn(`Failed to upsert event vector: ${err?.message}`);
+    }
 
     // Gửi thông báo lời mời cho những người được mời riêng lẻ (không gửi thông báo riêng cho thành viên kênh nếu là cuộc họp kênh)
     if (!isChannelMeeting && inviteeUserIds.length > 0) {
@@ -596,6 +611,19 @@ export class CalendarService {
         description: data.description || event.description,
       });
 
+      // Upsert vector cho sự kiện tách lẻ
+      this.vectorDbService
+        .upsertEventVector(
+          newEvent._id.toString(),
+          newEvent.title,
+          newEvent.description,
+          newEvent.hostId,
+          newEvent.acceptedUserIds || [],
+        )
+        .catch((err) => {
+          this.logger.warn(`Failed to upsert newEvent vector: ${err?.message}`);
+        });
+
       const hostUser = await this.userModel
         .findOne({ supabaseId: event.hostId })
         .select("email displayName avatarUrl")
@@ -667,6 +695,19 @@ export class CalendarService {
       if (!updatedEvent) {
         throw new AppException(ErrorCode.CALENDAR_EVENT_NOT_FOUND);
       }
+
+      // Cập nhật vector sự kiện lên Pinecone
+      this.vectorDbService
+        .upsertEventVector(
+          updatedEvent._id.toString(),
+          updatedEvent.title,
+          updatedEvent.description,
+          updatedEvent.hostId,
+          updatedEvent.acceptedUserIds || [],
+        )
+        .catch((err) => {
+          this.logger.warn(`Failed to update event vector: ${err?.message}`);
+        });
 
       // Cập nhật lại bài đăng meeting post nếu là cuộc họp kênh
       if (
@@ -825,6 +866,11 @@ export class CalendarService {
       // Hủy toàn bộ chuỗi
       await this.calendarEventModel.findByIdAndDelete(eventId);
 
+      // Xóa vector tương ứng trên Pinecone
+      this.vectorDbService.deleteEventVector(eventId).catch((err) => {
+        this.logger.warn(`Failed to delete event vector: ${err?.message}`);
+      });
+
       // Hủy / xóa job tương ứng trong Scheduler Service
       this.schedulerClientService.cancelJobByEvent(eventId).catch((err) => {
         this.logger.error(
@@ -961,6 +1007,19 @@ export class CalendarService {
       eventId,
       status,
     });
+
+    // Cập nhật lại metadata acceptedUserIds trên Pinecone
+    this.vectorDbService
+      .updateAcceptedUsers(
+        eventId,
+        updatedEvent.hostId,
+        updatedEvent.acceptedUserIds || [],
+      )
+      .catch((err) => {
+        this.logger.warn(
+          `Failed to update accepted users vector on RSVP: ${err?.message}`,
+        );
+      });
 
     // Emit Realtime cho host
     this.appGateway.server
@@ -1251,6 +1310,19 @@ export class CalendarService {
     if (!updatedEvent) {
       throw new AppException(ErrorCode.CALENDAR_EVENT_NOT_FOUND);
     }
+
+    // Cập nhật lại vector metadata khi thành viên rời lịch
+    this.vectorDbService
+      .updateAcceptedUsers(
+        eventId,
+        updatedEvent.hostId,
+        updatedEvent.acceptedUserIds || [],
+      )
+      .catch((err) => {
+        this.logger.warn(
+          `Failed to update accepted users vector on leave: ${err?.message}`,
+        );
+      });
 
     // Phát event để xoá thông báo có referenceId là calendar event này
     this.eventEmitter.emit("notification.calendar_leave", {

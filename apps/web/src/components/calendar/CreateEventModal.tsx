@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useTranslations } from "next-intl";
 import { X, ChevronDown, RefreshCw } from "lucide-react";
-import TeamsRichEditor from "@/components/calendar/TeamsRichEditor";
 import { useGlobalUserSearch } from "@/hooks/useGlobalUserSearch";
 import { CalendarEvent, InviteeItem, formatDateTimeLocal } from "./types";
 
@@ -621,16 +620,12 @@ export default function CreateEventModal({
               <label className="block text-[11px] font-bold text-slate-500 uppercase mb-2.5">
                 {t("create_modal.description")}
               </label>
-              <TeamsRichEditor
-                key={isEditMode ? `edit-${editingEvent?._id}` : `create-${editorResetKey}`}
+              <textarea
                 value={description}
-                onChange={(html) => {
-                  setDescription(html);
-                }}
-                resetKey={editorResetKey}
-                locale={locale}
+                onChange={(e) => setDescription(e.target.value)}
                 placeholder={t("create_modal.description_placeholder")}
-                allowDraft={!isEditMode}
+                rows={4}
+                className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all resize-none"
               />
             </div>
           </div>

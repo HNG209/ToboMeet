@@ -278,7 +278,7 @@ export default function ToboAgentChat() {
     setLoading(true);
 
     try {
-      const historyPayload = messages.slice(-10).map((m) => ({
+      const historyPayload = messages.slice(-20).map((m) => ({
         role: m.role,
         content: m.content,
       }));
@@ -578,6 +578,27 @@ export default function ToboAgentChat() {
                                     title: inv.result?.title || "",
                                   })
                                   : t("tool_create_failed")}
+                              </span>
+                            </div>
+                          );
+                        }
+
+                        if (
+                          inv.toolName === "semanticSearchCalendar" ||
+                          inv.toolName === "searchCalendar"
+                        ) {
+                          const count =
+                            inv.result?.matchCount ?? inv.result?.total ?? 0;
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-1.5 text-[11px] font-medium text-purple-700 bg-purple-50 px-2 py-1 rounded-md border border-purple-200"
+                            >
+                              <Sparkles className="w-3 h-3 text-purple-600 shrink-0" />
+                              <span className="truncate">
+                                {count > 0
+                                  ? `Đã tìm thấy ${count} lịch họp tương đồng`
+                                  : "Không tìm thấy lịch họp phù hợp"}
                               </span>
                             </div>
                           );

@@ -19,6 +19,7 @@ import {
   AssignmentSubmission,
   AssignmentSubmissionSchema,
 } from "../assignments/schemas/submission.schema";
+import { VectorDbModule } from "../vector-db/vector-db.module";
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import {
     CoreModule,
     SupabaseModule,
     MeetingsModule,
+    VectorDbModule,
   ],
   controllers: [CalendarController],
   providers: [CalendarService, CalendarProcessor],

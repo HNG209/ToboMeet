@@ -5,6 +5,14 @@ import { generateText, tool, isStepCount } from "ai";
 import { z } from "zod";
 import { CalendarService } from "../calendar/calendar.service";
 import { ChatAgentDto } from "./dto/chat-agent.dto";
+import { InjectModel } from "@nestjs/mongoose";
+import { Model } from "mongoose";
+import {
+  CalendarEvent,
+  CalendarEventDocument,
+} from "../calendar/schemas/calendar-event.schema";
+import { User, UserDocument } from "../users/schemas/user.schema";
+import { VectorDbService } from "../vector-db/vector-db.service";
 
 /**
  * Chuẩn hóa chuỗi thời gian về định dạng ISO 8601 hợp lệ.
@@ -53,6 +61,11 @@ export class AiAgentService {
   constructor(
     private readonly configService: ConfigService,
     private readonly calendarService: CalendarService,
+    private readonly vectorDbService: VectorDbService,
+    @InjectModel(CalendarEvent.name)
+    private readonly calendarEventModel: Model<CalendarEventDocument>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
   ) {
     const apiKey =
       this.configService.get<string>("GOOGLE_GENERATIVE_AI_API_KEY") ||
@@ -67,8 +80,6 @@ export class AiAgentService {
     const google = createGoogleGenerativeAI({
       apiKey: apiKey || "",
     });
-
-    // Sử dụng model gemini-2.5-flash tốc độ cao và hỗ trợ tool calling xuất sắc
     this.googleModel = google("gemini-2.5-flash");
   }
 
@@ -91,13 +102,42 @@ THÔNG TIN THỜI GIAN HIỆN TẠI CỦA HỆ THỐNG:
 - Mốc thời gian ISO: ${now.toISOString()}
 - Giờ địa phương Việt Nam (Asia/Ho_Chi_Minh, GMT+7): ${nowVnFormatted} (${dayOfWeek})
 
-QUY TẮC QUAN TRỌNG:
-1. LUÔN TRA CỨU BẰNG TOOL: Khi người dùng hỏi xem lịch có rảnh/bận không, hôm nay/ngày mai/tuần này có cuộc họp gì không, BẮT BUỘC gọi tool "checkCalendarAvailability" trước khi trả lời. Tuyệt đối không tự suy diễn lịch của người dùng.
-2. TẠO LỊCH KHI ĐƯỢC YÊU CẦU: Khi người dùng yêu cầu tạo lịch mới hoặc lên lịch họp, hãy chuyển đổi thời gian người dùng nói sang chuẩn ISO 8601 với múi giờ +07:00 (hoặc UTC) và gọi tool "createCalendarEvent".
-   - Nếu người dùng không nêu rõ thời lượng cuộc họp, mặc định là 60 phút (1 tiếng).
-   - Nếu người dùng nói thời gian tương đối như "sáng mai", "15h chiều nay", "thứ Hai tuần tới", hãy căn cứ vào ngày giờ hiện tại (${nowVnFormatted}) để tính chính xác.
-3. XỬ LÝ LỖI KHÉO LÉO: Khi tool trả về thông báo lỗi (ví dụ lịch trong quá khứ, giờ kết thúc trước giờ bắt đầu, hoặc lỗi hệ thống), hãy đọc kỹ lỗi và giải thích một cách lịch sự, dễ hiểu cho người dùng, đồng thời gợi ý họ sửa lại thời gian phù hợp.
-4. ĐỊNH DẠNG TRẢ LỜI: Sử dụng định dạng Markdown rõ ràng, dễ nhìn (in đậm tiêu đề, thời gian, dùng danh sách có gạch đầu dòng nếu có nhiều sự kiện).
+QUY TẮC VÀ NGUYÊN TẮC HOẠT ĐỘNG:
+
+1. PHÂN TÍCH LỊCH SỬ TRÒ CHUYỆN (CHAT HISTORY):
+   - Luôn đọc kỹ toàn bộ đoạn hội thoại trước đó do ứng dụng truyền xuống.
+   - Nếu trong các tin nhắn trước bạn đã đưa ra danh sách các cuộc họp và người dùng phản hồi như: "chọn cái thứ 1", "cuộc họp về UI", "cái đó diễn ra lúc nào", "tham gia cuộc họp đó"... hãy đối chiếu ngay với thông tin đã trao đổi để biết chính xác người dùng đang nói về sự kiện nào.
+   - Tuyệt đối không yêu cầu người dùng lặp lại thông tin họ đã cung cấp trong các lượt chat trước.
+
+2. CƠ CHẾ HỎI LÀM RÕ KHI YÊU CẦU MƠ HỒ (CLARIFICATION):
+   - Khi người dùng đưa ra câu hỏi hoặc yêu cầu quá mơ hồ, ngắn cụn hoặc thiếu thông tin cần thiết:
+     * Ví dụ: "lịch của tôi", "tìm cuộc họp", "xem lại cuộc họp đó", "tôi có lịch gì không" (mà không có ngày giờ cụ thể hay chủ đề trong bối cảnh)...
+     * Trước tiên hãy kiểm tra xem lịch sử trò chuyện có cung cấp manh mối nào không.
+     * Nếu không có bất kỳ ngữ cảnh nào rõ ràng: KHÔNG ĐƯỢC đoán mò hoặc thực hiện hành động sai lệch. Hãy chủ động đặt câu hỏi làm rõ một cách lịch sự, thân thiện và đưa ra 2-3 gợi ý cụ thể để người dùng chọn (ví dụ: "Bạn muốn kiểm tra lịch rảnh/bận trong hôm nay, hay muốn tìm một cuộc họp theo chủ đề cụ thể?").
+
+3. TÌM KIẾM THEO NGỮ NGHĨA (SEMANTIC SEARCH) VÀ HẬU KIỂM TRA BẰNG LLM:
+   - Khi người dùng muốn tìm kiếm cuộc họp theo chủ đề, tiêu đề, hoặc nội dung mô tả (description), BẮT BUỘC gọi tool "semanticSearchCalendar".
+   - BƯỚC HẬU KIỂM TRA BẰNG LLM (BẮT BUỘC):
+     Sau khi tool "semanticSearchCalendar" trả về kết quả (bao gồm top 5 vector tương đồng và toàn bộ metadata chi tiết từ DB: tiêu đề, mô tả đầy đủ, thời gian, người tổ chức, trạng thái quá khứ/tương lai):
+     a) ĐÁNH GIÁ SỰ PHÙ HỢP: Đọc kỹ phần description và title của từng sự kiện để phân tích xem có thực sự đáp ứng đúng nhu cầu của người dùng hay không. Đừng chỉ nhìn vào điểm số similarityScore, hãy dùng tư duy phân tích của bạn để loại bỏ những cuộc họp không liên quan đến ý định người dùng.
+     b) ĐÁNH GIÁ THỜI GIAN: Phân biệt rõ sự kiện đã qua (isPast: true) hay sự kiện sắp tới. Nếu người dùng hỏi về cuộc họp sắp diễn ra, đừng trả lời về cuộc họp đã kết thúc mà không lưu ý cho người dùng.
+     c) QUYẾT ĐỊNH BƯỚC TIẾP THEO:
+        - Nếu có 1 sự kiện khớp chính xác: Trình bày thông tin rõ ràng (tiêu đề, thời gian bắt đầu - kết thúc theo giờ VN, mô tả, người tổ chức, mã phòng) và gợi ý các hành động tiếp theo.
+        - Nếu có nhiều sự kiện tương đồng nhau: Liệt kê ngắn gọn các lựa chọn và hỏi làm rõ để người dùng xác nhận lựa chọn nào là đúng ý họ nhất.
+        - Nếu tất cả sự kiện trả về đều không khớp với ý định: Lịch sự thông báo không tìm thấy cuộc họp phù hợp và gợi ý người dùng cung cấp thêm từ khóa hoặc khoảng thời gian.
+
+4. KIỂM TRA LỊCH RẢNH / BẬN THEO THỜI GIAN:
+   - Khi người dùng hỏi xem lịch có rảnh/bận không, hôm nay/ngày mai/tuần này có cuộc họp gì không theo khung thời gian, BẮT BUỘC gọi tool "checkCalendarAvailability".
+
+5. TẠO LỊCH KHI ĐƯỢC YÊU CẦU:
+   - Khi người dùng yêu cầu tạo lịch mới hoặc lên lịch họp, hãy chuyển đổi thời gian sang ISO 8601 múi giờ +07:00 và gọi tool "createCalendarEvent".
+   - Mặc định thời lượng là 60 phút nếu không nêu rõ. Căn cứ vào thời gian hiện tại (${nowVnFormatted}) để tính các mốc tương đối như "sáng mai", "chiều nay", "thứ Hai tới".
+
+6. XỬ LÝ LỖI KHÉO LÉO:
+   - Khi tool trả về thông báo lỗi, hãy giải thích lịch sự, dễ hiểu cho người dùng và gợi ý cách khắc phục.
+
+7. ĐỊNH DẠNG TRẢ LỜI:
+   - Sử dụng Markdown rõ ràng, dễ nhìn, in đậm tiêu đề và mốc thời gian, dùng danh sách có gạch đầu dòng nếu có nhiều sự kiện.
 `;
 
     // Chuẩn bị lịch sử tin nhắn
@@ -122,7 +162,6 @@ QUY TẮC QUAN TRỌNG:
       content: dto.message,
     });
 
-    // Thiết lập danh sách tools cho Agent (typed Record<string, any> để tối ưu TypeScript compilation)
     const tools: Record<string, any> = {
       checkCalendarAvailability: (tool as any)({
         description:
@@ -141,10 +180,6 @@ QUY TẮC QUAN TRỌNG:
         }),
         execute: async (args: { startDate: string; endDate: string }) => {
           try {
-            this.logger.log(
-              `[Agent checkCalendarAvailability] User: ${userId}, Range: ${args.startDate} -> ${args.endDate}`,
-            );
-
             // Chuẩn hóa thời gian nếu thiếu múi giờ
             const startIso = normalizeToIsoString(args.startDate);
             const endIso = normalizeToIsoString(args.endDate);
@@ -186,10 +221,6 @@ QUY TẮC QUAN TRỌNG:
               message: `Tìm thấy ${trimmedEvents.length} sự kiện/lịch họp trong khoảng thời gian này.`,
             };
           } catch (error: any) {
-            this.logger.error(
-              `[Agent checkCalendarAvailability Error] ${error?.message}`,
-              error?.stack,
-            );
             return {
               success: false,
               error:
@@ -237,10 +268,6 @@ QUY TẮC QUAN TRỌNG:
           inviteeEmails?: string[];
         }) => {
           try {
-            this.logger.log(
-              `[Agent createCalendarEvent] User: ${userId}, Title: "${args.title}", Start: ${args.startDate}, End: ${args.endDate}`,
-            );
-
             // Format lại thời gian nếu sai múi giờ
             const startIso = normalizeToIsoString(args.startDate);
             const endIso = normalizeToIsoString(args.endDate);
@@ -293,10 +320,6 @@ QUY TẮC QUAN TRỌNG:
               )} đến ${formatVnTime(endIso)}.`,
             };
           } catch (error: any) {
-            this.logger.error(
-              `[Agent createCalendarEvent Error] ${error?.message}`,
-              error?.stack,
-            );
             return {
               success: false,
               error:
@@ -307,47 +330,117 @@ QUY TẮC QUAN TRỌNG:
         },
       }),
 
-      searchCalendar: (tool as any)({
-        description: "Tìm kiếm các cuộc họp hoặc sự kiện theo từ khóa/tiêu đề.",
+      semanticSearchCalendar: (tool as any)({
+        description:
+          "Tìm kiếm các cuộc họp hoặc sự kiện theo ngữ nghĩa (semantic search) dựa trên Tiêu đề và Nội dung mô tả (Description) lịch họp. " +
+          "Sử dụng công cụ này khi người dùng tìm kiếm cuộc họp theo chủ đề, từ khóa, nội dung thảo luận, hoặc khi người dùng hỏi về một cuộc họp cụ thể mà không xác định rõ ngày giờ.",
         inputSchema: z.object({
-          keyword: z.string().describe("Từ khóa tìm kiếm tiêu đề cuộc họp"),
+          query: z
+            .string()
+            .describe(
+              "Nội dung cần tìm kiếm (chủ đề, tiêu đề, từ khóa ngữ nghĩa hoặc tóm tắt nội dung cuộc họp)",
+            ),
         }),
-        execute: async (args: { keyword: string }) => {
+        execute: async (args: { query: string }) => {
           try {
-            this.logger.log(
-              `[Agent searchCalendar] User: ${userId}, Keyword: "${args.keyword}"`,
-            );
-
-            const results = await this.calendarService.searchEvents(
+            // Tìm kiếm top 5 vector tương đồng qua VectorDbService (Pinecone)
+            const matches = await this.vectorDbService.semanticSearch(
               userId,
-              args.keyword,
+              args.query,
+              5,
             );
 
-            const trimmed = (results || []).slice(0, 10).map((e: any) => ({
-              id: e._id?.toString(),
-              title: e.title,
-              startDate: formatVnTime(e.startDate),
-              endDate: formatVnTime(e.endDate),
-              description: e.description ? e.description.slice(0, 80) : undefined,
-              roomType: e.roomType,
-            }));
+            if (!matches || matches.length === 0) {
+              return {
+                success: true,
+                matchCount: 0,
+                events: [],
+                message: `Không tìm thấy cuộc họp nào phù hợp với yêu cầu "${args.query}" trong các lịch bạn đã tham gia hoặc tạo.`,
+              };
+            }
+
+            const eventIds = matches.map((m) => m.eventId);
+
+            // Query MongoDB để lấy toàn bộ metadata chi tiết đầy đủ của các lịch
+            const dbEvents = await this.calendarEventModel
+              .find({ _id: { $in: eventIds } })
+              .exec();
+
+            const eventMap = new Map<string, any>();
+            for (const ev of dbEvents) {
+              eventMap.set(ev._id.toString(), ev);
+            }
+
+            // Ghép metadata chi tiết và thông tin host/người tham gia
+            const detailedEvents = await Promise.all(
+              matches.map(async (match) => {
+                const ev = eventMap.get(match.eventId);
+                if (!ev) return null;
+
+                const hostUser = await this.userModel
+                  .findOne({ supabaseId: ev.hostId })
+                  .select("displayName email avatarUrl")
+                  .exec();
+
+                const hostName =
+                  hostUser?.displayName ||
+                  hostUser?.email?.split("@")[0] ||
+                  "Người tổ chức";
+
+                const isPast = new Date(ev.endDate).getTime() < Date.now();
+
+                const cleanDesc = (ev.description || "")
+                  .replace(/<[^>]*>/g, "")
+                  .replace(/&nbsp;/g, " ")
+                  .trim();
+
+                return {
+                  eventId: ev._id.toString(),
+                  title: ev.title,
+                  description: cleanDesc || "(Không có mô tả)",
+                  startDate: formatVnTime(ev.startDate),
+                  endDate: formatVnTime(ev.endDate),
+                  startDateIso: ev.startDate.toISOString(),
+                  endDateIso: ev.endDate.toISOString(),
+                  isPast,
+                  roomType: ev.roomType || "meeting",
+                  meetingCode: ev.meetingCode,
+                  isHost: ev.hostId === userId,
+                  hostName,
+                  hostEmail: hostUser?.email || "",
+                  acceptedUserCount: (ev.acceptedUserIds || []).length + 1,
+                  similarityScore: Math.round(match.score * 100) / 100,
+                };
+              }),
+            );
+
+            const filteredEvents = detailedEvents.filter(Boolean);
 
             return {
               success: true,
-              total: trimmed.length,
-              events: trimmed,
-              message: `Tìm thấy ${trimmed.length} kết quả phù hợp với từ khóa "${args.keyword}".`,
+              query: args.query,
+              matchCount: filteredEvents.length,
+              events: filteredEvents,
+              instructionForLLM:
+                "HẬU KIỂM TRA (POST-CHECK): Đọc kỹ mô tả (description), tiêu đề (title), thời gian và đối chiếu với lịch sử hội thoại của người dùng để quyết định sự kiện nào thực sự phù hợp. Hãy giải thích ngắn gọn lý do chọn hoặc hỏi làm rõ nếu có nhiều cuộc họp có khả năng trùng khớp.",
             };
           } catch (error: any) {
-            this.logger.error(
-              `[Agent searchCalendar Error] ${error?.message}`,
-              error?.stack,
-            );
             return {
               success: false,
-              error: error?.message || "Lỗi khi tìm kiếm sự kiện.",
+              error: error?.message || "Lỗi khi tìm kiếm lịch theo ngữ nghĩa.",
             };
           }
+        },
+      }),
+
+      searchCalendar: (tool as any)({
+        description:
+          "Tìm kiếm các cuộc họp hoặc sự kiện theo ngữ nghĩa dựa trên tiêu đề và mô tả cuộc họp.",
+        inputSchema: z.object({
+          keyword: z.string().describe("Từ khóa hoặc chủ đề cuộc họp cần tìm kiếm"),
+        }),
+        execute: async (args: { keyword: string }) => {
+          return tools.semanticSearchCalendar.execute({ query: args.keyword });
         },
       }),
     };
@@ -386,7 +479,7 @@ QUY TẮC QUAN TRỌNG:
         toolInvocations,
       };
     } catch (error: any) {
-      this.logger.error(`[Agent generateText Error] ${error?.message}`, error?.stack);
+      this.logger.error(`[Agent] ${error?.message}`, error?.stack);
       return {
         reply:
           "Xin lỗi, hiện tại hệ thống AI đang gặp sự cố kết nối tới Google AI Studio. Vui lòng thử lại sau giây lát.",

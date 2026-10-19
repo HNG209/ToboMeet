@@ -183,7 +183,7 @@ export default function AgentScreen() {
     scrollToBottom(true);
 
     try {
-      const historyPayload = messages.slice(-10).map((m) => ({
+      const historyPayload = messages.slice(-20).map((m) => ({
         role: m.role,
         content: m.content,
       }));
@@ -380,6 +380,26 @@ export default function AgentScreen() {
                       defaultValue: `Đã tạo: "${inv.result?.title || ""}"`,
                     })
                     : t("ai_agent.tool_create_failed", "Tạo lịch không thành công")}
+                </Text>
+              </View>
+            );
+          }
+
+          if (
+            inv.toolName === "semanticSearchCalendar" ||
+            inv.toolName === "searchCalendar"
+          ) {
+            const count = inv.result?.matchCount ?? inv.result?.total ?? 0;
+            return (
+              <View
+                key={idx}
+                className="flex-row items-center bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-100"
+              >
+                <Feather name="search" size={13} color="#7C3AED" />
+                <Text className="text-[12px] font-semibold text-purple-700 ml-1.5 flex-1">
+                  {count > 0
+                    ? `Tìm thấy ${count} cuộc họp tương đồng`
+                    : "Không tìm thấy cuộc họp phù hợp"}
                 </Text>
               </View>
             );
