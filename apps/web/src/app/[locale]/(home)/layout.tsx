@@ -98,8 +98,8 @@ function HomeLayoutInner({
 
   return (
     <HomeContext.Provider value={{ setShowJoinDialog, setShowCreateDialog }}>
-      {/* Container chính dạng flex-row để Sidebar full height */}
-      <div className="h-screen bg-[#f5f5f5] font-sans flex overflow-hidden">
+      {/* Container chính dạng flex-row để Sidebar full height và thích ứng dynamic viewport trên mobile browser */}
+      <div className="h-screen h-[100dvh] bg-[#f5f5f5] font-sans flex overflow-hidden">
         {/* ── Left Sidebar (Full Height) ── */}
         <aside className="w-16 md:w-20 h-full bg-[#f8f9fa] border-r border-slate-200 flex flex-col justify-between items-center py-4 shrink-0 z-50 shadow-[2px_0_8px_rgba(0,0,0,0.02)] relative">
           <div className="w-full flex flex-col items-center gap-1.5">

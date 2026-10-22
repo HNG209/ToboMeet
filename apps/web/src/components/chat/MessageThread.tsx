@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   DirectConversationResponse,
   DirectMessageResponse,
@@ -106,15 +106,37 @@ export default function MessageThread({
   const t = useTranslations("direct_chat");
   const [replyTo, setReplyTo] = useState<DirectMessageResponse | null>(null);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [mobileViewportHeight, setMobileViewportHeight] = useState<number | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const bottomAnchorRef = useRef<HTMLDivElement | null>(null);
+  const isNearBottomRef = useRef(true);
+
+  // Deduplicate messages by ID to prevent duplicate React keys if network/socket sends redundant frames
+  const uniqueMessages = useMemo(() => {
+    const seen = new Set<string>();
+    return messages.filter((msg, idx) => {
+      const id = msg.id || (msg as any)._id || `msg_fallback_${idx}`;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [messages]);
 
   // Auto-scroll to bottom on first load and on new message if close to bottom
   const scrollToBottom = useCallback((smooth = true) => {
+    const container = scrollContainerRef.current;
+    if (container) {
+      if (smooth) {
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      } else {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
     if (bottomAnchorRef.current) {
       bottomAnchorRef.current.scrollIntoView({
         behavior: smooth ? "smooth" : "auto",
+        block: "end",
       });
     }
   }, []);
@@ -133,7 +155,7 @@ export default function MessageThread({
         scrollToBottom(true);
       }
     }
-  }, [messages.length, scrollToBottom]);
+  }, [uniqueMessages.length, scrollToBottom]);
 
   // Track scroll position for infinite scroll & floating scroll button
   const handleScroll = () => {
@@ -143,6 +165,7 @@ export default function MessageThread({
     // Check if scrolled up
     const isNearBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+    isNearBottomRef.current = isNearBottom;
     setShowScrollBottom(!isNearBottom);
 
     // Infinite scroll up
@@ -151,6 +174,74 @@ export default function MessageThread({
     }
   };
 
+  // Theo dõi window.visualViewport trên thiết bị di động để tự động co lại vùng chat theo bàn phím
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.visualViewport) return;
+
+    const handleVisualViewportChange = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+
+      // Chỉ kích hoạt xử lý khi ở chế độ mobile (chiều rộng màn hình < 768px)
+      if (window.innerWidth < 768) {
+        // Cố định scroll window ở 0 để ngăn chặn Safari tự ý trượt khung trang
+        if (window.scrollY !== 0) {
+          window.scrollTo(0, 0);
+        }
+
+        setMobileViewportHeight(vv.height);
+
+        // Tự động cuộn thông minh: nếu trước đó người dùng đang ở cuối danh sách, lập tức ghim ở cuối
+        if (isNearBottomRef.current) {
+          const container = scrollContainerRef.current;
+          if (container) {
+            container.scrollTop = container.scrollHeight;
+          }
+          requestAnimationFrame(() => {
+            scrollToBottom(true);
+          });
+        }
+      } else {
+        setMobileViewportHeight(null);
+      }
+    };
+
+    const vv = window.visualViewport;
+    vv.addEventListener("resize", handleVisualViewportChange);
+    vv.addEventListener("scroll", handleVisualViewportChange);
+
+    return () => {
+      vv.removeEventListener("resize", handleVisualViewportChange);
+      vv.removeEventListener("scroll", handleVisualViewportChange);
+    };
+  }, [scrollToBottom]);
+
+  // Khi container thay đổi kích thước (ví dụ khi bàn phím mở làm co chiều cao),
+  // tự động ghim vị trí cuộn ở cuối nếu người dùng đang xem ở cuối để không bao giờ bị miss tin nhắn cuối
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container || typeof ResizeObserver === "undefined") return;
+
+    let previousHeight = container.clientHeight;
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const currentHeight = entry.contentRect.height;
+        // Nếu chiều cao bị co lại (bàn phím mở) và người dùng đang ở cuối
+        if (currentHeight < previousHeight && isNearBottomRef.current) {
+          container.scrollTop = container.scrollHeight;
+          requestAnimationFrame(() => {
+            scrollToBottom(false);
+          });
+        }
+        previousHeight = currentHeight;
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [scrollToBottom]);
+
   const { recipient } = conversation;
   const isOnline = recipient?.status === "ACTIVE";
 
@@ -158,7 +249,17 @@ export default function MessageThread({
   let lastDateStr = "";
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-[#fcfcfc] overflow-hidden relative">
+    <div
+      style={
+        mobileViewportHeight
+          ? {
+              height: `${mobileViewportHeight}px`,
+              maxHeight: `${mobileViewportHeight}px`,
+            }
+          : undefined
+      }
+      className="flex-1 h-full flex flex-col bg-[#fcfcfc] overflow-hidden relative"
+    >
       {/* ── Thread Header ── */}
       <div className="h-16 px-4 bg-white border-b border-slate-200/80 flex items-center justify-between shrink-0 shadow-xs z-10">
         <div className="flex items-center gap-3">
@@ -249,14 +350,14 @@ export default function MessageThread({
             <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
             <span className="text-xs">{t("loading_messages")}</span>
           </div>
-        ) : messages.length === 0 ? (
+        ) : uniqueMessages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center p-6 text-slate-400">
             <p className="text-sm font-medium text-slate-600 mb-1">
               {t("no_messages")}
             </p>
           </div>
         ) : (
-          messages.map((msg) => {
+          uniqueMessages.map((msg, idx) => {
             const dateStr = formatDateSeparator(msg.createdAt, t);
             const showDate = dateStr !== lastDateStr;
             if (showDate) {
@@ -278,8 +379,10 @@ export default function MessageThread({
               isPinned: isMsgPinned,
             };
 
+            const itemKey = msg.id || (msg as any)._id || `msg_${idx}`;
+
             return (
-              <React.Fragment key={msg.id}>
+              <React.Fragment key={itemKey}>
                 {showDate && (
                   <div className="flex items-center justify-center my-3">
                     <span className="px-3 py-1 rounded-full bg-slate-200/70 text-slate-500 text-[11px] font-semibold tracking-wide">
@@ -317,7 +420,7 @@ export default function MessageThread({
           />
         )}
 
-        <div ref={bottomAnchorRef} />
+        <div ref={bottomAnchorRef} className="h-2 shrink-0" />
       </div>
 
       {/* Floating Scroll-to-Bottom Button */}
@@ -333,10 +436,31 @@ export default function MessageThread({
       {/* ── Input Area ── */}
       <MessageInput
         conversationId={conversation.id}
-        onSendMessage={onSendMessage}
+        onSendMessage={async (payload) => {
+          isNearBottomRef.current = true;
+          await onSendMessage(payload);
+          requestAnimationFrame(() => scrollToBottom(true));
+        }}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         onTyping={onTyping}
+        onFocus={() => {
+          if (window.innerWidth < 768) {
+            if (window.scrollY !== 0) {
+              window.scrollTo(0, 0);
+            }
+            if (isNearBottomRef.current) {
+              requestAnimationFrame(() => {
+                if (bottomAnchorRef.current) {
+                  bottomAnchorRef.current.scrollIntoView({
+                    behavior: "smooth",
+                    block: "end",
+                  });
+                }
+              });
+            }
+          }
+        }}
       />
     </div>
   );

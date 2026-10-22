@@ -11,7 +11,6 @@ import {
   Image as ImageIcon,
   Video,
   CornerDownRight,
-  ExternalLink,
   Loader2,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -254,10 +253,6 @@ export default function PinnedMessagesBar({
                       <PinOff className="w-4 h-4" />
                     )}
                   </button>
-
-                  <div className="p-1.5 text-slate-400 group-hover:text-amber-600 transition-colors">
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </div>
                 </div>
               </div>
             );

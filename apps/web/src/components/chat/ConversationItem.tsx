@@ -54,6 +54,23 @@ export default function ConversationItem({
   const timeFormatted = formatRelativeTime(lastMessageAt, t("yesterday"));
   const isOnline = recipient?.status === "ACTIVE";
 
+  const renderPreview = () => {
+    if (
+      !lastMessagePreview ||
+      lastMessagePreview === "Cuộc trò chuyện mới" ||
+      lastMessagePreview === "New conversation"
+    ) {
+      return t("new_conversation");
+    }
+    if (lastMessagePreview === "📷 [Hình ảnh]" || lastMessagePreview === "📷 [Photo]") {
+      return `📷 ${t("photo_snippet")}`;
+    }
+    if (lastMessagePreview === "🎥 [Video]") {
+      return `🎥 ${t("video_snippet")}`;
+    }
+    return lastMessagePreview;
+  };
+
   return (
     <button
       onClick={onClick}
@@ -105,7 +122,7 @@ export default function ConversationItem({
                 : "text-slate-500"
             }`}
           >
-            {lastMessagePreview || t("no_messages")}
+            {renderPreview()}
           </p>
 
           {unreadCount > 0 && (

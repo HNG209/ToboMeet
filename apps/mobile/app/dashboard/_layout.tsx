@@ -30,6 +30,7 @@ export default function DashboardLayout() {
           fontSize: 10,
           fontWeight: "bold",
         },
+        tabBarHideOnKeyboard: true,
       }}
     >
       {/* Tab 1: Nhóm */}
@@ -43,7 +44,18 @@ export default function DashboardLayout() {
         }}
       />
 
-      {/* Tab 2: Lịch */}
+      {/* Tab 2: Trò chuyện */}
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: t("dashboard.tab_chat", "Trò chuyện"),
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="message-square" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* Tab 3: Lịch */}
       <Tabs.Screen
         name="calendar"
         options={{

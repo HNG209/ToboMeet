@@ -118,9 +118,21 @@ export function useChatSocket({
       if (msg.conversationId === conversationIdRef.current) {
         onNewMessageRef.current?.(msg);
       }
-      // Cập nhật danh sách conversation ngoài sidebar
+      // Cập nhật danh sách conversation ngoài sidebar trực tiếp vào cache RTK Query (0 network request)
       dispatchRef.current(
-        directChatApi.util.invalidateTags([{ type: "DirectConversation", id: "LIST" }]),
+        directChatApi.util.updateQueryData("getConversations", undefined, (draft) => {
+          const index = draft.findIndex((c) => c.id === msg.conversationId);
+          if (index !== -1) {
+            draft[index].lastMessagePreview =
+              msg.content || (msg.attachments?.length ? "[Tệp đính kèm]" : "");
+            draft[index].lastMessageAt = msg.createdAt;
+            if (msg.conversationId !== conversationIdRef.current) {
+              draft[index].unreadCount = (draft[index].unreadCount || 0) + 1;
+            }
+            const [conv] = draft.splice(index, 1);
+            draft.unshift(conv);
+          }
+        }),
       );
     };
 
@@ -130,7 +142,18 @@ export function useChatSocket({
     }) => {
       console.log("[ChatSocket] Received chat:conversation_updated:", data);
       dispatchRef.current(
-        directChatApi.util.invalidateTags([{ type: "DirectConversation", id: "LIST" }]),
+        directChatApi.util.updateQueryData("getConversations", undefined, (draft) => {
+          const index = draft.findIndex((c) => c.id === data.conversationId);
+          if (index !== -1) {
+            draft[index].lastMessagePreview = data.previewText;
+            draft[index].lastMessageAt = new Date().toISOString();
+            if (data.conversationId !== conversationIdRef.current) {
+              draft[index].unreadCount = (draft[index].unreadCount || 0) + 1;
+            }
+            const [conv] = draft.splice(index, 1);
+            draft.unshift(conv);
+          }
+        }),
       );
     };
 

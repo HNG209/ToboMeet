@@ -27,6 +27,7 @@ interface MessageInputProps {
   replyTo: DirectMessageResponse | null;
   onCancelReply: () => void;
   onTyping: (isTyping: boolean) => void;
+  onFocus?: () => void;
   disabled?: boolean;
 }
 
@@ -36,6 +37,7 @@ export default function MessageInput({
   replyTo,
   onCancelReply,
   onTyping,
+  onFocus,
   disabled,
 }: MessageInputProps) {
   const t = useTranslations("direct_chat");
@@ -148,24 +150,32 @@ export default function MessageInput({
       type = attachments[0].fileType;
     }
 
+    const currentContent = trimmed;
+    const currentAttachments = [...attachments];
+    const currentReplyToId = replyTo?.id;
+
+    // Reset giao diện NGAY LẬP TỨC (0ms) để người dùng có thể tiếp tục gõ tin khác ngay
+    setContent("");
+    setAttachments([]);
+    onCancelReply();
+    onTyping(false);
+
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.focus();
+    }
+
     try {
       await onSendMessage({
-        content: trimmed,
+        content: currentContent,
         type,
-        attachments,
-        replyToId: replyTo?.id,
+        attachments: currentAttachments,
+        replyToId: currentReplyToId,
       });
-
-      setContent("");
-      setAttachments([]);
-      onCancelReply();
-      onTyping(false);
-
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
-        textareaRef.current.focus();
-      }
     } catch (err: any) {
+      // Khôi phục lại nội dung nếu gửi thất bại
+      setContent(currentContent);
+      setAttachments(currentAttachments);
       const errMsg =
         err?.message ||
         err?.data?.message ||
@@ -297,6 +307,7 @@ export default function MessageInput({
             value={content}
             onChange={handleTextChange}
             onKeyDown={handleKeyDown}
+            onFocus={onFocus}
             disabled={disabled}
             placeholder={t("type_message")}
             className="w-full resize-none py-2 px-3.5 max-h-28 rounded-2xl bg-slate-100/80 border border-transparent focus:border-brand-400 focus:bg-white focus:outline-none text-sm text-slate-800 placeholder-slate-400 transition-all leading-relaxed"

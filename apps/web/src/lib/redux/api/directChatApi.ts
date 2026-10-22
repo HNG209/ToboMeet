@@ -93,10 +93,42 @@ export const directChatApi = baseApi.injectEndpoints({
         method: "POST",
         data,
       }),
-      invalidatesTags: (_result, _error, { conversationId }) => [
-        { type: "DirectConversation", id: "LIST" },
-        { type: "DirectConversation", id: conversationId },
-      ],
+      async onQueryStarted({ conversationId, content, attachments }, { dispatch, queryFulfilled }) {
+        let preview = content || "";
+        if (attachments && attachments.length > 0) {
+          const firstAtt = attachments[0];
+          if (firstAtt.fileType === "image") preview = content ? `📷 ${content}` : "📷 [Hình ảnh]";
+          else if (firstAtt.fileType === "video") preview = content ? `🎥 ${content}` : "🎥 [Video]";
+          else preview = content ? `📎 ${content}` : `📎 [Tệp: ${firstAtt.fileName}]`;
+        }
+
+        const now = new Date().toISOString();
+        const patchList = dispatch(
+          directChatApi.util.updateQueryData("getConversations", undefined, (draft) => {
+            const index = draft.findIndex((c) => c.id === conversationId);
+            if (index !== -1) {
+              draft[index].lastMessagePreview = preview;
+              draft[index].lastMessageAt = now;
+              const [conv] = draft.splice(index, 1);
+              draft.unshift(conv);
+            }
+          }),
+        );
+        const patchSingle = dispatch(
+          directChatApi.util.updateQueryData("getConversationById", conversationId, (draft) => {
+            if (draft) {
+              draft.lastMessagePreview = preview;
+              draft.lastMessageAt = now;
+            }
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchList.undo();
+          patchSingle.undo();
+        }
+      },
     }),
 
     markAsRead: builder.mutation<{ success: boolean }, string>({
@@ -104,10 +136,25 @@ export const directChatApi = baseApi.injectEndpoints({
         url: `/direct-chat/conversations/${conversationId}/read`,
         method: "PUT",
       }),
-      invalidatesTags: (_result, _error, conversationId) => [
-        { type: "DirectConversation", id: "LIST" },
-        { type: "DirectConversation", id: conversationId },
-      ],
+      async onQueryStarted(conversationId, { dispatch, queryFulfilled }) {
+        const patchList = dispatch(
+          directChatApi.util.updateQueryData("getConversations", undefined, (draft) => {
+            const conv = draft.find((c) => c.id === conversationId);
+            if (conv) conv.unreadCount = 0;
+          }),
+        );
+        const patchSingle = dispatch(
+          directChatApi.util.updateQueryData("getConversationById", conversationId, (draft) => {
+            if (draft) draft.unreadCount = 0;
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchList.undo();
+          patchSingle.undo();
+        }
+      },
     }),
 
     reactMessage: builder.mutation<

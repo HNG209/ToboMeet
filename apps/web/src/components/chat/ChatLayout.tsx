@@ -118,19 +118,54 @@ export default function ChatLayout() {
   const handleSocketNewMessage = useCallback(
     (newMsg: DirectMessageResponse) => {
       setLocalMessages((prev) => {
-        // Tránh trùng tin nhắn nếu đã có
-        if (prev.some((m) => m.id === newMsg.id || (m._id && m._id === newMsg._id))) {
+        const realId = newMsg.id || newMsg._id;
+
+        // Nếu là tin nhắn do chính mình gửi, thay thế tin tạm optimistic (nếu có)
+        if (newMsg.senderId === currentUserId) {
+          const alreadyHasReal = prev.some(
+            (m) => (m.id && m.id === realId) || (m._id && m._id === realId),
+          );
+          if (alreadyHasReal) {
+            return prev.filter((m) => !m.id?.startsWith("temp_"));
+          }
+
+          const tempIdx = prev.findIndex(
+            (m) =>
+              m.id?.startsWith("temp_") &&
+              m.conversationId === newMsg.conversationId &&
+              m.content === newMsg.content,
+          );
+
+          if (tempIdx !== -1) {
+            const next = [...prev];
+            next[tempIdx] = newMsg;
+            return next;
+          }
+        }
+
+        // Tránh trùng tin nhắn nếu đã có trong danh sách
+        const alreadyExists = prev.some(
+          (m) =>
+            (m.id && m.id === realId) ||
+            ((m as any)._id && (m as any)._id === realId),
+        );
+        if (alreadyExists) {
           return prev;
         }
+
         return [...prev, newMsg];
       });
 
-      // Tự động đánh dấu đã đọc nếu đang mở đúng conversation này
-      if (selectedConvId && newMsg.conversationId === selectedConvId) {
+      // Chỉ tự động đánh dấu đã đọc nếu là tin nhắn từ người khác gửi đến
+      if (
+        selectedConvId &&
+        newMsg.conversationId === selectedConvId &&
+        newMsg.senderId !== currentUserId
+      ) {
         markAsRead(selectedConvId).catch(() => {});
       }
     },
-    [selectedConvId, markAsRead],
+    [selectedConvId, currentUserId, markAsRead],
   );
 
   const handleSocketReactionUpdated = useCallback(
@@ -254,7 +289,16 @@ export default function ChatLayout() {
       }).unwrap();
 
       if (res && res.messages) {
-        setLocalMessages((prev) => [...res.messages, ...prev]);
+        setLocalMessages((prev) => {
+          const existingIds = new Set(
+            prev.map((m) => m.id || (m as any)._id).filter(Boolean),
+          );
+          const uniqueNewMessages = res.messages.filter(
+            (m: DirectMessageResponse) =>
+              !existingIds.has(m.id || (m as any)._id),
+          );
+          return [...uniqueNewMessages, ...prev];
+        });
         setHasMore(res.hasMore);
       }
     } catch (err) {
@@ -264,7 +308,7 @@ export default function ChatLayout() {
     }
   };
 
-  // Action: Send message
+  // Action: Send message (Optimistic UI - Hiển thị tức thì 0ms)
   const handleSendMessage = async (payload: {
     content?: string;
     type?: "text" | "file" | "video" | "image";
@@ -273,18 +317,84 @@ export default function ChatLayout() {
   }) => {
     if (!selectedConvId) return;
 
-    const res = await sendMessage({
-      conversationId: selectedConvId,
-      ...payload,
-    }).unwrap();
+    // Sinh ID tạm cho tin nhắn optimistic
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-    if (res) {
-      setLocalMessages((prev) => {
-        if (prev.some((m) => m.id === res.id || (m._id && m._id === res._id))) {
-          return prev;
-        }
-        return [...prev, res];
-      });
+    let replyObj: any = null;
+    if (payload.replyToId) {
+      const found = localMessages.find(
+        (m) => m.id === payload.replyToId || (m as any)._id === payload.replyToId,
+      );
+      if (found) {
+        replyObj = {
+          _id: found.id || (found as any)._id,
+          content: found.content,
+          senderId: found.senderId,
+          type: found.type,
+          attachments: found.attachments || [],
+          deletedAt: found.deletedAt,
+        };
+      }
+    }
+
+    const optimisticMsg: DirectMessageResponse = {
+      id: tempId,
+      _id: tempId,
+      conversationId: selectedConvId,
+      senderId: currentUserId || "",
+      sender: currentUser
+        ? {
+            supabaseId: currentUser.supabaseId,
+            displayName: currentUser.displayName,
+            avatarUrl: currentUser.avatarUrl,
+            email: currentUser.email,
+          }
+        : undefined,
+      type: payload.type || "text",
+      content: payload.content || "",
+      attachments: payload.attachments || [],
+      replyToId: replyObj,
+      reactions: [],
+      isPinned: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 1. Render tin nhắn ngay lập tức trên UI (0ms delay)
+    setLocalMessages((prev) => [...prev, optimisticMsg]);
+
+    try {
+      const res = await sendMessage({
+        conversationId: selectedConvId,
+        ...payload,
+      }).unwrap();
+
+      if (res) {
+        const realId = res.id || res._id;
+        setLocalMessages((prev) => {
+          // Nếu socket đã chèn tin thật trước
+          const alreadyHasReal = prev.some(
+            (m) => (m.id && m.id === realId) || (m._id && m._id === realId),
+          );
+
+          if (alreadyHasReal) {
+            return prev.filter((m) => m.id !== tempId);
+          }
+
+          // Thay thế tin tạm bằng dữ liệu thật từ response
+          const hasTemp = prev.some((m) => m.id === tempId);
+          if (hasTemp) {
+            return prev.map((m) => (m.id === tempId ? res : m));
+          }
+
+          return [...prev, res];
+        });
+      }
+    } catch (err) {
+      console.error("[ChatLayout] Send message error:", err);
+      // Xóa tin tạm nếu gửi thất bại
+      setLocalMessages((prev) => prev.filter((m) => m.id !== tempId));
+      throw err;
     }
   };
 

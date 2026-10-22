@@ -262,15 +262,6 @@ export class DirectChatService {
       throw new BadRequestException("Mã cuộc trò chuyện không hợp lệ");
     }
 
-    const conversation = await this.conversationModel.findById(conversationId);
-    if (!conversation) {
-      throw new NotFoundException("Không tìm thấy cuộc trò chuyện");
-    }
-
-    if (!conversation.participantIds.includes(currentUserId)) {
-      throw new ForbiddenException("Bạn không thể gửi tin nhắn vào cuộc trò chuyện này");
-    }
-
     const trimmedContent = dto.content?.trim() || "";
     const hasAttachments = Boolean(dto.attachments && dto.attachments.length > 0);
 
@@ -283,19 +274,40 @@ export class DirectChatService {
       type = dto.attachments![0].fileType || "file";
     }
 
-    let replyToObjectId: Types.ObjectId | null = null;
-    if (dto.replyToId) {
-      if (Types.ObjectId.isValid(dto.replyToId)) {
-        const replyMsg = await this.messageModel.findOne({
-          _id: new Types.ObjectId(dto.replyToId),
-          conversationId: new Types.ObjectId(conversationId),
-        } as any);
-        if (replyMsg) {
-          replyToObjectId = replyMsg._id as Types.ObjectId;
-        }
-      }
+    // 1. Song song hóa: Kiểm tra conversation, lấy thông tin sender và tin nhắn reply (nếu có)
+    const replyPromise =
+      dto.replyToId && Types.ObjectId.isValid(dto.replyToId)
+        ? (this.messageModel
+            .findOne({
+              _id: new Types.ObjectId(dto.replyToId),
+              conversationId: new Types.ObjectId(conversationId),
+            } as any)
+            .lean() as Promise<any>)
+        : Promise.resolve(null);
+
+    const [conversation, sender, replyMsg]: [any, any, any] = await Promise.all([
+      this.conversationModel.findById(conversationId),
+      this.userModel
+        .findOne({ supabaseId: currentUserId })
+        .select("supabaseId displayName avatarUrl email")
+        .lean(),
+      replyPromise,
+    ]);
+
+    if (!conversation) {
+      throw new NotFoundException("Không tìm thấy cuộc trò chuyện");
     }
 
+    if (!conversation.participantIds.includes(currentUserId)) {
+      throw new ForbiddenException("Bạn không thể gửi tin nhắn vào cuộc trò chuyện này");
+    }
+
+    let replyToObjectId: Types.ObjectId | null = null;
+    if (replyMsg?._id) {
+      replyToObjectId = replyMsg._id as Types.ObjectId;
+    }
+
+    // 2. Tạo tin nhắn mới trong Database
     const createdMsg: any = await this.messageModel.create({
       conversationId: new Types.ObjectId(conversationId),
       senderId: currentUserId,
@@ -307,7 +319,7 @@ export class DirectChatService {
       deletedAt: null,
     } as any);
 
-    // Tạo preview tóm tắt cho conversation
+    // 3. Tạo preview tóm tắt cho conversation
     let previewText = trimmedContent;
     if (hasAttachments) {
       const firstAtt = dto.attachments![0];
@@ -322,9 +334,9 @@ export class DirectChatService {
       }
     }
 
-    // Cập nhật conversation & tăng unread count cho người nhận
+    // 4. Cập nhật conversation & tăng unread count cho người nhận trong background (không chặn HTTP)
     const otherParticipantId = conversation.participantIds.find(
-      (id) => id !== currentUserId,
+      (id: string) => id !== currentUserId,
     );
 
     const updateOps: any = {
@@ -338,43 +350,68 @@ export class DirectChatService {
       updateOps.$inc = { [`unreadCounts.${otherParticipantId}`]: 1 };
     }
 
-    await this.conversationModel.findByIdAndUpdate(conversationId, updateOps);
+    this.conversationModel
+      .findByIdAndUpdate(conversationId, updateOps)
+      .catch((err) => {
+        console.error("[DirectChat] Background update conversation error:", err);
+      });
 
-    // Lấy thông tin người gửi để populate
-    const sender = await this.userModel
-      .findOne({ supabaseId: currentUserId })
-      .select("supabaseId displayName avatarUrl email")
-      .lean();
-
-    const populatedMsg: any = await this.messageModel
-      .findById(createdMsg?._id)
-      .populate({
-        path: "replyToId",
-        select: "_id content senderId type attachments deletedAt",
-      })
-      .lean();
-
-    populatedMsg.id = populatedMsg._id.toString();
-    populatedMsg.sender = sender || {
-      supabaseId: currentUserId,
-      displayName: "Người dùng",
-      avatarUrl: null,
+    // 5. Khởi tạo đối tượng populatedMsg trực tiếp từ dữ liệu bộ nhớ (không cần query lại database)
+    const populatedMsg: any = {
+      _id: createdMsg._id,
+      id: createdMsg._id.toString(),
+      conversationId: createdMsg.conversationId.toString(),
+      senderId: currentUserId,
+      type: createdMsg.type,
+      content: createdMsg.content,
+      attachments: createdMsg.attachments || [],
+      reactions: [],
+      replyToId: replyMsg
+        ? {
+            _id: replyMsg._id.toString(),
+            id: replyMsg._id.toString(),
+            content: replyMsg.content,
+            senderId: replyMsg.senderId,
+            type: replyMsg.type,
+            attachments: replyMsg.attachments || [],
+            deletedAt: replyMsg.deletedAt,
+          }
+        : null,
+      sender: sender || {
+        supabaseId: currentUserId,
+        displayName: "Người dùng",
+        avatarUrl: null,
+      },
+      createdAt: createdMsg.createdAt
+        ? createdMsg.createdAt.toISOString()
+        : new Date().toISOString(),
+      updatedAt: createdMsg.updatedAt
+        ? createdMsg.updatedAt.toISOString()
+        : new Date().toISOString(),
     };
 
-    // Emit Socket realtime events
+    // 6. Phát sự kiện Socket realtime ngay lập tức
     try {
       if (this.appGateway?.server) {
-        this.appGateway.server.to(`chat_${conversationId}`).emit("chat:new_message", populatedMsg);
+        this.appGateway.server
+          .to(`chat_${conversationId}`)
+          .emit("chat:new_message", populatedMsg);
         console.log(`[DirectChat] Emitted chat:new_message to chat_${conversationId}`);
         if (otherParticipantId) {
-          this.appGateway.server.to(`user_${otherParticipantId}`).emit("chat:conversation_updated", {
-            conversationId,
-            previewText,
-          });
-          console.log(`[DirectChat] Emitted chat:conversation_updated to user_${otherParticipantId}`);
+          this.appGateway.server
+            .to(`user_${otherParticipantId}`)
+            .emit("chat:conversation_updated", {
+              conversationId,
+              previewText,
+            });
+          console.log(
+            `[DirectChat] Emitted chat:conversation_updated to user_${otherParticipantId}`,
+          );
         }
       } else {
-        console.warn("[DirectChat] appGateway.server is not initialized during sendMessage!");
+        console.warn(
+          "[DirectChat] appGateway.server is not initialized during sendMessage!",
+        );
       }
     } catch (socketErr) {
       console.error("[DirectChat] Socket emit error:", socketErr);

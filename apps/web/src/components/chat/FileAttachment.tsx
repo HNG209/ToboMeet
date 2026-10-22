@@ -143,7 +143,7 @@ export default function FileAttachment({
             <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
               <button
                 onClick={() => setShowLightbox(false)}
-                className="absolute -top-10 right-0 p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors"
+                className="absolute -top-[35px] right-0 p-1.5 rounded-full bg-white/20 hover:bg-white/40 text-white transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -154,10 +154,8 @@ export default function FileAttachment({
                 className="max-h-[85vh] max-w-full rounded-lg object-contain shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
               />
-              <div className="mt-3 flex items-center gap-4 text-white/80 text-xs">
-                <span>{attachment.fileName}</span>
-                <span>•</span>
-                <span>{formatBytes(attachment.fileSize)}</span>
+              <div className="mt-3 flex items-center justify-between w-full text-white/90 text-xs px-1">
+                <span className="truncate max-w-md font-medium text-white">{attachment.fileName}</span>
                 <button
                   onClick={handleDownload}
                   disabled={isDownloading}
@@ -286,8 +284,6 @@ export default function FileAttachment({
                   <span className="font-medium text-sm text-white truncate max-w-md">
                     {attachment.fileName}
                   </span>
-                  <span className="text-white/60">•</span>
-                  <span className="text-white/70">{formatBytes(attachment.fileSize)}</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -312,40 +308,120 @@ export default function FileAttachment({
     );
   }
 
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const isPdf =
+    attachment.fileName?.toLowerCase().endsWith(".pdf") ||
+    attachment.mimeType === "application/pdf";
+
   // 3. Document / other file attachment
   return (
-    <div
-      className={`flex items-center gap-3 p-3 rounded-xl border transition-all mt-1 max-w-sm ${
-        isMe
-          ? "bg-brand-600/10 border-brand-200 text-slate-800"
-          : "bg-white border-slate-200 text-slate-800 shadow-sm"
-      }`}
-    >
-      <div className="p-2.5 rounded-lg bg-slate-100 shrink-0">
-        {getFileIcon(attachment.fileName)}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold truncate text-slate-800" title={attachment.fileName}>
-          {attachment.fileName}
-        </p>
-        <p className="text-[11px] text-slate-400 mt-0.5">
-          {formatBytes(attachment.fileSize)}
-        </p>
-      </div>
-
-      <button
-        onClick={handleDownload}
-        disabled={isDownloading}
-        className="p-2 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors shrink-0 disabled:opacity-60 disabled:cursor-not-allowed"
-        title={t("download")}
+    <>
+      <div
+        onClick={() => {
+          if (isPdf) {
+            setShowPdfModal(true);
+          }
+        }}
+        className={`flex items-center gap-3 p-3 rounded-xl border transition-all mt-1 max-w-sm ${
+          isPdf ? "cursor-pointer hover:border-red-400 hover:shadow-sm" : ""
+        } ${
+          isMe
+            ? "bg-brand-600/10 border-brand-200 text-slate-800"
+            : "bg-white border-slate-200 text-slate-800 shadow-sm"
+        }`}
       >
-        {isDownloading ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <Download className="w-4 h-4" />
-        )}
-      </button>
-    </div>
+        <div className={`p-2.5 rounded-lg shrink-0 ${isPdf ? "bg-red-50" : "bg-slate-100"}`}>
+          {getFileIcon(attachment.fileName)}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-xs font-semibold truncate text-slate-800" title={attachment.fileName}>
+              {attachment.fileName}
+            </p>
+            {isPdf && (
+              <span className="px-1.5 py-0.2 rounded bg-red-100 text-red-600 font-bold text-[9px]">
+                PDF
+              </span>
+            )}
+          </div>
+          <p className="text-[11px] text-slate-400 mt-0.5">
+            {formatBytes(attachment.fileSize)}
+            {isPdf && (
+              <span className="ml-2 text-blue-600 font-medium hover:underline">
+                {t("preview")}
+              </span>
+            )}
+          </p>
+        </div>
+
+        {/* Nút Download riêng biệt */}
+        <button
+          onClick={handleDownload}
+          disabled={isDownloading}
+          className="p-2 rounded-lg text-slate-500 hover:text-brand-600 hover:bg-brand-50 transition-colors shrink-0 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+          title={t("download")}
+        >
+          {isDownloading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-brand-600" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+        </button>
+      </div>
+
+      {/* PDF Modal Viewer for Web */}
+      {isPdf && showPdfModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setShowPdfModal(false)}
+        >
+          <div
+            className="relative w-full max-w-4xl h-[88vh] bg-slate-900 rounded-2xl flex flex-col shadow-2xl overflow-hidden border border-slate-800"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800 text-white">
+              <div className="flex items-center gap-2 min-w-0 pr-3">
+                <FileText className="w-5 h-5 text-red-500 shrink-0" />
+                <span className="font-semibold text-sm truncate" title={attachment.fileName}>
+                  {attachment.fileName}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={handleDownload}
+                  disabled={isDownloading}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition-colors disabled:opacity-60 cursor-pointer shadow-sm"
+                >
+                  {isDownloading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5" />
+                  )}
+                  <span>{t("download")}</span>
+                </button>
+                <button
+                  onClick={() => setShowPdfModal(false)}
+                  className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                  title={t("close") || "Đóng"}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* PDF iframe renderer */}
+            <div className="flex-1 w-full bg-slate-950 relative">
+              <iframe
+                src={attachment.url}
+                className="w-full h-full border-0"
+                title={attachment.fileName}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
