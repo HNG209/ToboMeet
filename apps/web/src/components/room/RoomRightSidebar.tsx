@@ -5,6 +5,7 @@ import { X, Search, MoreVertical } from "lucide-react";
 import { useTranslations } from "next-intl";
 import RoleBadge from "./RoleBadge";
 import MemberActionMenu from "./MemberActionMenu";
+import UserAvatar from "@/components/common/UserAvatar";
 
 interface RoomRightSidebarProps {
   room: any;
@@ -147,19 +148,13 @@ export default function RoomRightSidebar({
                             key={member.userId}
                             className="group relative flex items-center gap-3 hover:bg-slate-50 p-2 rounded-lg transition-colors cursor-pointer"
                           >
-                            {/* Avatar (Giữ nguyên) */}
+                            {/* Avatar */}
                             <div className="relative shrink-0">
-                              {member.avatarUrl ? (
-                                <img
-                                  src={member.avatarUrl}
-                                  alt={member.displayName}
-                                  className="w-8 h-8 rounded-full object-cover border border-slate-200"
-                                />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-brand-50 border border-brand-100 text-brand-600 flex items-center justify-center font-bold text-xs uppercase">
-                                  {member.displayName?.charAt(0) || "?"}
-                                </div>
-                              )}
+                              <UserAvatar
+                                avatarUrl={member.avatarUrl}
+                                displayName={member.displayName}
+                                size="w-8 h-8"
+                              />
                               <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
                             </div>
 

@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useChatManager } from "../../hooks/useChatManager";
 import { useRoomSettings } from "../../hooks/useRoomSettings";
 import { useTranslation } from "react-i18next";
+import MobileAttachmentViewerModal from "../chat/MobileAttachmentViewerModal";
 
 /** Nhóm tin liên tiếp cùng người gửi */
 function groupMessages<
@@ -226,14 +227,13 @@ export default function MobileChatModal({
                             onLongPress={() => setActiveMessage(item)}
                             onPress={() => {
                               if (item.publicUrl) {
-                                if (item.fileType?.startsWith("image/")) {
-                                  setPreviewMedia({
-                                    url: item.publicUrl,
-                                    name: item.fileName || "image",
-                                  });
-                                } else {
-                                  Linking.openURL(item.publicUrl);
-                                }
+                                setPreviewMedia({
+                                  url: item.publicUrl,
+                                  name: item.fileName || (item.fileType?.startsWith("image/") ? "image.jpg" : "file"),
+                                  fileType: item.fileType?.startsWith("image/") ? "image" : "file",
+                                  mimeType: item.fileType,
+                                  fileSize: item.fileSize || 0,
+                                } as any);
                               }
                             }}
                           >
@@ -685,35 +685,26 @@ export default function MobileChatModal({
         </TouchableOpacity>
       </Modal>
 
-      {/* ===== PREVIEW MEDIA ===== */}
-      <Modal visible={!!previewMedia} transparent animationType="fade">
-        <View className="flex-1 bg-black/95 justify-center items-center">
-          <TouchableOpacity
-            className="absolute top-12 right-4 p-3 z-50 bg-[#222] border border-[#333] rounded-full"
-            onPress={() => setPreviewMedia(null)}
-            style={{ marginTop: insets.top }}
-          >
-            <Feather name="x" size={22} color="white" />
-          </TouchableOpacity>
-          {previewMedia && (
-            <Image
-              source={{ uri: previewMedia.url }}
-              className="w-full h-full"
-              resizeMode="contain"
-            />
-          )}
-          <TouchableOpacity
-            className="absolute bottom-14 flex-row items-center bg-[#1c1c1c]/90 px-5 py-3 rounded-full border border-[#333]"
-            onPress={() => previewMedia && Linking.openURL(previewMedia.url)}
-            style={{ marginBottom: insets.bottom }}
-          >
-            <Feather name="external-link" size={16} color="white" />
-            <Text className="text-white ml-2 font-medium text-sm">
-              {t("meeting.chat.open_in_browser")}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      {/* ===== PREVIEW MEDIA IN-APP (IMAGE / PDF / FILES) ===== */}
+      <MobileAttachmentViewerModal
+        visible={Boolean(previewMedia)}
+        attachment={
+          previewMedia
+            ? {
+                url: previewMedia.url,
+                fileName: previewMedia.name,
+                fileType:
+                  (previewMedia as any).fileType ||
+                  (previewMedia.name?.match(/\.(jpg|jpeg|png|webp|gif)$/i)
+                    ? "image"
+                    : "file"),
+                mimeType: (previewMedia as any).mimeType,
+                fileSize: (previewMedia as any).fileSize || 0,
+              }
+            : null
+        }
+        onClose={() => setPreviewMedia(null)}
+      />
     </Modal>
   );
 }

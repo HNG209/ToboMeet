@@ -41,7 +41,7 @@ async function bootstrap() {
   app.enableCors({
     origin: isDev ? true : allowedOrigins,
     methods: "GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS",
-    allowedHeaders: "Content-Type,Authorization,X-Socket-Id",
+    allowedHeaders: "Content-Type,Authorization,X-Socket-Id,x-device-name,x-device-model,x-device-brand,x-device-os,ngrok-skip-browser-warning",
     credentials: true,
   });
   app.useGlobalInterceptors(new TransformInterceptor());

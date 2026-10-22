@@ -1,10 +1,10 @@
-// src/core/core.module.ts
-import { forwardRef, Module } from '@nestjs/common';
+import { forwardRef, Module, Global } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AppGateway } from './gateways/app.gateway';
 import { Notification, NotificationSchema } from '../notifications/schemas/notification.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
 
+@Global()
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: Notification.name, schema: NotificationSchema }]),

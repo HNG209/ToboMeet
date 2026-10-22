@@ -1,7 +1,7 @@
 // ─── [locale] Layout ──────────────────────────────────────────────────────────
 // Root locale layout: thiết lập html lang, font, metadata SEO và NextIntlClientProvider.
 
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { notFound } from 'next/navigation';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getMessages } from 'next-intl/server';
@@ -9,6 +9,15 @@ import { Plus_Jakarta_Sans } from 'next/font/google';
 import { routing } from '@/i18n/routing';
 import { GlobalSocketListeners } from '@/providers/GlobalSocketListeners';
 import '../globals.css';
+
+// ─── Viewport Configuration ───────────────────────────────────────────────────
+// Bật interactiveWidget: 'resizes-content' để trình duyệt mobile tự co giãn nội dung khi mở bàn phím
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  interactiveWidget: 'resizes-content',
+};
 
 // ─── Font ─────────────────────────────────────────────────────────────────────
 const plusJakartaSans = Plus_Jakarta_Sans({

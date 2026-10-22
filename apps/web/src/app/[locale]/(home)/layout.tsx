@@ -3,7 +3,7 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
-import { Video, Settings, Calendar, Bell } from "lucide-react";
+import { Video, Settings, Calendar, Bell, MessageCircle } from "lucide-react";
 import NotificationDrawer from "@/components/notification/NotificationDrawer";
 import JoinDialog from "@/components/dashboard/JoinDialog";
 import SettingsDialog from "@/components/dashboard/SettingsDialog";
@@ -87,12 +87,20 @@ function HomeLayoutInner({
       // Bật active nếu đường dẫn bắt đầu bằng /calendar (hỗ trợ cho cả các route con bên trong calendar nếu có)
       isActive: pathname.startsWith(`/${locale}/calendar`),
     },
+    {
+      id: "chat",
+      icon: MessageCircle,
+      label: t("tab_chat", { defaultValue: "Chat" }),
+      href: `/${locale}/chat`,
+      // Bật active nếu đường dẫn bắt đầu bằng /chat
+      isActive: pathname.startsWith(`/${locale}/chat`),
+    },
   ];
 
   return (
     <HomeContext.Provider value={{ setShowJoinDialog, setShowCreateDialog }}>
-      {/* Container chính dạng flex-row để Sidebar full height */}
-      <div className="h-screen bg-[#f5f5f5] font-sans flex overflow-hidden">
+      {/* Container chính dạng flex-row để Sidebar full height và thích ứng dynamic viewport trên mobile browser */}
+      <div className="h-screen h-[100dvh] bg-[#f5f5f5] font-sans flex overflow-hidden">
         {/* ── Left Sidebar (Full Height) ── */}
         <aside className="w-16 md:w-20 h-full bg-[#f8f9fa] border-r border-slate-200 flex flex-col justify-between items-center py-4 shrink-0 z-50 shadow-[2px_0_8px_rgba(0,0,0,0.02)] relative">
           <div className="w-full flex flex-col items-center gap-1.5">

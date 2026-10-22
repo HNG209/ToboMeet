@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useGetPostReactionsQuery } from "@/lib/redux/api/newsFeedApi";
 import { X, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import UserAvatar from "@/components/common/UserAvatar";
 
 interface ReactionsListModalProps {
   isOpen: boolean;
@@ -130,17 +131,11 @@ export default function ReactionsListModal({ isOpen, onClose, postId }: Reaction
                   >
                     {/* User Info */}
                     <div className="flex items-center gap-3">
-                      {item.user?.avatarUrl ? (
-                        <img
-                          src={item.user.avatarUrl}
-                          alt={item.user.displayName}
-                          className="w-9 h-9 rounded-full object-cover border border-slate-100"
-                        />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-brand-50 border border-brand-100 text-brand-600 flex items-center justify-center font-bold text-sm uppercase">
-                          {item.user?.displayName?.charAt(0) || "?"}
-                        </div>
-                      )}
+                      <UserAvatar
+                        avatarUrl={item.user?.avatarUrl}
+                        displayName={item.user?.displayName}
+                        size="w-9 h-9"
+                      />
 
                       <div className="text-left">
                         <p className="text-sm font-semibold text-slate-800">

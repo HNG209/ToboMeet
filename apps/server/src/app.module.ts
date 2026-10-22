@@ -13,6 +13,7 @@ import { UploadsModule } from "./uploads/uploads.module";
 import { NewsFeedModule } from "./news-feed/news-feed.module";
 import { ChannelFilesModule } from "./channel-files/channel-files.module";
 import { AssignmentsModule } from "./assignments/assignments.module";
+import { DirectChatModule } from "./direct-chat/direct-chat.module";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { BullModule } from "@nestjs/bullmq";
 import { SchedulerClientModule } from "./scheduler-client/scheduler-client.module";
@@ -53,6 +54,7 @@ import { VectorDbModule } from "./vector-db/vector-db.module";
     AssignmentsModule,
     AiAgentModule,
     VectorDbModule,
+    DirectChatModule,
   ],
 })
 export class AppModule { }

@@ -101,4 +101,54 @@ export class AppGateway implements OnGatewayConnection, OnGatewayDisconnect {
       console.error("[Socket] Lỗi khi đánh dấu thông báo đã đọc:", error);
     }
   }
+
+  /**
+   * Client tham gia phòng chat của một cuộc trò chuyện
+   */
+  @SubscribeMessage("chat:join")
+  handleChatJoin(
+    @MessageBody() data: { conversationId: string } | string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const conversationId = typeof data === "string" ? data : data?.conversationId;
+    if (conversationId) {
+      const room = `chat_${conversationId}`;
+      client.join(room);
+      console.log(`[Socket] Client ${client.id} joined chat room ${room}`);
+    }
+  }
+
+  /**
+   * Client rời khỏi phòng chat
+   */
+  @SubscribeMessage("chat:leave")
+  handleChatLeave(
+    @MessageBody() data: { conversationId: string } | string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const conversationId = typeof data === "string" ? data : data?.conversationId;
+    if (conversationId) {
+      const room = `chat_${conversationId}`;
+      client.leave(room);
+      console.log(`[Socket] Client ${client.id} left chat room ${room}`);
+    }
+  }
+
+  /**
+   * Thông báo đang gõ phím trong cuộc trò chuyện
+   */
+  @SubscribeMessage("chat:typing")
+  handleChatTyping(
+    @MessageBody()
+    data: { conversationId: string; userId: string; isTyping: boolean },
+    @ConnectedSocket() client: Socket,
+  ) {
+    if (data?.conversationId) {
+      client.to(`chat_${data.conversationId}`).emit("chat:typing_update", {
+        conversationId: data.conversationId,
+        userId: data.userId,
+        isTyping: data.isTyping,
+      });
+    }
+  }
 }

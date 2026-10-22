@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,10 @@ import MobileToolbar from "../../components/meeting/MobileToolbar";
 import MobileVideoGrid from "../../components/meeting/MobileVideoGrid";
 import MembersModal from "../../components/meeting/MembersModal";
 import MobileChatModal from "../../components/meeting/MobileChatModal";
-import MobileWhiteboardModal from "../../components/meeting/MobileWhiteboardModal";
+// Lazy load để tránh crash native module 'RNCWebViewModule' khi APK chưa có react-native-webview
+const MobileWhiteboardModal = lazy(
+  () => import("../../components/meeting/MobileWhiteboardModal"),
+);
 import MobileLiveCaptionOverlay from "../../components/meeting/MobileLiveCaptionOverlay";
 import { useParticipantManager } from "../../hooks/useParticipantManager";
 import { useTranslation } from "react-i18next";
@@ -359,11 +362,15 @@ export default function MeetingRoomContent({
         onClose={() => setShowChatModal(false)}
       />
 
-      <MobileWhiteboardModal
-        visible={showWhiteboardModal}
-        onClose={() => setShowWhiteboardModal(false)}
-        meetingCode={meetingCode}
-      />
+      {showWhiteboardModal && (
+        <Suspense fallback={null}>
+          <MobileWhiteboardModal
+            visible={showWhiteboardModal}
+            onClose={() => setShowWhiteboardModal(false)}
+            meetingCode={meetingCode}
+          />
+        </Suspense>
+      )}
     </View>
   );
 }
