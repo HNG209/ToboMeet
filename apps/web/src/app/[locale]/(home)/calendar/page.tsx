@@ -18,7 +18,7 @@ import {
   getCacheKey,
   formatDateTimeLocal,
 } from "@/components/calendar/types";
-import CalendarHeader from "@/components/calendar/CalendarHeader";
+import CalendarToolbar from "@/components/calendar/CalendarToolbar";
 import CalendarSidebar from "@/components/calendar/CalendarSidebar";
 import TimeGridView from "@/components/calendar/TimeGridView";
 import MonthView from "@/components/calendar/MonthView";
@@ -295,44 +295,40 @@ function CalendarContent() {
   }
 
   return (
-    <div className="h-screen bg-[#f5f5f5] font-sans flex flex-col overflow-hidden text-slate-800">
-      {/* ── Header ── */}
-      <CalendarHeader
-        locale={locale}
-        sidebarOpen={sidebarOpen}
-        onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-        currentDate={currentDate}
-        onSetCurrentDate={setCurrentDate}
-        view={view}
-        onSetView={setView}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        searchResults={searchResults}
-        searchLoading={searchLoading}
-        onSelectSearchEvent={handleSelectSearchEvent}
-        onOpenCreateEventModal={() => {
-          setEditingEvent(null);
-          setInitialModalStartDate(undefined);
-          setInitialModalEndDate(undefined);
-          setShowCreateModal(true);
-        }}
-        onOpenChannelMeetingModal={() => setShowChannelMeetingModal(true)}
-      />
-
+    <div className="h-full bg-white font-sans flex flex-col overflow-hidden text-slate-800">
       {/* ── Main Calendar Workspace ── */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative bg-white">
-        {/* Left Sidebar */}
+        {/* Left Sidebar (Chứa chữ Lịch và Lịch thu nhỏ) */}
         {sidebarOpen && (
           <CalendarSidebar
             locale={locale}
             currentDate={currentDate}
             onSetCurrentDate={setCurrentDate}
             events={events}
+            onToggleSidebar={() => setSidebarOpen(false)}
           />
         )}
 
-        {/* Calendar View Area */}
+        {/* Calendar View Area with Toolbar positioned directly above the time grid */}
         <main className="flex-1 flex flex-col overflow-hidden min-w-0 bg-white">
+          {/* Toolbar hợp với khung thời gian (Hôm nay, Prev, Next, Tháng Năm, View Switcher, Nút Tạo Lịch) */}
+          <CalendarToolbar
+            locale={locale}
+            sidebarOpen={sidebarOpen}
+            onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+            currentDate={currentDate}
+            onSetCurrentDate={setCurrentDate}
+            view={view}
+            onSetView={setView}
+            onOpenCreateEventModal={() => {
+              setEditingEvent(null);
+              setInitialModalStartDate(undefined);
+              setInitialModalEndDate(undefined);
+              setShowCreateModal(true);
+            }}
+            onOpenChannelMeetingModal={() => setShowChannelMeetingModal(true)}
+          />
+
           <div
             ref={calendarGridRef}
             className="flex-1 overflow-hidden relative flex flex-col"

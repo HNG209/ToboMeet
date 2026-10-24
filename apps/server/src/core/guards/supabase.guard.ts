@@ -16,22 +16,36 @@ export class SupabaseGuard implements CanActivate {
     private readonly supabaseService: SupabaseService,
     @InjectModel(DeviceSession.name)
     private readonly sessionModel: Model<DeviceSessionDocument>,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
+      console.warn(
+        `[SupabaseGuard] ❌ No Bearer token found for ${request.method} ${request.url}`,
+      );
       throw new AppException(ErrorCode.INVALID_TOKEN);
     }
 
+    const startTime = Date.now();
     const {
       data: { user },
       error,
     } = await this.supabaseService.client.auth.getUser(token);
+    const duration = Date.now() - startTime;
 
     if (error || !user) {
+      console.error(
+        `[SupabaseGuard] ❌ auth.getUser failed in ${duration}ms for ${request.method} ${request.url}:`,
+        {
+          message: error?.message,
+          status: (error as any)?.status,
+          name: error?.name,
+          error,
+        },
+      );
       // Bắt mọi lỗi: Token hết hạn, sai chữ ký, user đã bị khóa/xóa...
       throw new AppException(ErrorCode.INVALID_TOKEN);
     }
@@ -40,6 +54,9 @@ export class SupabaseGuard implements CanActivate {
     const isLocked =
       user.banned_until && new Date(user.banned_until) > new Date();
     if (isLocked) {
+      console.warn(
+        `[SupabaseGuard] ❌ Account locked/banned until ${user.banned_until} for user ${user.id} (${user.email})`,
+      );
       throw new AppException(ErrorCode.ACCOUNT_LOCKED);
     }
 
@@ -76,6 +93,9 @@ export class SupabaseGuard implements CanActivate {
             .lean();
 
           if (sessionDoc?.isRevoked) {
+            console.error(
+              `[SupabaseGuard] ❌ Session REVOKED in DB! sessionId=${sessionId}, userId=${user.id}`,
+            );
             throw new AppException(ErrorCode.INVALID_TOKEN);
           }
         }

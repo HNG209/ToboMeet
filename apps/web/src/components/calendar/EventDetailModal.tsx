@@ -133,7 +133,7 @@ export default function EventDetailModal({
     return (
       <div
         onClick={onClose}
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
       >
         <div
           onClick={(e) => e.stopPropagation()}
@@ -370,7 +370,7 @@ export default function EventDetailModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -725,7 +725,7 @@ export default function EventDetailModal({
       {showLeaveConfirm && (
         <div
           onClick={() => !isLeaving && setShowLeaveConfirm(false)}
-          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-60 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[110] flex items-center justify-center p-4 animate-in fade-in duration-150"
         >
           <div
             onClick={(e) => e.stopPropagation()}

@@ -1,18 +1,25 @@
+"use client";
+
+import React from "react";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Bell, Loader2, X } from "lucide-react";
 import NotificationCard from "./NotificationCard";
 import { useTranslations } from "next-intl";
 
+interface NotificationPopoverProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
 export default function NotificationDrawer({
   isOpen,
   onClose,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) {
+}: NotificationPopoverProps) {
   const t = useTranslations("notification");
   const { notifications, isLoading, isFetching, hasNext, loadMore } =
     useNotifications({ limit: 15, markAsRead: !isOpen });
+
+  if (!isOpen) return null;
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
@@ -25,50 +32,53 @@ export default function NotificationDrawer({
 
   return (
     <>
+      {/* Click-away backdrop overlay */}
       <div
-        className={`fixed inset-0 z-40 bg-slate-900/20 backdrop-blur-[2px] transition-all duration-300 ease-in-out ${isOpen ? "opacity-100 visible" : "opacity-0 invisible"
-          }`}
+        className="fixed inset-0 z-[60]"
         onClick={onClose}
       />
 
-      <div
-        className={`fixed top-0 left-16 md:left-20 bottom-0 w-80 sm:w-95 max-w-[calc(100vw-4rem)] md:max-w-[calc(100vw-5rem)] bg-white z-40 shadow-[24px_0_40px_rgba(0,0,0,0.08)] flex flex-col border-r border-slate-100 transition-transform duration-300 ease-in-out ${isOpen ? "translate-x-0" : "translate-x-[-150%]"
-          }`}
-      >
-        <div className="h-16 px-5 flex items-center justify-between border-b border-slate-100 bg-white/80 backdrop-blur-md">
-          <h2 className="text-lg font-bold text-slate-800">
-            {t("drawer.title")}
-          </h2>
+      {/* Floating Popover directly below bell icon */}
+      <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-slate-100 z-[70] animate-in fade-in zoom-in-95 duration-150 text-slate-800 flex flex-col max-h-[500px] overflow-hidden">
+        {/* Popover Header */}
+        <div className="h-12 px-4 flex items-center justify-between border-b border-slate-100 bg-white shrink-0">
+          <div className="flex items-center gap-2">
+            <Bell className="w-4 h-4 text-brand-600" />
+            <span className="text-sm font-bold text-slate-800">
+              {t("drawer.title", { defaultValue: "Thông báo" })}
+            </span>
+          </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-slate-100 text-slate-500 transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
+        {/* Scrollable List */}
         <div
-          className="flex-1 overflow-y-auto custom-scrollbar p-3"
+          className="flex-1 overflow-y-auto custom-scrollbar p-2.5 space-y-2 max-h-[440px]"
           onScroll={handleScroll}
         >
           {isLoading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
-              <p className="text-sm font-medium text-slate-400">
-                {t("drawer.loading")}
+            <div className="flex flex-col items-center justify-center py-16 gap-2.5">
+              <Loader2 className="w-7 h-7 animate-spin text-brand-500" />
+              <p className="text-xs font-medium text-slate-400">
+                {t("drawer.loading", { defaultValue: "Đang tải thông báo..." })}
               </p>
             </div>
           ) : notifications.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 gap-4 opacity-70">
-              <div className="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center">
-                <Bell className="w-8 h-8 text-slate-300" />
+            <div className="flex flex-col items-center justify-center py-16 gap-3 opacity-70">
+              <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center border border-slate-100">
+                <Bell className="w-6 h-6 text-slate-300" />
               </div>
-              <p className="text-sm font-medium text-slate-500">
-                {t("drawer.empty")}
+              <p className="text-xs font-medium text-slate-500">
+                {t("drawer.empty", { defaultValue: "Chưa có thông báo nào" })}
               </p>
             </div>
           ) : (
-            <div className="flex flex-col gap-2">
+            <>
               {notifications.map((notif) => (
                 <NotificationCard
                   key={notif._id}
@@ -78,11 +88,11 @@ export default function NotificationDrawer({
               ))}
 
               {isFetching && !isLoading && (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="w-5 h-5 animate-spin text-brand-500" />
+                <div className="flex justify-center py-3">
+                  <Loader2 className="w-4 h-4 animate-spin text-brand-500" />
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>

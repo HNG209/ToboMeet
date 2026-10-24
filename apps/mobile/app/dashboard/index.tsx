@@ -20,6 +20,7 @@ import JoinRoomModal from "../../components/JoinRoomModal";
 import CreateRoomModal from "../../components/CreateRoomModal";
 import { toast } from "../../lib/toast";
 import RoomCard from "../../components/dashboard/RoomCard";
+import DashboardHeader from "../../components/dashboard/DashboardHeader";
 
 export default function DashboardScreen() {
   const { t } = useTranslation();
@@ -99,46 +100,27 @@ export default function DashboardScreen() {
 
   return (
     <View className="flex-1 bg-slate-50">
-      {/* Header */}
-      <View className="flex-row justify-between items-center px-6 py-4 bg-white border-b border-slate-100">
-        <View className="flex-row items-center gap-3">
-          <View className="w-10 h-10 rounded-full bg-blue-100 justify-center items-center overflow-hidden">
-            {profile?.avatarUrl ? (
-              <Image
-                source={{ uri: profile.avatarUrl }}
-                className="w-full h-full"
-              />
-            ) : (
-              <Text className="font-bold text-blue-600 text-lg">
-                {(profile?.displayName || user?.email || "U")
-                  .charAt(0)
-                  .toUpperCase()}
-              </Text>
-            )}
-          </View>
-          <View>
-            <Text className="text-xs text-slate-400 font-semibold">
-              {t("dashboard.title")}
-            </Text>
-            <Text className="text-sm font-bold text-slate-800 truncate max-w-[150px]">
-              {profile?.displayName || user?.email?.split("@")[0]}
-            </Text>
-          </View>
-        </View>
-
-        {/* Nút bật/tắt tìm kiếm ở góc phải */}
-        <TouchableOpacity
-          onPress={() => {
-            setIsSearching(!isSearching);
-            if (isSearching) {
-              setSearchQuery("");
-            }
-          }}
-          className="p-2"
-        >
-          <Feather name="search" size={20} color="#94A3B8" />
-        </TouchableOpacity>
-      </View>
+      {/* Header đồng bộ (Teams style) */}
+      <DashboardHeader
+        title={t("dashboard.tab_rooms", "Nhóm")}
+        rightAction={
+          <TouchableOpacity
+            onPress={() => {
+              setIsSearching(!isSearching);
+              if (isSearching) {
+                setSearchQuery("");
+              }
+            }}
+            className="p-2"
+          >
+            <Feather
+              name="search"
+              size={20}
+              color={isSearching ? "#0052FF" : "#64748B"}
+            />
+          </TouchableOpacity>
+        }
+      />
 
       {/* Main Content Area */}
       <View className="flex-1">

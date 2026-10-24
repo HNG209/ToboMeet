@@ -19,6 +19,7 @@ import MobileUserAvatar from "../../components/chat/MobileUserAvatar";
 import { useGlobalUserSearch } from "../../hooks/useGlobalUserSearch";
 import { useTranslation } from "react-i18next";
 import { DirectConversationResponse } from "../../types/chat";
+import DashboardHeader from "../../components/dashboard/DashboardHeader";
 
 export default function ChatScreen() {
   const { t } = useTranslation();
@@ -103,11 +104,11 @@ export default function ChatScreen() {
 
   return (
     <View className="flex-1 bg-white">
-      {/* Header — Tiêu đề & Ô tìm kiếm */}
-      <View className="px-4 pt-4 pb-3 border-b border-slate-100 bg-white">
-        <Text className="text-2xl font-bold text-slate-800 mb-3">
-          {t("chat.title", "Trò chuyện")}
-        </Text>
+      {/* Header đồng bộ (Teams style) */}
+      <DashboardHeader title={t("dashboard.tab_chat", "Trò chuyện")} />
+
+      {/* Ô tìm kiếm người dùng */}
+      <View className="px-4 py-2.5 border-b border-slate-100 bg-white">
 
         {/* Ô tìm kiếm: Dùng style tĩnh, không thay đổi elevation khi focus để tránh mất focus trên Android */}
         <View

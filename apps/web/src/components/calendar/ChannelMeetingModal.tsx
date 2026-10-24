@@ -176,7 +176,7 @@ export default function ChannelMeetingModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -414,7 +414,7 @@ export default function ChannelMeetingModal({
               </div>
 
               {roomDropdownOpen && (
-                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-64 overflow-y-auto py-2">
+                <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-[110] max-h-64 overflow-y-auto py-2">
                   {isLoadingRooms ? (
                     <div className="p-3 text-center text-xs text-slate-400 flex items-center justify-center gap-1">
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />

@@ -207,7 +207,7 @@ export default function CreateEventModal({
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -423,7 +423,7 @@ export default function CreateEventModal({
 
                 {/* Autocomplete Dropdown List */}
                 {memberSearchQuery.trim().length > 0 && (
-                  <div className="absolute left-0 right-0 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg z-50 max-h-56 overflow-y-auto divide-y divide-slate-50">
+                  <div className="absolute left-0 right-0 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg z-[110] max-h-56 overflow-y-auto divide-y divide-slate-50">
                     {isSearchingMembers ? (
                       <div className="px-4 py-3 text-xs text-slate-400 flex items-center justify-center gap-2">
                         <RefreshCw className="w-3.5 h-3.5 animate-spin text-brand-500" />

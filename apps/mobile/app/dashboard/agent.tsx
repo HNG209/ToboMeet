@@ -19,6 +19,7 @@ import { useDispatch } from "react-redux";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { axiosInstance } from "../../lib/axios";
 import { calendarApi } from "../../lib/redux/api/calendarApi";
+import DashboardHeader from "../../components/dashboard/DashboardHeader";
 
 interface ToolInvocation {
   toolName: string;
@@ -499,35 +500,28 @@ export default function AgentScreen() {
 
   return (
     <View className="flex-1 bg-[#F8FAFC]">
-      {/* ── Header ── */}
-      <View className="pt-3.5 pb-3 px-5 bg-white border-b border-slate-100 flex-row items-center justify-between">
-        <View className="flex-row items-center">
-          <View className="w-9 h-9 rounded-xl bg-indigo-600 items-center justify-center mr-3 shadow-xs">
-            <MaterialCommunityIcons name="robot" size={20} color="#ffffff" />
-          </View>
-          <View>
-            <View className="flex-row items-center">
-              <Text className="text-base font-bold text-slate-800">
-                {t("ai_agent.title", "Tobo AI Agent")}
-              </Text>
-            </View>
-            <Text className="text-[11px] text-slate-400">
-              {t("ai_agent.subtitle", "Trợ lý lịch & cuộc họp")}
-            </Text>
-          </View>
-        </View>
-
-        {/* Nút xóa lịch sử */}
-        {messages.length > 0 && (
-          <TouchableOpacity
-            onPress={handleClearHistory}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            className="w-8 h-8 rounded-full bg-slate-50 items-center justify-center border border-slate-200"
-          >
-            <Feather name="rotate-ccw" size={15} color="#64748B" />
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* ── Header đồng bộ (Teams style) ── */}
+      <DashboardHeader
+        title={t("dashboard.tab_agent", "Agent")}
+        rightAction={
+          messages.length > 0 ? (
+            <TouchableOpacity
+              onPress={handleClearHistory}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={{
+                width: 32,
+                height: 32,
+                borderRadius: 16,
+                backgroundColor: "#F1F5F9",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Feather name="rotate-ccw" size={15} color="#64748B" />
+            </TouchableOpacity>
+          ) : undefined
+        }
+      />
 
       {/* ── Danh sách tin nhắn ── */}
       <FlatList

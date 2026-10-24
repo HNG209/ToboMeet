@@ -30,9 +30,12 @@ import ConversationDetailsDrawer from "./ConversationDetailsDrawer";
 import MessageReactionsModal from "./MessageReactionsModal";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 
 export default function ChatLayout() {
   const t = useTranslations("direct_chat");
+  const searchParams = useSearchParams();
+  const convIdFromUrl = searchParams.get("convId");
   const dispatch = useDispatch();
   const { data: currentUser } = useGetMeQuery();
   const currentUserId = currentUser?.supabaseId;
@@ -42,7 +45,13 @@ export default function ChatLayout() {
     isLoading: isLoadingConversations,
   } = useGetConversationsQuery();
 
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(convIdFromUrl);
+
+  useEffect(() => {
+    if (convIdFromUrl) {
+      setSelectedConvId(convIdFromUrl);
+    }
+  }, [convIdFromUrl]);
   const [showDetails, setShowDetails] = useState(false);
   const [localMessages, setLocalMessages] = useState<DirectMessageResponse[]>([]);
   const [localPinnedMessages, setLocalPinnedMessages] = useState<PinnedMessageDetail[]>([]);

@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
+import DashboardHeader from "../dashboard/DashboardHeader";
 
 interface CalendarHeaderProps {
   searchActive: boolean;
@@ -44,8 +45,8 @@ export default function CalendarHeader({
   return (
     <>
       {/* Top Header / Search Header */}
-      <View className="px-5 py-3.5 border-b border-slate-200 bg-white flex-row items-center justify-between">
-        {searchActive ? (
+      {searchActive ? (
+        <View className="px-5 py-3.5 border-b border-slate-200 bg-white flex-row items-center justify-between">
           <View className="flex-row items-center flex-1 gap-3">
             <TouchableOpacity
               onPress={() => {
@@ -76,20 +77,20 @@ export default function CalendarHeader({
               </TouchableOpacity>
             )}
           </View>
-        ) : (
-          <>
-            <Text className="text-xl font-bold text-slate-900">
-              {t("calendar.title", { defaultValue: "Lịch" })}
-            </Text>
+        </View>
+      ) : (
+        <DashboardHeader
+          title={t("dashboard.tab_calendar", "Lịch")}
+          rightAction={
             <TouchableOpacity
               onPress={() => setSearchActive(true)}
               className="w-9 h-9 rounded-full bg-slate-100 justify-center items-center active:bg-slate-200"
             >
               <Feather name="search" size={18} color="#475569" />
             </TouchableOpacity>
-          </>
-        )}
-      </View>
+          }
+        />
+      )}
 
       {/* Toolbar: Navigation title & View mode switcher */}
       {!searchActive && (

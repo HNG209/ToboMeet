@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { CalendarEvent } from "./types";
 
 interface CalendarSidebarProps {
@@ -9,6 +9,7 @@ interface CalendarSidebarProps {
   currentDate: Date;
   onSetCurrentDate: (date: Date) => void;
   events: CalendarEvent[];
+  onToggleSidebar?: () => void;
 }
 
 export default function CalendarSidebar({
@@ -16,6 +17,7 @@ export default function CalendarSidebar({
   currentDate,
   onSetCurrentDate,
   events,
+  onToggleSidebar,
 }: CalendarSidebarProps) {
   const t = useTranslations("calendar");
   const shortDays = (t.raw("days.short") as string[]) || ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -35,9 +37,21 @@ export default function CalendarSidebar({
   }
 
   return (
-    <aside className="w-64 bg-white border-r border-slate-200 p-5 flex flex-col gap-6 flex-shrink-0 animate-in slide-in-from-left duration-200">
+    <aside className="w-64 bg-white border-r border-slate-200 p-4 flex flex-col gap-4 flex-shrink-0 animate-in slide-in-from-left duration-200 select-none">
+      {/* Header bên thanh trái: Bê chữ Lịch xuống cạnh tab chứa lịch thu nhỏ */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shadow-xs">
+            <CalendarIcon className="w-4 h-4" />
+          </div>
+          <span className="text-base font-bold text-slate-800 tracking-tight">
+            {t("title", { defaultValue: "Lịch" })}
+          </span>
+        </div>
+      </div>
+
       {/* Mini Calendar */}
-      <div className="border border-slate-100 rounded-xl p-3 bg-slate-50/50">
+      <div className="border border-slate-200/80 rounded-2xl p-3 bg-slate-50/60 shadow-xs">
         <div className="flex items-center justify-between mb-3.5">
           <span className="text-xs font-bold text-slate-800">
             {currentDate

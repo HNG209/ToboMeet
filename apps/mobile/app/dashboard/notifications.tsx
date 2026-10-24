@@ -15,6 +15,7 @@ import { useNotifications } from "../../hooks/useNotifications";
 import { useLazyExchangeSessionQuery } from "../../lib/redux/features/meetings/meetingsApi";
 import { useUpdateCalendarRsvpMutation } from "../../lib/redux/api/calendarApi";
 import { NotificationResponse } from "@tobomeet/shared/types";
+import DashboardHeader from "../../components/dashboard/DashboardHeader";
 
 // Hàm xử lý thời gian linh hoạt
 const formatTimeAgo = (dateString: string, t: any, i18n: any) => {
@@ -68,11 +69,8 @@ export default function NotificationsScreen() {
 
   return (
     <View className="flex-1 bg-[#f5f5f5]">
-      <View className="pt-4 pb-4 px-5 bg-white border-b border-slate-100 flex-row items-center">
-        <Text className="text-xl font-bold text-slate-800">
-          {t("notification.screen.title")}
-        </Text>
-      </View>
+      {/* Header đồng bộ (Teams style) */}
+      <DashboardHeader title={t("dashboard.tab_notification", "Thông báo")} />
 
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
