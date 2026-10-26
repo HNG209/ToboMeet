@@ -15,13 +15,6 @@ export class Channel {
   @Prop({ type: [ChannelMemberSchema] })
   members?: ChannelMember[];
 
-  /**
-   * Danh sách userId đã rời khỏi kênh công khai (public channel).
-   * Kênh riêng tư (private) dùng hard-delete trên members[].
-   */
-  @Prop({ type: [String], default: [] })
-  leftMemberIds?: string[];
-
   @Prop({ default: () => new Date() })
   createdAt: Date;
 }

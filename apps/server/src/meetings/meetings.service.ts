@@ -116,7 +116,7 @@ export class MeetingsService {
       }
     }
 
-    // Chặn user đang join ở thiết bị khác (trừ khi forceSwitch)
+    // Chặn user đang join ở thiết bị khác (trừ khi forceSwitch) và kiểm tra phòng họp đã đầy
     if (livekitRoom && this.livekitRoomService) {
       try {
         const participants = await this.livekitRoomService.listParticipants(meeting.meetingCode);
@@ -124,6 +124,18 @@ export class MeetingsService {
 
         if (isAlreadyInThisRoom && !forceSwitch) {
           throw new AppException(ErrorCode.ALREADY_IN_MEETING);
+        }
+
+        // Lọc người tham gia thực tế (loại trừ STT agent bot)
+        const humanParticipants = participants.filter(
+          (p) =>
+            !p.identity?.includes(this.STT_AGENT_NAME) &&
+            !p.name?.includes(this.STT_AGENT_NAME),
+        );
+
+        // Giới hạn tối đa 100 người trong 1 meeting, nếu lớn hơn thì báo lỗi đã đầy
+        if (!isAlreadyInThisRoom && humanParticipants.length >= 100) {
+          throw new AppException(ErrorCode.MEETING_FULL);
         }
       } catch (error) {
         if (error instanceof AppException) throw error;
@@ -729,60 +741,6 @@ export class MeetingsService {
       );
     } catch (error) {
       throw new AppException(ErrorCode.APPROVAL_PERMISSION_UPDATE_FAILED);
-    }
-  }
-
-
-
-  /**
-   * Kiểm tra xem thiết bị hiện tại có đang nằm trong cuộc họp của kênh này không.
-   */
-  async getDeviceStatus(
-    meetingCode: string,
-    userId: string,
-    deviceId: string,
-  ): Promise<MeetingDeviceStatus> {
-    const meeting = await this.meetingModel
-      .findOne({
-        meetingCode
-      })
-      .exec();
-
-    if (!meeting || !this.livekitRoomService) {
-      return { isJoinedOnThisDevice: false, meetingCode: null };
-    }
-
-    try {
-      // Hỏi trực tiếp LiveKit xem có ai đang trong phòng không
-      const participants = await this.livekitRoomService.listParticipants(
-        meeting.meetingCode,
-      );
-
-      // Tìm xem user này có đang kết nối không
-      const userParticipant = participants.find((p) => p.identity === userId);
-
-      if (userParticipant && userParticipant.metadata) {
-        try {
-          // Giải mã metadata để lấy deviceId
-          const meta = JSON.parse(userParticipant.metadata);
-
-          if (meta.deviceId === deviceId) {
-            return {
-              isJoinedOnThisDevice: true,
-              meetingCode: meeting.meetingCode,
-            };
-          }
-        } catch (parseError) {
-          console.error("Lỗi parse metadata từ LiveKit:", parseError);
-        }
-      }
-
-      // Có người trong phòng nhưng không phải là thiết bị này
-      return { isJoinedOnThisDevice: false, meetingCode: meeting.meetingCode };
-    } catch (error) {
-      console.log(error);
-      // Khi không có ai trong phòng, LiveKit SFU tự động dọn dẹp (xóa) phòng.
-      return { isJoinedOnThisDevice: false, meetingCode: meeting.meetingCode };
     }
   }
 

@@ -99,6 +99,31 @@ export const ErrorCode: Record<string, ErrorDetail> = {
     message: "Phòng họp đã đạt số lượng tối đa",
     statusCode: 400,
   },
+  MEETING_FULL: {
+    code: 40020,
+    message: "Cuộc họp đã đầy người tham gia (tối đa 100 người)",
+    statusCode: 400,
+  },
+  MAX_ROOMS_REACHED: {
+    code: 40021,
+    message: "Bạn chỉ được phép tham gia và tạo tối đa 100 phòng họp",
+    statusCode: 400,
+  },
+  MAX_CHANNELS_REACHED: {
+    code: 40022,
+    message: "Phòng chỉ có thể có tối đa 50 kênh",
+    statusCode: 400,
+  },
+  MAX_PRIVATE_CHANNEL_MEMBERS_REACHED: {
+    code: 40023,
+    message: "Kênh riêng tư chỉ có thể có tối đa 100 người",
+    statusCode: 400,
+  },
+  MAX_ROOM_MEMBERS_REACHED: {
+    code: 40024,
+    message: "Phòng đã đạt số lượng tối đa (500 người)",
+    statusCode: 400,
+  },
   // Lỗi hệ thống (50x), không public lỗi chi tiết cho người dùng
   SERVER_ERROR: {
     code: 5011,
@@ -353,7 +378,7 @@ export interface RoomResponse {
 
 export interface RoomMemberResponse {
   userId: string;
-  role: "owner" | "admin" | "member" | string;
+  role: "owner" | "admin" | "member";
   displayRole?: string;
   status?: "active" | "removed" | "left";
   joinedAt: string;
@@ -363,6 +388,7 @@ export interface RoomMemberResponse {
   displayName?: string;
   avatarUrl?: string;
   email?: string;
+  supabaseId?: string;
 }
 
 export interface ChannelMemberResponse {

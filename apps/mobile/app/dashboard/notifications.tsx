@@ -136,7 +136,9 @@ function NotificationCard({
     switch (type) {
       case "KICKED":
         return {
-          title: t("notification.types.kicked.title"),
+          title: t("notification.types.kicked.title", {
+            roomName: metadata?.roomName || "",
+          }),
           content: t("notification.types.kicked.content", {
             roomName: metadata?.roomName || "",
           }),
@@ -328,9 +330,11 @@ function NotificationCard({
 
         <View className="flex-1 pt-0.5">
           <Text className="text-[14px] font-bold text-slate-800">{title}</Text>
-          <Text className="text-[12px] text-slate-600 mt-1 leading-5">
-            {content}
-          </Text>
+          {content ? (
+            <Text className="text-[12px] text-slate-600 mt-1 leading-5">
+              {content}
+            </Text>
+          ) : null}
           <Text className="text-[10px] text-slate-400 font-medium mt-2">
             {formatTimeAgo(
               (notification.createdAt || notification.updatedAt).toString(),

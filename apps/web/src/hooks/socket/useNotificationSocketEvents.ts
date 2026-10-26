@@ -53,7 +53,7 @@ export function useNotificationSocketEvents() {
               if (roomId) removeRoomFromMyList(roomId); // dọn cache rtk query
 
               toast.info(t("toast.system_notification"), {
-                description: t("types.kicked.content", {
+                description: t("types.kicked.title", {
                   roomName: notif.metadata?.roomName || "",
                 }),
                 duration: 8000,

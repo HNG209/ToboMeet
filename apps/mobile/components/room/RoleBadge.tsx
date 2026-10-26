@@ -13,9 +13,8 @@ interface RoleBadgeProps {
 
 export default function RoleBadge({ role, displayRole, t }: RoleBadgeProps) {
   const normalizedRole = React.useMemo(() => {
-    if (["owner", "teacher", "leader"].includes(role)) return "owner";
-    if (["vice", "vice_leader", "assistant", "admin"].includes(role))
-      return "admin";
+    if (role === "owner") return "owner";
+    if (role === "admin") return "admin";
     return "member";
   }, [role]);
 

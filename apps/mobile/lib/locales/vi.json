@@ -734,8 +734,8 @@
     },
     "types": {
       "kicked": {
-        "title": "Bị xóa khỏi nhóm",
-        "content": "Bạn đã bị xoá khỏi nhóm {{roomName}}."
+        "title": "Bạn đã bị xoá khỏi nhóm {{roomName}}.",
+        "content": ""
       },
       "room_disbanded": {
         "title": "Nhóm đã giải tán",

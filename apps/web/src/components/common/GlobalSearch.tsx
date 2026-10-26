@@ -38,18 +38,20 @@ export default function GlobalSearch() {
   const [roomsPage, setRoomsPage] = useState(1);
   const [calendarPage, setCalendarPage] = useState(1);
   const [usersCursor, setUsersCursor] = useState<string | undefined>(undefined);
-  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([]);
+  const [mergedUsers, setMergedUsers] = useState<any[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const trimmedQuery = query.trim().toLowerCase();
 
   // Reset pagination when query changes
   useEffect(() => {
     setRoomsPage(1);
     setCalendarPage(1);
     setUsersCursor(undefined);
-    setCursorHistory([]);
-  }, [query]);
+    setMergedUsers([]);
+  }, [trimmedQuery]);
 
   // Click outside to close
   useEffect(() => {
@@ -78,8 +80,6 @@ export default function GlobalSearch() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const trimmedQuery = query.trim().toLowerCase();
-
   // 1. Fetch & Filter Rooms
   const { data: allRooms = [], isLoading: isLoadingRooms } = useGetMyRoomsQuery();
   const matchingRooms: any[] = useMemo(() => {
@@ -107,15 +107,33 @@ export default function GlobalSearch() {
     return [];
   }, [searchEventsData, trimmedQuery]);
 
-  // 3. Fetch Users
+  // 3. Fetch Users & Accumulate
   const { data: usersData, isFetching: isSearchingUsers } = useSearchUsersQuery(
     { q: trimmedQuery, cursor: usersCursor, limit: 10 },
     { skip: !trimmedQuery }
   );
-  const matchingUsers: any[] = useMemo(() => {
-    if (!trimmedQuery || !usersData?.items) return [];
-    return Array.isArray(usersData.items) ? usersData.items : [];
-  }, [usersData, trimmedQuery]);
+
+  // Merge users when new data arrives
+  useEffect(() => {
+    if (!trimmedQuery) {
+      setMergedUsers([]);
+      return;
+    }
+    const incomingItems = usersData?.items;
+    if (Array.isArray(incomingItems)) {
+      if (!usersCursor) {
+        setMergedUsers(incomingItems);
+      } else {
+        setMergedUsers((prev) => {
+          const existingIds = new Set(prev.map((u: any) => u._id));
+          const newItems = incomingItems.filter((u: any) => !existingIds.has(u._id));
+          return [...prev, ...newItems];
+        });
+      }
+    }
+  }, [usersData, usersCursor, trimmedQuery]);
+
+  const matchingUsers = mergedUsers;
 
   const [createOrGetConversation] = useCreateOrGetConversationMutation();
 
@@ -135,21 +153,6 @@ export default function GlobalSearch() {
   const totalCalendarPages = Math.ceil(matchingEvents.length / PAGE_SIZE) || 1;
 
   const hasResults = matchingRooms.length > 0 || matchingEvents.length > 0 || matchingUsers.length > 0;
-
-  const handleUsersNextPage = () => {
-    if (usersData?.hasNext && usersData?.nextCursor) {
-      setCursorHistory((prev) => [...prev, usersCursor]);
-      setUsersCursor(usersData.nextCursor);
-    }
-  };
-
-  const handleUsersPrevPage = () => {
-    if (cursorHistory.length > 0) {
-      const prevCursor = cursorHistory[cursorHistory.length - 1];
-      setCursorHistory((prev) => prev.slice(0, -1));
-      setUsersCursor(prevCursor);
-    }
-  };
 
   // Navigation handlers
   const handleOpenRoom = (room: any) => {
@@ -534,10 +537,10 @@ export default function GlobalSearch() {
               </div>
             )}
 
-            {/* --- TAB USERS (Phân trang riêng) --- */}
+            {/* --- TAB USERS (Tải thêm và merge) --- */}
             {activeTab === "users" && (
               <div className="flex flex-col h-full">
-                {isSearchingUsers ? (
+                {isSearchingUsers && matchingUsers.length === 0 ? (
                   <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-emerald-500" /></div>
                 ) : matchingUsers.length === 0 ? (
                   <p className="py-8 text-center text-xs text-slate-400">Không tìm thấy người dùng</p>
@@ -570,27 +573,27 @@ export default function GlobalSearch() {
                   </div>
                 )}
 
-                {/* Pagination Controls */}
-                {(cursorHistory.length > 0 || usersData?.hasNext) && (
-                  <div className="flex items-center justify-end pt-3 mt-3 border-t border-slate-100 text-xs text-slate-500">
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={handleUsersPrevPage}
-                        disabled={cursorHistory.length === 0}
-                        className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-40"
-                        title="Trang trước"
-                      >
-                        <ChevronLeft className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={handleUsersNextPage}
-                        disabled={!usersData?.hasNext}
-                        className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-40"
-                        title="Trang sau"
-                      >
-                        <ChevronRight className="w-4 h-4" />
-                      </button>
-                    </div>
+                {/* Nút tải thêm */}
+                {usersData?.hasNext && (
+                  <div className="pt-3 mt-3 border-t border-slate-100 flex justify-center">
+                    <button
+                      onClick={() => {
+                        if (usersData?.nextCursor) {
+                          setUsersCursor(usersData.nextCursor);
+                        }
+                      }}
+                      disabled={isSearchingUsers}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 px-4 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 rounded-xl border border-slate-200 transition-all disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSearchingUsers ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-slate-500" />
+                          <span>Đang tải thêm...</span>
+                        </>
+                      ) : (
+                        <span>Tải thêm người dùng</span>
+                      )}
+                    </button>
                   </div>
                 )}
               </div>

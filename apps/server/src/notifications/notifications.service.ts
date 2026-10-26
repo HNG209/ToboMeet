@@ -106,20 +106,47 @@ export class NotificationsService {
     metadata: Record<string, unknown>;
   }) {
     try {
-      const newNotif = await this.notificationModel.create({
-        userId: payload.userId,
-        type: "KICKED",
-        metadata: payload.metadata,
-        isRead: false,
-        isNotified: false,
-        canPopup: true,
-      });
+      const roomId = payload.metadata?.roomId as string | undefined;
+
+      // Tìm thông báo KICKED cũ của cùng roomId để tái sử dụng
+      let notif = roomId
+        ? await this.notificationModel.findOne({
+            userId: payload.userId,
+            type: "KICKED",
+            $or: [{ referenceId: roomId }, { "metadata.roomId": roomId }],
+          })
+        : null;
+
+      if (notif) {
+        // Tái sử dụng lại nếu cùng 1 roomId, cập nhật lại thông tin phòng và thời gian
+        notif.referenceId = roomId;
+        notif.metadata = {
+          ...notif.metadata,
+          ...payload.metadata,
+        };
+        notif.isRead = false;
+        notif.isNotified = false;
+        notif.canPopup = true;
+        notif.createdAt = new Date();
+        notif.markModified("metadata");
+        await notif.save();
+      } else {
+        notif = await this.notificationModel.create({
+          userId: payload.userId,
+          type: "KICKED",
+          referenceId: roomId,
+          metadata: payload.metadata,
+          isRead: false,
+          isNotified: false,
+          canPopup: true,
+        });
+      }
 
       this.toggleUnreadStatus(payload.userId, true);
 
       this.appGateway.server
         .to(`user_${payload.userId}`)
-        .emit("receive_notifications", [newNotif]);
+        .emit("receive_notifications", [notif]);
     } catch (error) {
       console.error(error);
     }

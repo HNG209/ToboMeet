@@ -76,7 +76,7 @@ export class ChannelFilesService {
     const roomMember = room.members?.find(
       (m) =>
         m.userId === userId &&
-        m.status !== "remove" &&
+        m.status !== "removed" &&
         m.status !== "left",
     );
 
@@ -108,14 +108,6 @@ export class ChannelFilesService {
       }
     }
 
-    // Check if left public channel
-    if (!channel.isPrivate && channel.leftMemberIds?.includes(userId)) {
-      throw new ForbiddenException({
-        success: false,
-        message: "Bạn đã rời khỏi kênh này.",
-      });
-    }
-
     return room;
   }
 
@@ -129,7 +121,7 @@ export class ChannelFilesService {
     const member = room.members?.find(
       (m) =>
         m.userId === userId &&
-        m.status !== "remove" &&
+        m.status !== "removed" &&
         m.status !== "left",
     );
 

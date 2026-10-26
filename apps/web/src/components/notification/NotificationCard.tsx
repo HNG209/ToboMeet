@@ -76,7 +76,9 @@ export default function NotificationCard({
     switch (type) {
       case "KICKED":
         return {
-          title: t("types.kicked.title"),
+          title: t("types.kicked.title", {
+            roomName: metadata?.roomName || "",
+          }),
           content: t("types.kicked.content", {
             roomName: metadata?.roomName || "",
           }),
@@ -252,9 +254,11 @@ export default function NotificationCard({
           <h4 className="text-[13px] font-bold text-slate-800 leading-tight">
             {title}
           </h4>
-          <p className="text-[12px] text-slate-600 mt-1 leading-snug">
-            {content}
-          </p>
+          {content ? (
+            <p className="text-[12px] text-slate-600 mt-1 leading-snug">
+              {content}
+            </p>
+          ) : null}
           <p className="text-[10px] text-slate-400 font-medium mt-2 flex items-center gap-1">
             {formatTimeAgo(notification.createdAt.toString())}
           </p>

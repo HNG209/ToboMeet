@@ -732,8 +732,8 @@
     },
     "types": {
       "kicked": {
-        "title": "Removed from room",
-        "content": "You have been removed from {{roomName}}."
+        "title": "You have been removed from {{roomName}}.",
+        "content": ""
       },
       "room_disbanded": {
         "title": "Room disbanded",

@@ -47,9 +47,13 @@ export default function JoinScreen() {
     try {
       const room = await joinRoom({ code: code.trim() }).unwrap();
       router.replace(`/room/${room._id}`);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Không thể tham gia phòng. Vui lòng thử lại!");
+      toast.error(
+        err?.data?.message ||
+          err?.message ||
+          "Không thể tham gia phòng. Vui lòng thử lại!",
+      );
     }
   };
 

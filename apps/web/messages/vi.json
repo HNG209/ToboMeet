@@ -2008,8 +2008,8 @@
     },
     "types": {
       "kicked": {
-        "title": "Bị xóa khỏi nhóm",
-        "content": "Bạn đã bị xoá khỏi nhóm {roomName}."
+        "title": "Bạn đã bị xoá khỏi nhóm {roomName}.",
+        "content": ""
       },
       "room_disbanded": {
         "title": "Nhóm đã giải tán",
@@ -2081,6 +2081,11 @@
     "errors": {
       "4001": "Email này đã được sử dụng",
       "4002": "Phòng họp đã đạt số lượng tối đa",
+      "40020": "Cuộc họp đã đầy người tham gia (tối đa 100 người)",
+      "40021": "Bạn chỉ được phép tham gia và tạo tối đa 100 phòng họp",
+      "40022": "Phòng chỉ có thể có tối đa 50 kênh",
+      "40023": "Kênh riêng tư chỉ có thể có tối đa 100 người",
+      "40024": "Phòng đã đạt số lượng tối đa (500 người)",
       "4003": "Cuộc họp hiện không diễn ra",
       "4004": "Không thể truy cập thông tin cuộc họp",
       "4005": "Bạn phải đang tham gia cuộc họp mới có thể gửi lời mời",

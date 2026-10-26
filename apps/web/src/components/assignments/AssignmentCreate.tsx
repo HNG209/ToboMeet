@@ -145,10 +145,9 @@ export default function AssignmentCreate({
           }
         });
       } else {
-        // Kênh công khai: roomMembers trừ những ai đã rời kênh
-        const leftIds = new Set<string>(selectedChannel.leftMemberIds || []);
+        // Kênh công khai: tất cả roomMembers (trừ chính mình)
         roomMembers.forEach((m: any) => {
-          if (!leftIds.has(m.userId) && m.userId !== userId) {
+          if (m.userId !== userId) {
             memberMap.set(m.userId, m);
           }
         });

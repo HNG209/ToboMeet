@@ -62,7 +62,7 @@ export class AssignmentsService {
   /**
    * Kiểm tra user có quyền truy cập vào bất kỳ kênh nào trong danh sách channelIds của bài tập hay không.
    * - Owner phòng: luôn hợp lệ
-   * - Với mỗi kênh: nếu private -> check channel.members; nếu public -> check không nằm trong leftMemberIds
+   * - Với mỗi kênh: nếu private -> check channel.members; nếu public -> ai trong phòng cũng truy cập được
    */
   private isUserInAnyChannel(room: RoomDocument, channelIds: string[], userId: string): boolean {
     if (room.ownerId === userId) return true;
@@ -75,7 +75,7 @@ export class AssignmentsService {
       if (channel.isPrivate) {
         return channel.members?.some((m: ChannelMember) => m.userId === userId) ?? false;
       } else {
-        return !(channel.leftMemberIds?.includes(userId) ?? false);
+        return true;
       }
     });
   }
@@ -98,9 +98,8 @@ export class AssignmentsService {
       if (channel.isPrivate) {
         (channel.members || []).forEach((m: ChannelMember) => memberSet.add(m.userId));
       } else {
-        const leftIds = new Set<string>(channel.leftMemberIds || []);
         (room.members || [])
-          .filter((m: RoomMember) => m.status === "active" && !leftIds.has(m.userId))
+          .filter((m: RoomMember) => m.status === "active")
           .forEach((m: RoomMember) => memberSet.add(m.userId));
       }
     }

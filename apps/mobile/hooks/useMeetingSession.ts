@@ -246,7 +246,8 @@ export function useMeetingSession() {
 
         setStatus("JOINED");
       } catch (error: any) {
-        if (error?.code === 4013) {
+        const errorCode = error?.code || error?.data?.code;
+        if (errorCode === 4013) {
           Alert.alert(
             "Đang trong cuộc họp",
             "Bạn đang ở trong phòng này trên một thiết bị khác. Bạn có muốn chuyển sang điện thoại này không?",
@@ -261,7 +262,13 @@ export function useMeetingSession() {
               },
             ],
           );
-        } else if (error?.code === 4014) {
+        } else if (errorCode === 40020) {
+          toast.error(
+            error?.data?.message ||
+              error?.message ||
+              "Cuộc họp đã đầy người tham gia (tối đa 100 người).",
+          );
+        } else if (errorCode === 4014) {
           toast.error("Cuộc họp chưa bắt đầu hoặc đã kết thúc");
           await handleSmartRedirect();
         } else {

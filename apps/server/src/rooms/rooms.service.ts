@@ -26,15 +26,6 @@ import { normalizeRole } from "./helpers/room-role.helper";
 import { mapToRoomResponse } from "./helpers/room.helper";
 import { MeetingsService } from "../meetings/meetings.service";
 
-/*
-  Covention (tuân thủ tuyệt đối, không được cãi, nếu có làm khác thì cảnh báo ngay lập tức):
-  1) Các service nào không trả về dữ liệu thì không return {message: ""} hoặc tương tự
-  2) Tất cả các service nào trả về dữ liệu là object thì định nghĩa type riêng
-  3) Nếu có các Promise có thể chạy song song thì dùng Promise.all hay 3 cái còn lại tuỳ trường hợp để tối ưu hiệu năng
-  4) Chỉ có 3 role duy nhất là owner, admin, member
-  5) Nếu có user thì chỉ dùng nguồn id duy nhất từ supabaseId (token), cấm dùng _id của mongo (bỏ fallback)
-  6) Không xoá mềm ở cấp độ kênh, chỉ xoá mềm ở cấp độ phòng
-*/
 @Injectable()
 export class RoomsService {
   constructor(
@@ -46,12 +37,29 @@ export class RoomsService {
     @InjectModel(RoomActivity.name)
     private activityModel: Model<RoomActivityDocument>,
     private readonly roomsGateway: RoomsGateway,
-  ) {}
+  ) { }
 
   /**
    * Tạo phòng mới — auto-gen code, thêm owner vào members, tạo channel "General"
    */
   async createRoom(userId: string, dto: CreateRoomDto): Promise<RoomResponse> {
+    const currentRoomCount = await this.roomModel.countDocuments({
+      members: {
+        $elemMatch: {
+          userId: userId,
+          status: { $nin: ["removed", "left"] },
+        },
+      },
+      isDeleted: { $ne: true },
+      status: { $nin: ["disbanded", "blocked"] },
+    });
+
+    if (currentRoomCount >= 100) {
+      throw new BadRequestException(
+        "Bạn chỉ được phép tham gia và tạo tối đa 100 phòng họp",
+      );
+    }
+
     const code = this.generateRoomCode();
 
     const room = await this.roomModel.create({
@@ -118,7 +126,7 @@ export class RoomsService {
     // Xác thực người chuyển quyền (phải là Owner)
     const operatorMember = room.members.find(
       (m) =>
-        m.userId === operatorId && m.status !== "remove" && m.status !== "left",
+        m.userId === operatorId && m.status !== "removed" && m.status !== "left",
     );
     if (!operatorMember)
       throw new ForbiddenException(
@@ -132,7 +140,7 @@ export class RoomsService {
     // Xác thực người nhận quyền (phải đang là thành viên)
     const newOwnerIdx = room.members.findIndex(
       (m) =>
-        m.userId === newOwnerId && m.status !== "remove" && m.status !== "left",
+        m.userId === newOwnerId && m.status !== "removed" && m.status !== "left",
     );
     if (newOwnerIdx === -1) {
       throw new NotFoundException(
@@ -258,35 +266,47 @@ export class RoomsService {
     });
     if (!room) throw new NotFoundException("Không tìm thấy phòng với mã này");
 
-    // Ràng buộc 1: Giới hạn 100 thành viên
-    if (room.members.length >= 100) {
-      throw new BadRequestException("Phòng đã đạt số lượng tối đa (100 người)");
+    // Ràng buộc 1: Giới hạn tối đa 500 thành viên trong phòng (kênh công khai kế thừa từ giới hạn này)
+    const activeMembersCount = room.members.filter(
+      (member) =>
+        member.status !== "removed" &&
+        member.status !== "left",
+    ).length;
+    if (activeMembersCount >= 500) {
+      throw new BadRequestException("Phòng đã đạt số lượng tối đa (500 người)");
     }
 
-    const requesterDoc = await this.userModel
-      .findOne({ supabaseId: userId })
-      .exec();
-
-    const allowedRequesterIds = new Set<string>([userId]);
-    if (requesterDoc?.supabaseId)
-      allowedRequesterIds.add(requesterDoc.supabaseId);
-    if (requesterDoc?._id) allowedRequesterIds.add(requesterDoc._id.toString());
-    const resolvedUserId = requesterDoc?.supabaseId || userId;
+    // Ràng buộc: Người dùng chỉ được tham gia và tạo tối đa 100 phòng họp
+    const userRoomCount = await this.roomModel.countDocuments({
+      members: {
+        $elemMatch: {
+          userId: userId,
+          status: { $nin: ["removed", "left"] },
+        },
+      },
+      isDeleted: { $ne: true },
+      status: { $nin: ["disbanded", "blocked"] },
+    });
+    if (userRoomCount >= 100) {
+      throw new BadRequestException(
+        "Bạn chỉ được phép tham gia và tạo tối đa 100 phòng họp",
+      );
+    }
 
     // Ràng buộc 2: Kiểm tra trùng lặp
     const isAlreadyMember = room.members.some(
       (member) =>
-        allowedRequesterIds.has(member.userId) &&
-        member.status !== "remove" &&
+        member.userId === userId &&
+        member.status !== "removed" &&
         member.status !== "left",
     );
     if (isAlreadyMember) {
       throw new BadRequestException("Bạn đã là thành viên của phòng này");
     }
 
-    // Nếu từng bị xóa bởi chủ phòng (status === "remove"), không cho tự tham gia lại
+    // Nếu từng bị xóa bởi chủ phòng (status === "removed"), không cho tự tham gia lại
     const removedMember = room.members.find(
-      (m) => allowedRequesterIds.has(m.userId) && m.status === "remove",
+      (m) => m.userId === userId && m.status === "removed",
     );
     if (removedMember) {
       throw new ForbiddenException(
@@ -296,8 +316,7 @@ export class RoomsService {
 
     // Kiểm tra xem trước đó từng là thành viên và đã rời phòng (left)
     const previousMemberIndex = room.members.findIndex(
-      (member) =>
-        allowedRequesterIds.has(member.userId) && member.status === "left",
+      (member) => member.userId === userId && member.status === "left",
     );
 
     const now = new Date();
@@ -308,7 +327,19 @@ export class RoomsService {
       room.members[previousMemberIndex].status = "active";
       room.members[previousMemberIndex].role = "member"; // BẮT BUỘC reset role về 'member'
       room.members[previousMemberIndex].rejoinedAt = new Date();
-      room.members[previousMemberIndex].userId = resolvedUserId; // Đồng bộ hóa ID
+      room.members[previousMemberIndex].userId = userId;
+
+      // Đảm bảo không còn dữ liệu cũ trong các kênh khi họ vào lại phòng
+      if (room.channels && Array.isArray(room.channels)) {
+        room.channels.forEach((channel) => {
+          if (channel.members) {
+            channel.members = channel.members.filter(
+              (cm) => cm.userId !== userId,
+            );
+          }
+        });
+        room.markModified("channels");
+      }
 
       joinedAtDate = room.members[previousMemberIndex].joinedAt;
       rejoinedAtDate = now;
@@ -317,7 +348,7 @@ export class RoomsService {
     } else {
       // Thêm member mới với vai trò chuẩn 'member' dưới DB
       room.members.push({
-        userId: resolvedUserId,
+        userId,
         role: "member",
         joinedAt: new Date(),
         status: "active",
@@ -326,17 +357,18 @@ export class RoomsService {
 
     await room.save();
 
-    // Lấy thông tin user từ Database
     const userInfo = await this.userModel.findOne({ supabaseId: userId });
-
     const existingMember = room.members.find((m) => m.userId === userId);
-    const memberRole = existingMember?.role || "member";
+    const memberRole: "owner" | "admin" | "member" =
+      existingMember?.role === "owner"
+        ? "owner"
+        : existingMember?.role === "admin"
+          ? "admin"
+          : "member";
 
-    // Format dữ liệu chuẩn theo interface RoomMemberResponse
     const newMemberPayload: RoomMemberResponse = {
       userId: userId,
       role: memberRole,
-      // status: "active",
       joinedAt: joinedAtDate.toISOString(),
       ...(rejoinedAtDate && { rejoinedAt: rejoinedAtDate.toISOString() }),
       displayName: userInfo?.displayName || "Người dùng ẩn danh",
@@ -346,9 +378,9 @@ export class RoomsService {
 
     // Phát sự kiện qua Socket cho các client đang ở trong phòng
     this.roomsGateway.notifyRoomUpdated(room._id.toString(), {
-      type: "member_joined", // Frontend sẽ bắt case này
+      type: "member_joined",
       roomId: room._id.toString(),
-      member: newMemberPayload, // Chứa object hoàn chỉnh để đưa thẳng vào RTK Query Cache
+      member: newMemberPayload,
     });
 
     return mapToRoomResponse(room);
@@ -373,7 +405,6 @@ export class RoomsService {
       (m) =>
         m.userId === userId &&
         m.status !== "removed" &&
-        m.status !== "remove" &&
         m.status !== "left",
     );
     if (memberIdx === -1) {
@@ -387,7 +418,6 @@ export class RoomsService {
       const activeMembers = room.members.filter(
         (m) =>
           m.status !== "removed" &&
-          m.status !== "remove" &&
           m.status !== "left",
       );
 
@@ -409,7 +439,6 @@ export class RoomsService {
         (m) =>
           m.userId === newOwnerId &&
           m.status !== "removed" &&
-          m.status !== "remove" &&
           m.status !== "left",
       );
       if (newOwnerIndex === -1) {
@@ -468,7 +497,7 @@ export class RoomsService {
     // Tạo thông báo cho tất cả thành viên trong phòng (async)
     this.eventEmitter.emit("notification.room_disbanded", {
       userIds: room.members
-        .filter((m) => m.status !== "remove" && m.status !== "left") // không thông báo cho người bị xoá hoặc đã rời
+        .filter((m) => m.status !== "removed" && m.status !== "left") // không thông báo cho người bị xoá hoặc đã rời
         .map((m) => m.userId) // chỉ lấy id
         .filter((id) => id !== userId), // loại trừ người thực hiện
       metadata: {
@@ -517,8 +546,7 @@ export class RoomsService {
       members: {
         $elemMatch: {
           userId: userId,
-          isLeft: { $ne: true }, // Phải chưa tự rời đi
-          status: { $nin: ["remove", "left"] }, // Trạng thái không phải là đã bị xóa hoặc đã rời
+          status: { $nin: ["removed", "left"] }, // Trạng thái không phải là đã bị xóa hoặc đã rời
         },
       },
     });
@@ -539,8 +567,7 @@ export class RoomsService {
       members: {
         $elemMatch: {
           userId: userId,
-          isLeft: { $ne: true },
-          status: { $nin: ["remove", "left"] },
+          status: { $nin: ["removed", "left"] },
         },
       },
     });
@@ -563,18 +590,10 @@ export class RoomsService {
       );
     }
 
-    const userDoc = await this.userModel.findOne({ supabaseId: userId }).exec();
-
-    const allowedUserIds = new Set<string>([userId]);
-    if (userDoc) {
-      if (userDoc.supabaseId) allowedUserIds.add(userDoc.supabaseId);
-      if (userDoc._id) allowedUserIds.add(userDoc._id.toString());
-    }
-
     const member = room.members.find(
       (m) =>
-        allowedUserIds.has(m.userId) &&
-        m.status !== "remove" &&
+        m.userId === userId &&
+        m.status !== "removed" &&
         m.status !== "left",
     );
     if (!member) {
@@ -582,7 +601,6 @@ export class RoomsService {
     }
 
     // Sử dụng mapToRoomResponse với forUserId để tự động filter channels
-    // (public channels ẩn nếu user trong leftMemberIds, private channels ẩn nếu không trong members[])
     return mapToRoomResponse(room, userId);
   }
 

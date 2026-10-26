@@ -79,24 +79,6 @@ export const meetingsApi = baseApi.injectEndpoints({
       }),
     }),
 
-    // Kiểm tra trạng thái thiết bị trong cuộc họp
-    getDeviceStatus: builder.query<
-      MeetingDeviceStatus,
-      { meetingCode: string; deviceId: string }
-    >({
-      query: ({ meetingCode, deviceId }) => ({
-        url: `/meetings/${meetingCode}/devices/${deviceId}`,
-        method: "GET",
-      }),
-
-      providesTags: (result, error, { meetingCode, deviceId }) => [
-        {
-          type: "DeviceStatus",
-          id: `${meetingCode}-${deviceId}`,
-        },
-      ],
-    }),
-
     getMemberStatus: builder.query<RoomMemberStatus, { meetingCode: string }>({
       query: ({ meetingCode }) => ({
         url: `/meetings/${meetingCode}/member-status`,
@@ -390,8 +372,6 @@ export const {
   useEnsureChannelMeetingMutation,
   useGetActiveMeetingQuery,
   useLazyGetActiveMeetingQuery,
-  useGetDeviceStatusQuery,
-  useLazyGetDeviceStatusQuery,
   useGetMemberStatusQuery,
   useLazyGetMemberStatusQuery,
   useToggleMeetingChatMutation,

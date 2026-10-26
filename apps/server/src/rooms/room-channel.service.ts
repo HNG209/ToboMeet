@@ -53,6 +53,13 @@ export class RoomChannelService {
       throw new ForbiddenException("Chỉ chủ phòng mới có quyền tạo kênh mới");
     }
 
+    // Giới hạn tối đa 50 kênh trong 1 phòng (công khai + riêng tư)
+    if ((room.channels?.length || 0) >= 50) {
+      throw new BadRequestException(
+        "Phòng đã đạt số lượng kênh tối đa (50 kênh)",
+      );
+    }
+
     // Kiểm tra tên kênh đã trùng chưa (không phân biệt hoa thường)
     const exists = room.channels.some(
       (c) => c.name.toLowerCase() === channelName.trim().toLowerCase(),
@@ -74,6 +81,13 @@ export class RoomChannelService {
         (id) => id !== userId,
       );
 
+      // Kênh riêng tư tối đa 100 người (bao gồm cả chủ phòng)
+      if (memberIds.length + 1 > 100) {
+        throw new BadRequestException(
+          "Kênh riêng tư chỉ có thể có tối đa 100 người",
+        );
+      }
+
       newChannel.members = memberIds.map((id) => ({
         userId: id,
         role: "member",
@@ -94,20 +108,12 @@ export class RoomChannelService {
     channelId: string,
     userId: string,
   ): Promise<boolean> {
-    const userDoc = await this.userModel.findOne({ supabaseId: userId }).exec();
-
-    const allowedUserIds = new Set<string>([userId]);
-    if (userDoc) {
-      if (userDoc.supabaseId) allowedUserIds.add(userDoc.supabaseId);
-      if (userDoc._id) allowedUserIds.add(userDoc._id.toString());
-    }
-
-    if (allowedUserIds.has(room.ownerId)) return true;
+    if (room.ownerId === userId) return true;
 
     const roomMember = room.members?.find(
       (m) =>
-        allowedUserIds.has(m.userId) &&
-        m.status !== "remove" &&
+        m.userId === userId &&
+        m.status !== "removed" &&
         m.status !== "left",
     );
 
@@ -119,9 +125,7 @@ export class RoomChannelService {
     const channel = room.channels.find((c) => c._id?.toString() === channelId);
     if (!channel) return false;
 
-    const channelMember = channel.members?.find((m) =>
-      allowedUserIds.has(m.userId),
-    );
+    const channelMember = channel.members?.find((m) => m.userId === userId);
 
     // Chỉ có admin kênh mới có quyền quản lý kênh đó
     return !!channelMember && channelMember.role === "admin";
@@ -275,11 +279,56 @@ export class RoomChannelService {
       throw new BadRequestException("Không thể thêm chính mình vào kênh");
     }
 
+    // Giới hạn thành viên kênh riêng tư (tối đa 100 người bao gồm cả chủ phòng)
+    if (channel.isPrivate) {
+      if (!channel.members) channel.members = [];
+      const currentChannelMembersCount = channel.members.length + 1; // Bao gồm chủ phòng
+      if (currentChannelMembersCount >= 100) {
+        throw new BadRequestException(
+          "Kênh riêng tư đã đạt số lượng tối đa (100 người)",
+        );
+      }
+    }
+
     // Xử lý cấp độ Phòng: Tự động thêm vào phòng họp/lớp học nếu chưa phải thành viên
     if (!room.members) room.members = [];
     const existingRoomMember = room.members.find(
       (m) => m.userId === resolvedTargetId,
     );
+
+    const isAddingToRoom =
+      !existingRoomMember ||
+      existingRoomMember.status === "removed" ||
+      existingRoomMember.status === "left";
+
+    if (isAddingToRoom) {
+      // Giới hạn tối đa 500 thành viên trong phòng (kênh công khai kế thừa từ giới hạn này)
+      const activeMembersCount = room.members.filter(
+        (m) =>
+          m.status !== "removed" &&
+          m.status !== "left",
+      ).length;
+      if (activeMembersCount >= 500) {
+        throw new BadRequestException("Phòng đã đạt số lượng tối đa (500 người)");
+      }
+
+      // Giới hạn người dùng được phép tham gia và tạo tối đa 100 phòng họp
+      const targetRoomCount = await this.roomModel.countDocuments({
+        members: {
+          $elemMatch: {
+            userId: resolvedTargetId,
+            status: { $nin: ["removed", "left"] },
+          },
+        },
+        isDeleted: { $ne: true },
+        status: { $nin: ["disbanded", "blocked"] },
+      });
+      if (targetRoomCount >= 100) {
+        throw new BadRequestException(
+          "Người dùng này đã tham gia tối đa 100 phòng họp",
+        );
+      }
+    }
 
     if (!existingRoomMember) {
       room.members.push({
@@ -290,7 +339,7 @@ export class RoomChannelService {
       });
       room.markModified("members");
     } else if (
-      existingRoomMember.status === "remove" ||
+      existingRoomMember.status === "removed" ||
       existingRoomMember.status === "left"
     ) {
       // Phục hồi trạng thái nếu đã từng rời/bị xóa khỏi phòng và BẮT BUỘC reset role về 'member'
@@ -367,7 +416,7 @@ export class RoomChannelService {
     const isRoomOwner = userId === room.ownerId;
     const roomMember = room.members?.find(
       (m) =>
-        m.userId === userId && m.status !== "remove" && m.status !== "left",
+        m.userId === userId && m.status !== "removed" && m.status !== "left",
     );
     const isRoomLeader =
       isRoomOwner || (roomMember && roomMember.role === "owner");
@@ -428,7 +477,7 @@ export class RoomChannelService {
     const roomMember = room.members?.find(
       (m) =>
         m.userId === userId &&
-        m.status !== "remove" &&
+        m.status !== "removed" &&
         m.status !== "left",
     );
     if (!roomMember) {
@@ -445,48 +494,24 @@ export class RoomChannelService {
 
     const channel = room.channels[channelIndex];
 
-    // Không cho phép rời kênh General (kênh đầu tiên / mặc định)
-    const isDefaultChannel = channelIndex === 0;
-    if (isDefaultChannel) {
+    if (!channel.isPrivate) {
       throw new BadRequestException(
-        "Không thể rời khỏi kênh General (kênh mặc định của phòng)",
+        "Không thể rời khỏi kênh công khai. Nếu muốn rời, bạn phải rời khỏi phòng.",
       );
     }
 
-    let memberCount: number;
-
-    if (channel.isPrivate) {
-      // === PRIVATE CHANNEL: hard-delete khỏi members[] ===
-      const existingIdx = channel.members?.findIndex(
-        (m) => m.userId === userId,
+    // === PRIVATE CHANNEL: hard-delete khỏi members[] ===
+    const existingIdx = channel.members?.findIndex(
+      (m) => m.userId === userId,
+    );
+    if (existingIdx === undefined || existingIdx === -1) {
+      throw new NotFoundException(
+        "Bạn không phải là thành viên của kênh riêng tư này",
       );
-      if (existingIdx === undefined || existingIdx === -1) {
-        throw new NotFoundException(
-          "Bạn không phải là thành viên của kênh riêng tư này",
-        );
-      }
-
-      channel.members!.splice(existingIdx, 1);
-      memberCount = channel.members!.length + 1; // +1 cho Owner luôn ngầm định
-
-    } else {
-      // === PUBLIC CHANNEL: Thêm userId vào leftMemberIds[] ===
-      if (!channel.leftMemberIds) {
-        channel.leftMemberIds = [];
-      }
-
-      if (channel.leftMemberIds.includes(userId)) {
-        throw new BadRequestException("Bạn đã rời khỏi kênh này rồi");
-      }
-
-      channel.leftMemberIds.push(userId);
-
-      // memberCount = thành viên active của phòng - số người đã rời kênh này
-      const activeMemberCount = room.members.filter(
-        (m) => m.status !== "remove" && m.status !== "left",
-      ).length;
-      memberCount = activeMemberCount - channel.leftMemberIds.length;
     }
+
+    channel.members!.splice(existingIdx, 1);
+    const memberCount = channel.members!.length + 1; // +1 cho Owner luôn ngầm định
 
     room.markModified("channels");
     await room.save();
@@ -503,7 +528,7 @@ export class RoomChannelService {
     });
 
     this.logger.log(
-      `[leaveChannel] User ${userId} đã rời kênh ${channel.name} (${channel.isPrivate ? "private" : "public"}) trong phòng ${roomId}`,
+      `[leaveChannel] User ${userId} đã rời kênh riêng tư ${channel.name} trong phòng ${roomId}`,
     );
 
     return { success: true };

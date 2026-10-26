@@ -122,14 +122,12 @@ export class CalendarService {
               if (m.userId) channelMemberIds.add(m.userId);
             });
           } else {
-            // Kênh công khai: Tất cả thành viên trong room còn active (trừ người đã rời kênh)
-            const leftSet = new Set(channel.leftMemberIds || []);
+            // Kênh công khai: Tất cả thành viên trong room còn active
             room.members?.forEach((m) => {
               if (
                 m.userId &&
                 m.status !== "left" &&
-                m.status !== "removed" &&
-                !leftSet.has(m.userId)
+                m.status !== "removed"
               ) {
                 channelMemberIds.add(m.userId);
               }

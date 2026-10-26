@@ -454,25 +454,6 @@ export class MeetingsController {
     await this.meetingsService.toggleRoomChat(meetingCode, body.isChatEnabled);
   }
 
-  /**
- * GET /api/meetings/:code/devices/:deviceId
- * Kiểm tra trạng thái tham gia của thiết bị
- */
-  @Get(":code/devices/:deviceId")
-  @UseGuards(SupabaseGuard)
-  async getDeviceStatus(
-    @Param("code") meetingCode: string,
-    @Param("deviceId") deviceId: string,
-    @Req() req: AuthenticatedRequest,
-  ) {
-    const userId = req.user.id;
-    return this.meetingsService.getDeviceStatus(
-      meetingCode,
-      userId,
-      deviceId,
-    );
-  }
-
   @Get(":code/attendance")
   @UseGuards(SupabaseGuard)
   async getAttendance(

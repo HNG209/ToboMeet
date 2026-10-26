@@ -29,7 +29,7 @@ export function mapToRoomResponse(
     plainRoom.members
       ?.filter(
         (member: RoomMember) =>
-          member.status !== "remove" && member.status !== "left",
+          member.status !== "removed" && member.status !== "left",
       )
       .map((member: RoomMember) => {
         // Đảm bảo DUY NHẤT room.ownerId mang role 'owner'
@@ -45,7 +45,7 @@ export function mapToRoomResponse(
           role: effectiveRole,
           displayRole: getDisplayRole(effectiveRole),
           joinedAt: safeToIsoString(member.joinedAt),
-          supabaseId: member.userId.includes("-") ? member.userId : undefined,
+          supabaseId: member.userId,
         };
       }) ?? [];
 
@@ -61,8 +61,8 @@ export function mapToRoomResponse(
         // Private: user phải có trong members[]
         return channel.members?.some((m: any) => m.userId === forUserId);
       } else {
-        // Public: user không được có trong leftMemberIds[]
-        return !channel.leftMemberIds?.includes(forUserId);
+        // Public: kênh công khai hiển thị cho mọi thành viên trong phòng
+        return true;
       }
     }) ?? [];
 
@@ -78,7 +78,6 @@ export function mapToRoomResponse(
             ...channel,
             _id: channel._id?.toString() ?? "",
             members: channel.members ?? [],
-            leftMemberIds: undefined, // Không expose ra ngoài client
           };
         }
 
@@ -96,7 +95,6 @@ export function mapToRoomResponse(
             userId: member.userId,
             role: memberRoles.get(member.userId) ?? "member",
           })),
-          leftMemberIds: undefined, // Không expose ra ngoài client
         };
       }) ?? [],
     members: activeRoomMembers,

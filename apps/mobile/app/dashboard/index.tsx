@@ -153,24 +153,40 @@ export default function DashboardScreen() {
               </TouchableOpacity>
             </View>
           )}
-          {/* Join or Create buttons */}
+          {/* Join or Create buttons — Phong cách thanh lịch, sang trọng chuẩn Web */}
           <View className="flex-row gap-3">
             <TouchableOpacity
               onPress={() => setShowJoinModal(true)}
-              className="flex-1 bg-blue-50 border border-blue-100 py-4 rounded-2xl flex-row justify-center items-center gap-2 active:bg-blue-100"
+              activeOpacity={0.7}
+              className="flex-1 bg-white border border-slate-200/90 py-3.5 px-4 rounded-xl flex-row justify-center items-center gap-2 shadow-xs"
+              style={{
+                shadowColor: "#0F172A",
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 2,
+                elevation: 1,
+              }}
             >
-              <Feather name="user-plus" size={16} color="#0052FF" />
-              <Text className="text-[#0052FF] font-bold text-xs">
+              <Feather name="users" size={16} color="#64748B" />
+              <Text className="text-slate-700 font-bold text-xs tracking-tight">
                 {t("dashboard.join_team")}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               onPress={() => setShowCreateModal(true)}
-              className="flex-1 bg-[#0052FF] py-4 rounded-2xl flex-row justify-center items-center gap-2 active:opacity-90"
+              activeOpacity={0.85}
+              className="flex-1 bg-[#0052FF] py-3.5 px-4 rounded-xl flex-row justify-center items-center gap-2 shadow-sm"
+              style={{
+                shadowColor: "#0052FF",
+                shadowOffset: { width: 0, height: 3 },
+                shadowOpacity: 0.25,
+                shadowRadius: 6,
+                elevation: 2,
+              }}
             >
-              <Feather name="plus" size={16} color="#ffffff" />
-              <Text className="text-white font-bold text-xs">
+              <Feather name="plus" size={16} color="#FFFFFF" />
+              <Text className="text-white font-bold text-xs tracking-tight">
                 {t("dashboard.create_team")}
               </Text>
             </TouchableOpacity>
@@ -206,17 +222,53 @@ export default function DashboardScreen() {
                 </View>
               </View>
             ) : (
-              <View className="items-center justify-center py-20 gap-4">
-                <View className="w-16 h-16 rounded-full bg-slate-100 items-center justify-center">
+              <View className="items-center justify-center py-20 gap-5">
+                <View className="w-16 h-16 rounded-full bg-slate-100 items-center justify-center border border-slate-200/60">
                   <Feather name="folder" size={24} color="#94A3B8" />
                 </View>
-                <View className="items-center">
-                  <Text className="text-sm font-bold text-slate-800">
+                <View className="items-center px-6">
+                  <Text className="text-base font-bold text-slate-800 text-center">
                     {t("dashboard.empty_title")}
                   </Text>
-                  <Text className="text-xs text-slate-400 mt-1">
+                  <Text className="text-xs text-slate-400 mt-1.5 text-center leading-relaxed">
                     {t("dashboard.empty_description")}
                   </Text>
+                </View>
+                <View className="flex-row gap-3 mt-2 px-2">
+                  <TouchableOpacity
+                    onPress={() => setShowJoinModal(true)}
+                    activeOpacity={0.7}
+                    className="bg-white border border-slate-200/90 py-2.5 px-4 rounded-xl flex-row items-center gap-2 shadow-xs"
+                    style={{
+                      shadowColor: "#0F172A",
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 2,
+                      elevation: 1,
+                    }}
+                  >
+                    <Feather name="users" size={15} color="#64748B" />
+                    <Text className="text-slate-700 font-bold text-xs">
+                      {t("dashboard.join_team")}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowCreateModal(true)}
+                    activeOpacity={0.85}
+                    className="bg-[#0052FF] py-2.5 px-4 rounded-xl flex-row items-center gap-2 shadow-sm"
+                    style={{
+                      shadowColor: "#0052FF",
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: 0.2,
+                      shadowRadius: 5,
+                      elevation: 2,
+                    }}
+                  >
+                    <Feather name="plus" size={15} color="#FFFFFF" />
+                    <Text className="text-white font-bold text-xs">
+                      {t("dashboard.create_team")}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             )
