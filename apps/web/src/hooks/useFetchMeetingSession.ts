@@ -13,22 +13,22 @@ export function useFetchMeetingSession({
   limit = 50,
   skip = false,
 }: UseFetchMeetingSessionOptions) {
-  const [page, setPage] = useState(1);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
 
-  // Tự động reset về trang 1 mỗi khi meetingCode thay đổi
+  // Tự động reset cursor mỗi khi meetingCode thay đổi
   useEffect(() => {
-    setPage(1);
+    setCursor(undefined);
   }, [meetingCode]);
 
   // Ngăn chặn gọi API nếu meetingCode rỗng hoặc cờ skip = true
   const trimmedMeetingCode = meetingCode?.trim() || "";
   const shouldSkip = skip || !trimmedMeetingCode;
 
-  // Gọi RTK Query với page hiện tại và meetingCode
+  // Gọi RTK Query với cursor hiện tại và meetingCode
   const queryResult = useGetMeetingSessionsQuery(
     {
       meetingCode: trimmedMeetingCode,
-      page,
+      cursor,
       limit,
     },
     { skip: shouldSkip },
@@ -38,31 +38,29 @@ export function useFetchMeetingSession({
   const sessions: MeetingSessionResponse[] = data?.items || [];
 
   // Đang tải trang đầu tiên
-  const isInitialLoading = !shouldSkip && isFetching && page === 1;
+  const isInitialLoading = !shouldSkip && isFetching && !cursor;
 
-  // Đang tải thêm trang tiếp theo (Load more: page > 1)
-  const isLoadingMore = !shouldSkip && isFetching && page > 1;
+  // Đang tải thêm trang tiếp theo (Load more: có cursor và đang fetch)
+  const isLoadingMore = !shouldSkip && isFetching && Boolean(cursor);
 
   // Hàm gọi trang tiếp theo (Load More)
   const loadMore = useCallback(() => {
-    if (data?.hasNext && !isFetching) {
-      setPage((prevPage) => prevPage + 1);
+    if (data?.hasNext && data?.nextCursor && !isFetching) {
+      setCursor(data.nextCursor);
     }
-  }, [data?.hasNext, isFetching]);
+  }, [data?.hasNext, data?.nextCursor, isFetching]);
 
   // Hàm làm mới danh sách
   const refresh = useCallback(() => {
-    setPage(1);
+    setCursor(undefined);
     queryResult.refetch();
   }, [queryResult]);
 
   return {
     ...queryResult, // Bao gồm isLoading, isError, isSuccess, error, refetch,...
     sessions,
-    total: data?.total || 0,
     hasNext: data?.hasNext || false,
-    totalPages: data?.totalPages || 0,
-    currentPage: page,
+    nextCursor: data?.nextCursor || null,
     isInitialLoading,
     isLoadingMore,
     loadMore,

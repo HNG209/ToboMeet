@@ -22,8 +22,7 @@ export function useNotificationCacheManager() {
         // Đã tồn tại -> Cập nhật trực tiếp
         draft.items[existingIndex] = notif;
       } else {
-        // Chưa tồn tại -> Tăng tổng số lượng
-        draft.total += 1;
+        // Chưa tồn tại -> Đưa vào danh sách
         draft.items.push(notif);
       }
     };
@@ -39,7 +38,7 @@ export function useNotificationCacheManager() {
     dispatch(
       notificationsApi.util.updateQueryData(
         "getNotifications",
-        { page: 1 },
+        { cursor: undefined },
         (draft) => {
           newNotifications.forEach((notif) => {
             updateDraftItems(draft, notif);
@@ -56,7 +55,7 @@ export function useNotificationCacheManager() {
       dispatch(
         notificationsApi.util.updateQueryData(
           "getNotifications",
-          { page: 1, type: notif.type },
+          { cursor: undefined, type: notif.type },
           (draft) => {
             updateDraftItems(draft, notif);
             sortByCreatedAt(draft.items);
@@ -90,7 +89,7 @@ export function useNotificationCacheManager() {
     dispatch(
       notificationsApi.util.updateQueryData(
         "getNotifications",
-        { page: 1, type, isRead },
+        { cursor: undefined, type, isRead },
         (draft) => {
           draft.items.forEach((item) => {
             if (unreadSet.has(item._id)) {
@@ -106,7 +105,7 @@ export function useNotificationCacheManager() {
       dispatch(
         notificationsApi.util.updateQueryData(
           "getNotifications",
-          { page: 1 },
+          { cursor: undefined },
           (draft) => {
             draft.items.forEach((item) => {
               if (unreadSet.has(item._id)) {

@@ -527,14 +527,13 @@ export class MeetingsController {
   @UseGuards(SupabaseGuard)
   async getMeetingSessions(
     @Param("code") meetingCode: string,
-    @Query("page") page?: number,
+    @Query("cursor") cursor?: string,
     @Query("limit") limit?: number,
   ) {
-    const parsedPage = Math.max(1, Number(page) || 1);
     const parsedLimit = Math.min(100, Math.max(1, Number(limit) || 50));
     return this.meetingsService.getMeetingSessions(
       meetingCode,
-      parsedPage,
+      cursor,
       parsedLimit,
     );
   }

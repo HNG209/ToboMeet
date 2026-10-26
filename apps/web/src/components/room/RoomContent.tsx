@@ -232,7 +232,7 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
           dispatch(
             meetingsApi.util.updateQueryData(
               "getMeetingSessions",
-              { meetingCode: targetMeetingCode, page: 1, limit: 50 },
+              { meetingCode: targetMeetingCode, cursor: undefined, limit: 50 },
               (draft) => {
                 if (draft?.items) {
                   draft.items.forEach((item) => {

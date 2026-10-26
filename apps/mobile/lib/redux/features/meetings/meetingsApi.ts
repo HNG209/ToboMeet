@@ -323,17 +323,17 @@ export const meetingsApi = baseApi.injectEndpoints({
       }),
     }),
 
-    // Lấy danh sách các session của meetingCode có phân trang
+    // Lấy danh sách các session của meetingCode có phân trang cursor
     getMeetingSessions: builder.query<
       PageResponse<MeetingSessionResponse>,
       GetMeetingSessionsArgs
     >({
-      query: ({ meetingCode, page, limit = 50 }) => ({
+      query: ({ meetingCode, cursor, limit = 50 }) => ({
         url: `/meetings/${meetingCode}/sessions`,
-        params: { page, limit },
+        params: { cursor, limit },
       }),
 
-      // Chỉ tạo khoá (Cache Key) dựa trên meetingCode, bỏ qua page và limit
+      // Chỉ tạo khoá (Cache Key) dựa trên meetingCode, bỏ qua cursor và limit
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
         const queryKey = queryArgs.meetingCode || "";
         return `${endpointName}-${queryKey}`;
@@ -341,8 +341,8 @@ export const meetingsApi = baseApi.injectEndpoints({
 
       // Gộp (Merge) dữ liệu mới vào cache cũ khi fetch trang mới
       merge: (currentCache, newItems, { arg }) => {
-        if (arg.page === 1) {
-          // Nếu gọi lại trang 1 (refresh hoặc đổi mã), ghi đè toàn bộ
+        if (!arg.cursor) {
+          // Nếu gọi lại không có cursor (refresh hoặc đổi mã), ghi đè toàn bộ
           return newItems;
         }
 
@@ -350,16 +350,15 @@ export const meetingsApi = baseApi.injectEndpoints({
         currentCache.items.push(...newItems.items);
 
         // Cập nhật lại các thông tin phân trang
-        currentCache.page = newItems.page;
+        currentCache.nextCursor = newItems.nextCursor;
         currentCache.hasNext = newItems.hasNext;
-        currentCache.total = newItems.total;
-        currentCache.totalPages = newItems.totalPages;
+        currentCache.limit = newItems.limit;
       },
 
-      // Bắt buộc gọi lại API khi page hoặc meetingCode thay đổi
+      // Bắt buộc gọi lại API khi cursor hoặc meetingCode thay đổi
       forceRefetch({ currentArg, previousArg }) {
         return (
-          currentArg?.page !== previousArg?.page ||
+          currentArg?.cursor !== previousArg?.cursor ||
           currentArg?.meetingCode !== previousArg?.meetingCode
         );
       },

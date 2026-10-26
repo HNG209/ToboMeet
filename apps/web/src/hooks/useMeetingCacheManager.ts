@@ -32,7 +32,7 @@ export function useMeetingCacheManager() {
     dispatch(
       meetingsApi.util.updateQueryData(
         "getMeetingSessions",
-        { meetingCode, page: 1, limit: 50 },
+        { meetingCode, cursor: undefined, limit: 50 },
         (draft) => {
           if (draft?.items) {
             draft.items.forEach((item) => {

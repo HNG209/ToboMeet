@@ -10,10 +10,14 @@ import { Type } from "class-transformer";
 
 export class GetNotificationsDto {
   @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  page?: number = 1;
+  page?: number;
 
   @IsOptional()
   @Type(() => Number)

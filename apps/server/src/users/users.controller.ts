@@ -19,23 +19,17 @@ export class UsersController {
 
   /**
    * GET /api/users/search
-   * Tìm kiếm người dùng theo tên hoặc email có phân trang
+   * Tìm kiếm người dùng theo tên hoặc email có phân trang cursor
    */
   @Get("search")
   @UseGuards(SupabaseGuard)
   async searchUsers(
     @Query("q") query: string,
-    @Query("page") pageParam?: string,
+    @Query("cursor") cursor?: string,
     @Query("limit") limitParam?: string,
   ) {
-    const page = parseInt(pageParam as string, 10) || 1;
-    const limit = parseInt(limitParam as string, 10) || 20;
-
-    if (page < 1 || limit < 1) {
-      throw new BadRequestException("Tham số phân trang không hợp lệ.");
-    }
-
-    return this.usersService.searchUsers(query, page, limit);
+    const limit = Math.min(100, Math.max(1, parseInt(limitParam as string, 10) || 20));
+    return this.usersService.searchUsers(query, cursor, limit);
   }
 
   private getClientIp(req: any): string {

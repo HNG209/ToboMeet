@@ -562,11 +562,9 @@ export interface ChannelFileResponse {
 
 export interface PageResponse<T> {
   items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
+  nextCursor: string | null;
   hasNext: boolean;
+  limit: number;
 }
 
 export interface NotificationResponse {
@@ -608,7 +606,7 @@ export interface MeetingSessionResponse {
 
 export interface GetMeetingSessionsArgs {
   meetingCode: string;
-  page: number;
+  cursor?: string;
   limit?: number;
 }
 

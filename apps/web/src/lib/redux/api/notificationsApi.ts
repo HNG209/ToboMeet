@@ -2,7 +2,7 @@ import { NotificationResponse, PageResponse } from "@tobomeet/shared/types";
 import { baseApi } from "./baseApi";
 
 export type GetNotificationsArgs = {
-  page: number;
+  cursor?: string;
   limit?: number;
   type?: string;
   isRead?: boolean | string;
@@ -16,10 +16,10 @@ export const notificationsApi = baseApi.injectEndpoints({
     >({
       query: (args) => ({
         url: "/notifications",
-        params: args, // RTK Query tự động chuyển object thành query string (?page=1&limit=20...)
+        params: args,
       }),
 
-      // Chỉ tạo khoá (Cache Key) dựa trên các trường lọc, bỏ qua page và limit
+      // Chỉ tạo khoá (Cache Key) dựa trên các trường lọc, bỏ qua cursor và limit
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
         const typeKey = queryArgs.type || "all";
         const readKey =
@@ -31,8 +31,8 @@ export const notificationsApi = baseApi.injectEndpoints({
 
       // Gộp (Merge) dữ liệu mới vào cache cũ
       merge: (currentCache, newItems, { arg }) => {
-        if (arg.page === 1) {
-          // Nếu gọi lại trang 1 (ví dụ pull to refresh), ghi đè toàn bộ cache
+        if (!arg.cursor) {
+          // Nếu gọi lại không có cursor (ví dụ pull to refresh), ghi đè toàn bộ cache
           return newItems;
         }
 
@@ -40,15 +40,18 @@ export const notificationsApi = baseApi.injectEndpoints({
         currentCache.items.push(...newItems.items);
 
         // Cập nhật lại các thông tin phân trang
-        currentCache.page = newItems.page;
+        currentCache.nextCursor = newItems.nextCursor;
         currentCache.hasNext = newItems.hasNext;
-        currentCache.total = newItems.total;
-        currentCache.totalPages = newItems.totalPages;
+        currentCache.limit = newItems.limit;
       },
 
-      // Bắt buộc gọi lại API khi page thay đổi (do cache key không chứa page nên RTK Query sẽ tưởng là đã có data rồi)
+      // Bắt buộc gọi lại API khi cursor hoặc bộ lọc thay đổi
       forceRefetch({ currentArg, previousArg }) {
-        return currentArg?.page !== previousArg?.page;
+        return (
+          currentArg?.cursor !== previousArg?.cursor ||
+          currentArg?.type !== previousArg?.type ||
+          currentArg?.isRead !== previousArg?.isRead
+        );
       },
 
       providesTags: ["Notification"],

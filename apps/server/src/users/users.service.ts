@@ -12,7 +12,7 @@ import {
   DeviceSession,
   DeviceSessionDocument,
 } from "./schemas/device-session.schema";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import { ConfigService } from "@nestjs/config";
 import { createClient } from "@supabase/supabase-js";
 import { AppGateway } from "../core/gateways/app.gateway";
@@ -979,27 +979,24 @@ export class UsersService {
   // FE đã cung cấp hook useGlobalUserSearch để sử dụng
   async searchUsers(
     query: string,
-    page: number = 1,
+    cursor?: string,
     limit: number = 20,
   ): Promise<PageResponse<UserResponse>> {
     if (!query || !query.trim()) {
       return {
         items: [],
-        total: 0,
-        page,
-        limit,
-        totalPages: 0,
+        nextCursor: null,
         hasNext: false,
+        limit,
       };
     }
 
     const cleanQuery = query.trim();
-    const skip = (page - 1) * limit;
 
     // Xây dựng điều kiện tìm kiếm (Mongoose Query)
     // - status không bị BLOCKED
     // - email HOẶC displayName chứa từ khóa (không phân biệt hoa thường nhờ $options: "i")
-    const searchFilter = {
+    const searchFilter: Record<string, any> = {
       status: { $nin: ["BLOCKED"] },
       $or: [
         { email: { $regex: cleanQuery, $options: "i" } },
@@ -1007,21 +1004,23 @@ export class UsersService {
       ],
     };
 
-    const [total, users] = await Promise.all([
-      this.userModel.countDocuments(searchFilter),
-      this.userModel
-        .find(searchFilter)
-        .select("supabaseId email displayName avatarUrl")
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
-    ]);
+    if (cursor && Types.ObjectId.isValid(cursor)) {
+      searchFilter._id = { $lt: new Types.ObjectId(cursor) };
+    }
 
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
+    // Query limit + 1 phần tử để xác định hasNext mà không cần countDocuments
+    const users = await this.userModel
+      .find(searchFilter)
+      .select("supabaseId email displayName avatarUrl")
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .lean()
+      .exec();
 
-    const items: UserResponse[] = users.map((user: UserDocument) => ({
+    const hasNext = users.length > limit;
+    const pagedUsers = hasNext ? users.slice(0, limit) : users;
+
+    const items: UserResponse[] = pagedUsers.map((user: UserDocument) => ({
       _id: user._id.toString(),
       supabaseId: user.supabaseId,
       email: user.email,
@@ -1029,13 +1028,14 @@ export class UsersService {
       avatarUrl: user.avatarUrl,
     }));
 
+    const nextCursor =
+      hasNext && items.length > 0 ? items[items.length - 1]._id : null;
+
     return {
       items,
-      total,
-      page,
-      limit,
-      totalPages,
+      nextCursor,
       hasNext,
+      limit,
     };
   }
 

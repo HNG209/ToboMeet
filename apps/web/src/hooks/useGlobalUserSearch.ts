@@ -16,7 +16,7 @@ export function useGlobalUserSearch({
   debounceMs = 500,
 }: UseGlobalUserSearchOptions) {
   const [debouncedQuery, setDebouncedQuery] = useState(q);
-  const [page, setPage] = useState(1);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
 
   // Debounce logic
   const debouncedSetQuery = useMemo(
@@ -34,20 +34,20 @@ export function useGlobalUserSearch({
     };
   }, [q, debouncedSetQuery]);
 
-  // Tự động reset về trang 1 mỗi khi từ khóa tìm kiếm (đã debounce) thay đổi
+  // Tự động reset cursor mỗi khi từ khóa tìm kiếm (đã debounce) thay đổi
   useEffect(() => {
-    setPage(1);
+    setCursor(undefined);
   }, [debouncedQuery]);
 
   // Ngăn chặn gọi API nếu từ khóa rỗng hoặc skip được truyền vào
   const trimmedQuery = debouncedQuery?.trim() || "";
   const shouldSkip = skip || !trimmedQuery;
 
-  // Gọi RTK Query với page hiện tại và debounced query
+  // Gọi RTK Query với cursor hiện tại và debounced query
   const queryResult = useSearchUsersQuery(
     {
       q: trimmedQuery,
-      page,
+      cursor,
       limit,
     },
     { skip: shouldSkip },
@@ -60,22 +60,22 @@ export function useGlobalUserSearch({
   const isDebouncing =
     !skip && q.trim().length > 0 && q.trim() !== debouncedQuery.trim();
 
-  // Đang tìm kiếm từ khóa mới (trang 1): khi đang debounce hoặc RTK Query đang fetch trang 1
-  const isSearching = !skip && (isDebouncing || (isFetching && page === 1));
+  // Đang tìm kiếm từ khóa mới: khi đang debounce hoặc RTK Query đang fetch trang đầu (!cursor)
+  const isSearching = !skip && (isDebouncing || (isFetching && !cursor));
 
-  // Đang tải thêm trang tiếp theo (Load more: page > 1)
-  const isLoadingMore = !skip && isFetching && page > 1;
+  // Đang tải thêm trang tiếp theo (Load more: có cursor và đang fetch)
+  const isLoadingMore = !skip && isFetching && Boolean(cursor);
 
   // Hàm gọi trang tiếp theo (Load More)
   const loadMore = useCallback(() => {
-    if (data?.hasNext && !isFetching) {
-      setPage((prevPage) => prevPage + 1);
+    if (data?.hasNext && data?.nextCursor && !isFetching) {
+      setCursor(data.nextCursor);
     }
-  }, [data?.hasNext, isFetching]);
+  }, [data?.hasNext, data?.nextCursor, isFetching]);
 
   // Hàm làm mới danh sách (Pull to refresh)
   const refresh = useCallback(() => {
-    setPage(1);
+    setCursor(undefined);
     queryResult.refetch();
   }, [queryResult]);
 
@@ -87,9 +87,8 @@ export function useGlobalUserSearch({
     isLoadingMore,
     users,
     debouncedQuery,
-    total: data?.total || 0,
     hasNext: data?.hasNext || false,
-    currentPage: page,
+    nextCursor: data?.nextCursor || null,
     loadMore,
     refresh,
   };

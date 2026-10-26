@@ -37,7 +37,8 @@ export default function GlobalSearch() {
   // Separate pagination state for each category
   const [roomsPage, setRoomsPage] = useState(1);
   const [calendarPage, setCalendarPage] = useState(1);
-  const [usersPage, setUsersPage] = useState(1);
+  const [usersCursor, setUsersCursor] = useState<string | undefined>(undefined);
+  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([]);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,7 +47,8 @@ export default function GlobalSearch() {
   useEffect(() => {
     setRoomsPage(1);
     setCalendarPage(1);
-    setUsersPage(1);
+    setUsersCursor(undefined);
+    setCursorHistory([]);
   }, [query]);
 
   // Click outside to close
@@ -107,7 +109,7 @@ export default function GlobalSearch() {
 
   // 3. Fetch Users
   const { data: usersData, isFetching: isSearchingUsers } = useSearchUsersQuery(
-    { q: trimmedQuery, page: usersPage, limit: 10 },
+    { q: trimmedQuery, cursor: usersCursor, limit: 10 },
     { skip: !trimmedQuery }
   );
   const matchingUsers: any[] = useMemo(() => {
@@ -132,9 +134,22 @@ export default function GlobalSearch() {
   }, [matchingEvents, calendarPage]);
   const totalCalendarPages = Math.ceil(matchingEvents.length / PAGE_SIZE) || 1;
 
-  const totalUsersPages = usersData?.totalPages || Math.ceil(matchingUsers.length / PAGE_SIZE) || 1;
+  const hasResults = matchingRooms.length > 0 || matchingEvents.length > 0 || matchingUsers.length > 0;
 
-  const totalResults = matchingRooms.length + matchingEvents.length + (usersData?.total || matchingUsers.length);
+  const handleUsersNextPage = () => {
+    if (usersData?.hasNext && usersData?.nextCursor) {
+      setCursorHistory((prev) => [...prev, usersCursor]);
+      setUsersCursor(usersData.nextCursor);
+    }
+  };
+
+  const handleUsersPrevPage = () => {
+    if (cursorHistory.length > 0) {
+      const prevCursor = cursorHistory[cursorHistory.length - 1];
+      setCursorHistory((prev) => prev.slice(0, -1));
+      setUsersCursor(prevCursor);
+    }
+  };
 
   // Navigation handlers
   const handleOpenRoom = (room: any) => {
@@ -212,7 +227,7 @@ export default function GlobalSearch() {
                   : "text-slate-600 hover:bg-white/60"
               }`}
             >
-              Tất cả ({totalResults})
+              Tất cả
             </button>
             <button
               onClick={() => setActiveTab("rooms")}
@@ -245,13 +260,13 @@ export default function GlobalSearch() {
               }`}
             >
               <User className="w-3.5 h-3.5" />
-              Người dùng ({usersData?.total ?? matchingUsers.length})
+              Người dùng
             </button>
           </div>
 
           {/* Body Content */}
           <div className="flex-1 overflow-y-auto p-3 divide-y divide-slate-100">
-            {totalResults === 0 && !isSearchingCalendar && !isSearchingUsers ? (
+            {!hasResults && !isSearchingCalendar && !isSearchingUsers ? (
               <div className="py-12 text-center text-slate-400">
                 <Search className="w-8 h-8 mx-auto mb-2 opacity-40" />
                 <p className="text-sm font-medium">Không tìm thấy kết quả phù hợp với &quot;{query}&quot;</p>
@@ -355,7 +370,7 @@ export default function GlobalSearch() {
                   <div>
                     <div className="flex items-center justify-between pb-1.5 px-1">
                       <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-                        <User className="w-3 h-3 text-emerald-500" /> Người dùng ({usersData?.total || matchingUsers.length})
+                        <User className="w-3 h-3 text-emerald-500" /> Người dùng
                       </span>
                       {matchingUsers.length > 3 && (
                         <button
@@ -556,21 +571,22 @@ export default function GlobalSearch() {
                 )}
 
                 {/* Pagination Controls */}
-                {totalUsersPages > 1 && (
-                  <div className="flex items-center justify-between pt-3 mt-3 border-t border-slate-100 text-xs text-slate-500">
-                    <span>Trang {usersPage} / {totalUsersPages}</span>
+                {(cursorHistory.length > 0 || usersData?.hasNext) && (
+                  <div className="flex items-center justify-end pt-3 mt-3 border-t border-slate-100 text-xs text-slate-500">
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setUsersPage((p) => Math.max(1, p - 1))}
-                        disabled={usersPage === 1}
+                        onClick={handleUsersPrevPage}
+                        disabled={cursorHistory.length === 0}
                         className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-40"
+                        title="Trang trước"
                       >
                         <ChevronLeft className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => setUsersPage((p) => Math.min(totalUsersPages, p + 1))}
-                        disabled={usersPage === totalUsersPages}
+                        onClick={handleUsersNextPage}
+                        disabled={!usersData?.hasNext}
                         className="p-1 rounded-lg hover:bg-slate-100 disabled:opacity-40"
+                        title="Trang sau"
                       >
                         <ChevronRight className="w-4 h-4" />
                       </button>

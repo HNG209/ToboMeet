@@ -1,7 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { OnEvent } from "@nestjs/event-emitter";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import { AppGateway } from "../core/gateways/app.gateway";
 import {
   Notification,
@@ -41,14 +41,13 @@ export class NotificationsService {
   }
 
   /**
-   * Lấy danh sách thông báo của người dùng với bộ lọc tự code
+   * Lấy danh sách thông báo theo phân trang cursor
    */
   async getUserNotifications(
     userId: string,
     query: GetNotificationsDto,
   ): Promise<PageResponse<NotificationResponse>> {
-    const { page = 1, limit = 20, type, isRead } = query;
-    const skip = (page - 1) * limit;
+    const { cursor, limit = 20, type, isRead } = query;
 
     // Build filter an toàn: Bắt buộc filter phải chứa userId của người đang login
     const filter: Record<string, any> = { userId };
@@ -61,21 +60,24 @@ export class NotificationsService {
       filter.isRead = isRead === "true";
     }
 
-    // Chạy song song query
-    const [total, notifications] = await Promise.all([
-      this.notificationModel.countDocuments(filter),
-      this.notificationModel
-        .find(filter)
-        .sort({ createdAt: -1 }) // Cố định mới nhất lên đầu theo createdAt
-        .skip(skip)
-        .limit(limit)
-        .exec(),
-    ]);
+    if (cursor && Types.ObjectId.isValid(cursor)) {
+      filter._id = { $lt: new Types.ObjectId(cursor) };
+    }
+
+    // Query limit + 1 phần tử để xác định hasNext mà không cần countDocuments
+    const notifications = await this.notificationModel
+      .find(filter)
+      .sort({ _id: -1 }) // Cố định mới nhất lên đầu theo _id ObjectId
+      .limit(limit + 1)
+      .exec();
 
     this.toggleUnreadStatus(userId, false);
 
+    const hasNext = notifications.length > limit;
+    const pagedDocs = hasNext ? notifications.slice(0, limit) : notifications;
+
     // Map dữ liệu
-    const items: NotificationResponse[] = notifications.map((doc: any) => ({
+    const items: NotificationResponse[] = pagedDocs.map((doc: any) => ({
       _id: doc._id.toString(),
       userId: doc.userId,
       type: doc.type,
@@ -86,15 +88,14 @@ export class NotificationsService {
       updatedAt: doc.updatedAt,
     }));
 
-    const totalPages = Math.ceil(total / limit);
+    const nextCursor =
+      hasNext && items.length > 0 ? items[items.length - 1]._id : null;
 
     return {
       items,
-      total,
-      page,
+      nextCursor,
+      hasNext,
       limit,
-      totalPages,
-      hasNext: page < totalPages,
     };
   }
 

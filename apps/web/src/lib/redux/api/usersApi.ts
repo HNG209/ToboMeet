@@ -36,7 +36,7 @@ export interface SessionsResponse {
 
 export type SearchUsersArgs = {
   q: string;
-  page: number;
+  cursor?: string;
   limit?: number;
 };
 
@@ -55,14 +55,14 @@ export const usersApi = baseApi.injectEndpoints({
       providesTags: ["User"],
     }),
 
-    // Tìm kiếm toàn cục + phân trang
+    // Tìm kiếm toàn cục + phân trang cursor
     searchUsers: builder.query<PageResponse<UserResponse>, SearchUsersArgs>({
       query: (args) => ({
         url: "/users/search",
         params: args,
       }),
 
-      // Chỉ tạo khoá (Cache Key) dựa trên từ khóa tìm kiếm (q), bỏ qua page và limit
+      // Chỉ tạo khoá (Cache Key) dựa trên từ khóa tìm kiếm (q), bỏ qua cursor và limit
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
         const queryKey = queryArgs.q || "";
         return `${endpointName}-${queryKey}`;
@@ -70,8 +70,8 @@ export const usersApi = baseApi.injectEndpoints({
 
       // Gộp (Merge) dữ liệu mới vào cache cũ khi cuộn tải thêm
       merge: (currentCache, newItems, { arg }) => {
-        if (arg.page === 1) {
-          // Nếu gọi lại trang 1 (khi search từ khóa mới hoặc refresh), ghi đè toàn bộ
+        if (!arg.cursor) {
+          // Nếu gọi lại không có cursor (khi search từ khóa mới hoặc refresh), ghi đè toàn bộ
           return newItems;
         }
 
@@ -79,16 +79,15 @@ export const usersApi = baseApi.injectEndpoints({
         currentCache.items.push(...newItems.items);
 
         // Cập nhật lại các thông tin phân trang
-        currentCache.page = newItems.page;
+        currentCache.nextCursor = newItems.nextCursor;
         currentCache.hasNext = newItems.hasNext;
-        currentCache.total = newItems.total;
-        currentCache.totalPages = newItems.totalPages;
+        currentCache.limit = newItems.limit;
       },
 
-      // Bắt buộc gọi lại API khi page thay đổi hoặc từ khóa q thay đổi
+      // Bắt buộc gọi lại API khi cursor thay đổi hoặc từ khóa q thay đổi
       forceRefetch({ currentArg, previousArg }) {
         return (
-          currentArg?.page !== previousArg?.page ||
+          currentArg?.cursor !== previousArg?.cursor ||
           currentArg?.q !== previousArg?.q
         );
       },

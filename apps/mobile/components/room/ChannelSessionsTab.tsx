@@ -79,7 +79,6 @@ export default function ChannelSessionsTab({
   // Hook phân trang phiên họp
   const {
     sessions,
-    total,
     hasNext,
     isInitialLoading,
     isLoadingMore,
@@ -177,11 +176,6 @@ export default function ChannelSessionsTab({
             <Text className="text-sm font-bold text-slate-900">
               {t("room.sessions_title")}
             </Text>
-            <View className="px-2 py-0.5 bg-blue-50 rounded-full border border-blue-200">
-              <Text className="text-[11px] font-bold text-blue-700">
-                {t("room.sessions_count", { count: total })}
-              </Text>
-            </View>
           </View>
           {channelName ? (
             <Text className="text-xs text-slate-500 mt-0.5">
@@ -230,7 +224,7 @@ export default function ChannelSessionsTab({
         }
         renderItem={({ item, index }) => {
           const isOngoing = item.status === "ongoing";
-          const sessionIndex = total > 0 ? total - index : index + 1;
+          const sessionIndex = index + 1;
 
           return (
             <TouchableOpacity

@@ -1,7 +1,7 @@
 // src/meetings/meetings.service.ts
 import { Injectable } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import { Meeting, MeetingDocument } from "./schemas/meeting.schema";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import {
@@ -1279,36 +1279,36 @@ export class MeetingsService {
    */
   async getMeetingSessions(
     meetingCode: string,
-    page: number = 1,
+    cursor?: string,
     limit: number = 50,
   ): Promise<PageResponse<MeetingSessionResponse>> {
     if (!meetingCode || !meetingCode.trim()) {
       return {
         items: [],
-        total: 0,
-        page,
-        limit,
-        totalPages: 0,
+        nextCursor: null,
         hasNext: false,
+        limit,
       };
     }
 
     const cleanCode = meetingCode.trim();
-    const skip = (page - 1) * limit;
-    const filter = { meetingCode: cleanCode };
+    const filter: Record<string, any> = { meetingCode: cleanCode };
 
-    const [total, sessions] = await Promise.all([
-      this.sessionModel.countDocuments(filter),
-      this.sessionModel
-        .find(filter)
-        .sort({ startedAt: -1, createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean()
-        .exec(),
-    ]);
+    if (cursor && Types.ObjectId.isValid(cursor)) {
+      filter._id = { $lt: new Types.ObjectId(cursor) };
+    }
 
-    const sessionIds = sessions.map((s) => s._id.toString());
+    // Query limit + 1 phần tử để kiểm tra hasNext mà không cần countDocuments
+    const sessions = await this.sessionModel
+      .find(filter)
+      .sort({ _id: -1 })
+      .limit(limit + 1)
+      .lean()
+      .exec();
+
+    const hasNext = sessions.length > limit;
+    const pagedSessions = hasNext ? sessions.slice(0, limit) : sessions;
+    const sessionIds = pagedSessions.map((s: any) => s._id.toString());
 
     // Đếm số người tham gia (attendance) cho từng session trong trang hiện tại
     const participantCountsMap = new Map<string, number>();
@@ -1326,7 +1326,7 @@ export class MeetingsService {
       }
     }
 
-    const items: MeetingSessionResponse[] = sessions.map((doc: any) => {
+    const items: MeetingSessionResponse[] = pagedSessions.map((doc: any) => {
       const started = doc.startedAt
         ? new Date(doc.startedAt)
         : doc.createdAt
@@ -1362,16 +1362,14 @@ export class MeetingsService {
       };
     });
 
-    const totalPages = Math.ceil(total / limit);
-    const hasNext = page < totalPages;
+    const nextCursor =
+      hasNext && items.length > 0 ? items[items.length - 1]._id : null;
 
     return {
       items,
-      total,
-      page,
-      limit,
-      totalPages,
+      nextCursor,
       hasNext,
+      limit,
     };
   }
 }

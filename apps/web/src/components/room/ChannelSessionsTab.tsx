@@ -89,7 +89,6 @@ export default function ChannelSessionsTab({
   // Hook fetch meeting sessions có phân trang (50 sessions / page)
   const {
     sessions,
-    total,
     hasNext,
     isInitialLoading,
     isLoadingMore,
@@ -207,9 +206,6 @@ export default function ChannelSessionsTab({
             <h2 className="text-base font-bold text-slate-900">
               {t("sessions_title")}
             </h2>
-            <span className="px-2 py-0.5 text-xs font-semibold bg-brand-50 text-brand-700 border border-brand-200/60 rounded-full">
-              {t("sessions_count", { count: total })}
-            </span>
             {channelName && (
               <span className="hidden sm:inline-flex items-center gap-1 text-xs text-slate-500 font-medium">
                 #{channelName}
@@ -251,7 +247,7 @@ export default function ChannelSessionsTab({
           <>
             {sessions.map((session, index) => {
               const isOngoing = session.status === "ongoing";
-              const sessionIndex = total > 0 ? total - index : index + 1;
+              const sessionIndex = index + 1;
 
               return (
                 <div

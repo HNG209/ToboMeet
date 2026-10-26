@@ -17,21 +17,21 @@ export function useNotifications({
   isRead,
   skip,
 }: UseNotificationsOptions = {}) {
-  const [page, setPage] = useState(1);
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
   const { markNotificationsAsReadInCache } = useNotificationCacheManager();
 
   // ID thông báo chưa đọc
   const unreadIdsRef = useRef<Set<string>>(new Set());
 
-  // Tự động reset về trang 1 mỗi khi các tham số lọc thay đổi
+  // Tự động reset cursor mỗi khi các tham số lọc thay đổi
   useEffect(() => {
-    setPage(1);
+    setCursor(undefined);
   }, [type, isRead]);
 
-  // Gọi RTK Query với page hiện tại và các tham số lọc
+  // Gọi RTK Query với cursor hiện tại và các tham số lọc
   const queryResult = useGetNotificationsQuery(
     {
-      page,
+      cursor,
       limit,
       type,
       isRead,
@@ -68,23 +68,22 @@ export function useNotifications({
 
   // Hàm gọi trang tiếp theo (Load More)
   const loadMore = useCallback(() => {
-    if (data?.hasNext && !isFetching) {
-      setPage((prevPage) => prevPage + 1);
+    if (data?.hasNext && data?.nextCursor && !isFetching) {
+      setCursor(data.nextCursor);
     }
-  }, [data?.hasNext, isFetching]);
+  }, [data?.hasNext, data?.nextCursor, isFetching]);
 
   // Hàm làm mới danh sách (Pull to refresh)
   const refresh = useCallback(() => {
-    setPage(1);
+    setCursor(undefined);
     queryResult.refetch();
   }, [queryResult]);
 
   return {
     ...queryResult, // Trả về tất cả các cờ như isLoading, isFetching, isError,...
     notifications,
-    total: data?.total || 0,
     hasNext: data?.hasNext || false,
-    currentPage: page,
+    nextCursor: data?.nextCursor || null,
     loadMore,
     refresh,
   };
