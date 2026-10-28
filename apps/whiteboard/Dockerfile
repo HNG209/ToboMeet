@@ -22,6 +22,8 @@ RUN mkdir -p /app/data/rooms
 # Thiết lập biến môi trường mặc định
 ENV PORT=3002
 ENV NODE_ENV=production
+# Giới hạn heap V8 128MB cho whiteboard server và bật expose-gc
+ENV NODE_OPTIONS="--max-old-space-size=128 --expose-gc"
 
 # Mở cổng kết nối 3002
 EXPOSE 3002

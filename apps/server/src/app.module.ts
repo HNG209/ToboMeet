@@ -31,6 +31,9 @@ import { VectorDbModule } from "./vector-db/vector-db.module";
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         uri: configService.get<string>("MONGODB_URI"),
+        maxPoolSize: 10,
+        minPoolSize: 1,
+        serverSelectionTimeoutMS: 5000,
       }),
       inject: [ConfigService],
     }),

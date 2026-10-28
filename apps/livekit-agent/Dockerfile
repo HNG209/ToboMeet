@@ -1,12 +1,14 @@
 FROM python:3.11-slim
 
-# Ngăn Python tạo bytecode .pyc và hiển thị logs lập tức (unbuffered)
+# Ngăn Python tạo bytecode .pyc, hiển thị logs lập tức, tối ưu bộ nhớ heap
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONOPTIMIZE=1
+ENV MALLOC_TRIM_THRESHOLD_=100000
 
 WORKDIR /app
 
-# Cài đặt các gói hệ thống cần thiết cho thư viện âm thanh, mạng và build native extensions
+# Cài đặt các gói hệ thống cần thiết cho mạng và runtime
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc \
@@ -17,12 +19,9 @@ RUN apt-get update && \
     curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Cài đặt các thư viện Python
+# Cài đặt các thư viện Python (đã loại bỏ torch/silero không dùng tới để giảm RAM)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-
-# Tải trước trọng số mô hình hoặc file plugins (nếu có) để tăng tốc khởi động
-RUN python -m livekit.agents download-files || true
 
 # Sao chép file mã nguồn chính
 COPY main.py .

@@ -354,4 +354,7 @@ server.listen(PORT, () => {
     console.log(`🚀 Whiteboard server running at http://localhost:${PORT}`);
     console.log(`🔌 WebSocket endpoint: ws://localhost:${PORT}/sync`);
     console.log(`💾 SQLite persistence directory: ${DATA_DIR}`);
+    if (typeof (global as any).gc === "function") {
+        (global as any).gc();
+    }
 });

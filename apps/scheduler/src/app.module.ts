@@ -13,6 +13,9 @@ import { JobsModule } from './jobs/jobs.module';
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
         uri: configService.get<string>('MONGO_URI') || 'mongodb://localhost:27017/scheduler-db',
+        maxPoolSize: 5,
+        minPoolSize: 1,
+        serverSelectionTimeoutMS: 5000,
       }),
       inject: [ConfigService],
     }),

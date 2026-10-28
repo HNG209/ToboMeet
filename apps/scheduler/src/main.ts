@@ -12,6 +12,12 @@ async function bootstrap() {
   const port = configService.get<number>('PORT') || 2909;
 
   await app.listen(port);
+
+  if (typeof (global as any).gc === 'function') {
+    (global as any).gc();
+    console.log('🧹 Garbage collection executed in Scheduler after bootstrap.');
+  }
+
   console.log(`Scheduler Service is running on: http://localhost:${port}`);
 }
 bootstrap();

@@ -36,6 +36,8 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3001
+# Giới hạn heap V8 256MB và bật expose-gc để thu hồi RAM sau khi bootstrap
+ENV NODE_OPTIONS="--max-old-space-size=256 --expose-gc"
 
 # Cài đặt tzdata để đồng bộ múi giờ
 RUN apk add --no-cache tzdata

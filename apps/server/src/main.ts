@@ -50,6 +50,12 @@ async function bootstrap() {
   const port = process.env.PORT || 3001;
   await app.listen(port, "0.0.0.0");
 
+  // Thu hồi rác và giải phóng RAM tạm của quá trình bootstrap module/metadata
+  if (typeof (global as any).gc === "function") {
+    (global as any).gc();
+    console.log("🧹 Garbage collection executed after bootstrap.");
+  }
+
   console.log(`🚀 Backend đang chạy tại: http://localhost:${port}/api`);
 }
 bootstrap();

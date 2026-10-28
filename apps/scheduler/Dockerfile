@@ -5,6 +5,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+ENV UV_USE_IO_URING=0
+
 # Sao chép manifest và cấu hình TypeScript / Nest CLI
 COPY package*.json tsconfig*.json nest-cli.json ./
 
@@ -28,6 +30,8 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+# Giới hạn heap V8 128MB cho scheduler service và bật expose-gc
+ENV NODE_OPTIONS="--max-old-space-size=128 --expose-gc"
 
 # Sao chép package.json
 COPY package*.json ./
