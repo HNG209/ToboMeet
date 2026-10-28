@@ -1,0 +1,97 @@
+services:
+  # 1. REDIS: Dùng chung cho BullMQ (Server & Scheduler)
+  redis:
+    image: redis:7-alpine
+    container_name: tobomeet-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    networks:
+      - tobomeet-network
+
+  # 2. TOBOMEET CORE API SERVER (NestJS)
+  server:
+    image: ${DOCKER_USERNAME:-tobomeet}/tobomeet-server:latest
+    container_name: tobomeet-server
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WHITEBOARD_SERVER_URL=http://whiteboard:3002
+      - SCHEDULER_SERVICE_URL=http://scheduler:2909
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      - redis
+    volumes:
+      - ./uploads:/app/apps/server/uploads
+    restart: unless-stopped
+    networks:
+      - tobomeet-network
+
+  # 3. WHITEBOARD SYNC SERVER (tldraw SQLite sync server)
+  whiteboard:
+    image: ${DOCKER_USERNAME:-tobomeet}/tobomeet-whiteboard:latest
+    container_name: tobomeet-whiteboard
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+      - PORT=3002
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./data/whiteboard:/app/data/rooms
+    restart: unless-stopped
+    networks:
+      - tobomeet-network
+
+  # 4. SCHEDULER SERVICE (NestJS cron / BullMQ scheduler)
+  scheduler:
+    image: ${DOCKER_USERNAME:-tobomeet}/tobomeet-scheduler:latest
+    container_name: tobomeet-scheduler
+    ports:
+      - "2909:2909"
+    environment:
+      - NODE_ENV=production
+      - PORT=2909
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    env_file:
+      - path: .env
+        required: false
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - tobomeet-network
+
+  # 5. LIVEKIT AGENT (Python STT transcription worker kết nối Cloud LiveKit)
+  livekit-agent:
+    image: ${DOCKER_USERNAME:-tobomeet}/tobomeet-livekit-agent:latest
+    container_name: tobomeet-livekit-agent
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - ./transcripts:/app/transcripts
+    restart: unless-stopped
+    networks:
+      - tobomeet-network
+
+volumes:
+  redis_data:
+
+networks:
+  tobomeet-network:
+    driver: bridge

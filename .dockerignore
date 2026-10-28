@@ -18,3 +18,5 @@ build
 *.db-*
 .env
 .env.*
+.venv
+**/.venv

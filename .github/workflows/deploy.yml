@@ -1,0 +1,148 @@
+name: Build and Deploy ToboMeet
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  # ==========================================================
+  # JOB 1: Build tất cả Docker images và push lên Docker Hub
+  # ==========================================================
+  build-and-push:
+    name: Build & Push Images to Docker Hub
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 1. Build & Push Server chính (NestJS)
+      - name: Build & Push Server
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/server/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/tobomeet-server:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 2. Build & Push Whiteboard Sync Server
+      - name: Build & Push Whiteboard
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/whiteboard
+          file: apps/whiteboard/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/tobomeet-whiteboard:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 3. Build & Push Scheduler Service
+      - name: Build & Push Scheduler
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/scheduler
+          file: apps/scheduler/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/tobomeet-scheduler:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # 4. Build & Push LiveKit Agent
+      - name: Build & Push LiveKit Agent
+        uses: docker/build-push-action@v5
+        with:
+          context: apps/livekit-agent
+          file: apps/livekit-agent/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/tobomeet-livekit-agent:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ==========================================================
+  # JOB 2: Copy docker-compose.prod.yml vào VPS và khởi chạy
+  # ==========================================================
+  deploy:
+    name: Deploy to VPS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        env:
+          VPS_IP: ${{ secrets.VPS_IP }}
+          VPS_USERNAME: ${{ secrets.VPS_USERNAME }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          # Thiết lập private key SSH
+          mkdir -p ~/.ssh
+          echo "$VPS_SSH_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H -t rsa,ed25519 "$VPS_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          SSH_OPTS="-i ~/.ssh/id_rsa -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+
+          echo "🚀 Đang kết nối tới VPS: $VPS_USERNAME@$VPS_IP ..."
+
+          # 1. Tự động tạo thư mục tobomeet-deploy trên VPS nếu chưa có
+          ssh $SSH_OPTS "$VPS_USERNAME@$VPS_IP" "mkdir -p ~/tobomeet-deploy"
+
+          # 2. Copy duy nhất file docker-compose.prod.yml vào thư mục ~/tobomeet-deploy
+          scp $SSH_OPTS docker-compose.prod.yml "$VPS_USERNAME@$VPS_IP:~/tobomeet-deploy/docker-compose.prod.yml"
+
+          # 3. Chạy pull images và khởi động hệ thống trên VPS
+          ssh $SSH_OPTS "$VPS_USERNAME@$VPS_IP" "
+            set -e
+            cd ~/tobomeet-deploy
+
+            # Xác định lệnh docker compose (hỗ trợ cả 'docker compose' và 'docker-compose')
+            if docker compose version >/dev/null 2>&1; then
+              COMPOSE_CMD=\"docker compose\"
+            elif command -v docker-compose >/dev/null 2>&1; then
+              COMPOSE_CMD=\"docker-compose\"
+            else
+              echo \"❌ Lỗi: Không tìm thấy docker compose hoặc docker-compose trên VPS!\"
+              exit 1
+            fi
+
+            export DOCKER_USERNAME=\"$DOCKER_USERNAME\"
+
+            # Đảm bảo DOCKER_USERNAME tồn tại trong file .env trên VPS
+            if [ -f .env ]; then
+              if grep -q '^DOCKER_USERNAME=' .env; then
+                sed -i \"s|^DOCKER_USERNAME=.*|DOCKER_USERNAME=$DOCKER_USERNAME|\" .env
+              else
+                echo \"DOCKER_USERNAME=$DOCKER_USERNAME\" >> .env
+              fi
+            else
+              echo \"DOCKER_USERNAME=$DOCKER_USERNAME\" > .env
+              echo \"⚠️ File .env chưa được thiết lập. Hãy cập nhật các biến môi trường tại ~/tobomeet-deploy/.env\"
+            fi
+
+            echo \"📥 Đang kéo các Docker image mới nhất từ Docker Hub...\"
+            \$COMPOSE_CMD -f docker-compose.prod.yml pull
+
+            echo \"⚡ Khởi chạy các container trên VPS...\"
+            \$COMPOSE_CMD -f docker-compose.prod.yml up -d --remove-orphans
+
+            echo \"🧹 Dọn dẹp images dangling cũ...\"
+            docker image prune -f || true
+
+            echo \"✅ Triển khai thành công! Danh sách container đang chạy:\"
+            \$COMPOSE_CMD -f docker-compose.prod.yml ps
+          "
+
