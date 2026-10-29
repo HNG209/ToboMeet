@@ -140,6 +140,10 @@ jobs:
             echo \"⚡ Khởi chạy các container trên VPS...\"
             \$COMPOSE_CMD -f docker-compose.prod.yml up -d --remove-orphans
 
+            # Áp dụng Caddyfile mới ngay lập tức
+            echo \"🔄 Đang nạp cấu hình Caddyfile mới...\"
+            docker exec tobomeet-caddy caddy reload --config /etc/caddy/Caddyfile 2>/dev/null || \$COMPOSE_CMD -f docker-compose.prod.yml restart caddy || true
+
             echo \"🧹 Dọn dẹp images dangling cũ...\"
             docker image prune -f || true
 
