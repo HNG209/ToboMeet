@@ -1,4 +1,4 @@
-api.tobomeet.id.vn {
+api.tobo.id.vn {
 	# Tự động nén dữ liệu để tối ưu tốc độ và băng thông
 	encode zstd gzip
 
