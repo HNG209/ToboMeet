@@ -144,8 +144,39 @@ services:
     networks:
       - tobomeet-network
 
+  # 6. CADDY REVERSE PROXY & AUTOMATIC HTTPS (Let's Encrypt / ZeroSSL)
+  caddy:
+    image: caddy:2-alpine
+    container_name: tobomeet-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # Hỗ trợ HTTP/3 QUIC
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+      - whiteboard
+    mem_limit: 64m
+    mem_reservation: 30m
+    cpus: 0.15
+    deploy:
+      resources:
+        limits:
+          cpus: "0.15"
+          memory: 64M
+        reservations:
+          memory: 30M
+    networks:
+      - tobomeet-network
+
 volumes:
   redis_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   tobomeet-network:

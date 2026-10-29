@@ -1,0 +1,10 @@
+api.tobomeet.id.vn {
+	# Tự động nén dữ liệu để tối ưu tốc độ và băng thông
+	encode zstd gzip
+
+	# Định tuyến WebSocket và request cho Whiteboard (/sync, /sync?roomId=...)
+	reverse_proxy /sync* tobomeet-whiteboard:3002
+
+	# Định tuyến toàn bộ API và request còn lại sang NestJS Server
+	reverse_proxy tobomeet-server:3001
+}
