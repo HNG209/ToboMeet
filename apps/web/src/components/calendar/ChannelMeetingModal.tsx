@@ -143,8 +143,8 @@ export default function ChannelMeetingModal({
       const payload: any = {
         title: cmTitle,
         description: cmDesc.trim(),
-        startDate: cmStartDate,
-        endDate: cmEndDate,
+        startDate: new Date(cmStartDate).toISOString(),
+        endDate: new Date(cmEndDate).toISOString(),
         roomType: "channel_meeting",
         roomId: selectedRoom._id,
         channelId: selectedChannel._id,

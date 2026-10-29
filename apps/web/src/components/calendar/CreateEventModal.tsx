@@ -169,8 +169,8 @@ export default function CreateEventModal({
         const payload: any = {
           title,
           description,
-          startDate,
-          endDate,
+          startDate: new Date(startDate).toISOString(),
+          endDate: new Date(endDate).toISOString(),
           roomType,
           invitees: inviteeList,
         };

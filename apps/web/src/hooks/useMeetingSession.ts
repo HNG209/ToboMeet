@@ -339,12 +339,8 @@ export function useMeetingSession() {
         syncChannel.close();
       }
 
-      window.close();
-
-      setTimeout(() => {
-        handleSmartRedirect(meetingData?.roomId, true);
-      }, 300);
-    }, 1000);
+      handleSmartRedirect(meetingData?.roomId, true);
+    }, 500);
   };
 
   return {

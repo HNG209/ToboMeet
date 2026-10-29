@@ -131,16 +131,17 @@ services:
     volumes:
       - ./transcripts:/app/transcripts
     restart: unless-stopped
-    mem_limit: 200m
-    mem_reservation: 90m
-    cpus: 0.35
+    shm_size: 128m
+    mem_limit: 320m
+    mem_reservation: 100m
+    cpus: 0.40
     deploy:
       resources:
         limits:
-          cpus: "0.35"
-          memory: 200M
+          cpus: "0.40"
+          memory: 320M
         reservations:
-          memory: 90M
+          memory: 100M
     networks:
       - tobomeet-network
 
