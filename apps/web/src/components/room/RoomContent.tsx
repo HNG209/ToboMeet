@@ -7,6 +7,7 @@ import {
   useRemoveMemberMutation,
 } from "@/lib/redux/api/roomsApi";
 import Sidebar from "./Sidebar";
+import RoomSkeleton from "./RoomSkeleton";
 import { Loader2, Menu, X, Info, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSocket } from "@/hooks/useSocket";
@@ -291,11 +292,7 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
   };
 
   if (roomLoading) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-white">
-        <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
-      </div>
-    );
+    return <RoomSkeleton />;
   }
 
   if (roomError) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { RoomResponse } from "@tobomeet/shared/types";
 import { Users, Hash, Layers, Copy, Check } from "lucide-react";
@@ -31,7 +31,6 @@ interface RoomCardProps {
 }
 
 export default function RoomCard({ room }: RoomCardProps) {
-  const router = useRouter();
   const t = useTranslations("dashboard");
   const gradient = getGradient(room._id);
 
@@ -49,12 +48,13 @@ export default function RoomCard({ room }: RoomCardProps) {
   };
 
   return (
-    <div
+    <Link
       id={`room-card-${room._id}`}
-      onClick={() => router.push(`room/${room._id}`)}
+      href={`/room/${room._id}`}
+      prefetch={true}
       className="group relative text-left w-full bg-white rounded-2xl overflow-hidden border border-slate-200/80
                  shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-slate-300
-                 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between"
+                 hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between block"
     >
       {/* Header Banner — Teams & Slack style */}
       <div
@@ -135,6 +135,6 @@ export default function RoomCard({ room }: RoomCardProps) {
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

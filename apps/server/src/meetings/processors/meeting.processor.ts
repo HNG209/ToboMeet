@@ -71,6 +71,7 @@ export class MeetingProcessor extends WorkerHost {
       case "attendance-close-all": {
         const { meetingCode } = job.data as { meetingCode: string };
         await this.attendanceService.closeAllOpenVisits(meetingCode);
+        await this.meetingsService.endMeetingByCode(meetingCode);
         break;
       }
 

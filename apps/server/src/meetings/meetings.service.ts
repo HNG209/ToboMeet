@@ -101,6 +101,18 @@ export class MeetingsService {
 
     // Kiểm tra phòng LiveKit có đang active không
     let livekitRoom = await this.isRoomActive(meeting.meetingCode);
+    let humanParticipantsCount = 0;
+
+    if (livekitRoom && this.livekitRoomService) {
+      humanParticipantsCount = await this.getHumanParticipantsCount(meeting.meetingCode);
+      // Nếu phòng LiveKit vẫn còn nhưng thực tế không còn ai, kết thúc session cũ và dọn phòng
+      if (humanParticipantsCount === 0) {
+        await this.endMeetingByCode(meeting.meetingCode);
+        await this.forceDeleteLiveKitRoom(meeting.meetingCode);
+        livekitRoom = null;
+      }
+    }
+
     const isMeetingStarting = !livekitRoom;
 
     if (isMeetingStarting) {
@@ -142,9 +154,15 @@ export class MeetingsService {
       }
     }
 
-    // Tạo Session nếu đang start mới
+    // Quản lý Session
     let currentSessionId = "";
     if (isMeetingStarting) {
+      // Trước khi tạo session mới, kết thúc toàn bộ session ongoing cũ còn treo
+      await this.sessionModel.updateMany(
+        { meetingCode: meeting.meetingCode, status: "ongoing" },
+        { $set: { status: "ended", endedAt: new Date() } },
+      );
+
       try {
         const newSession = await this.sessionModel.create({
           meetingCode: meeting.meetingCode,
@@ -152,13 +170,25 @@ export class MeetingsService {
         });
         currentSessionId = newSession._id.toString();
       } catch (error) {
-        // Race condition: đã có session ongoing
         const ongoing = await this.sessionModel.findOne({
           meetingCode: meeting.meetingCode,
           status: "ongoing",
         });
         if (ongoing) currentSessionId = ongoing._id.toString();
       }
+    } else {
+      // Cuộc họp đang diễn ra, tìm session ongoing hoặc tạo mới nếu thiếu
+      let ongoing = await this.sessionModel.findOne({
+        meetingCode: meeting.meetingCode,
+        status: "ongoing",
+      });
+      if (!ongoing) {
+        ongoing = await this.sessionModel.create({
+          meetingCode: meeting.meetingCode,
+          status: "ongoing",
+        });
+      }
+      currentSessionId = ongoing._id.toString();
     }
 
     // Eager create LiveKit room nếu chưa có
@@ -339,10 +369,22 @@ export class MeetingsService {
       return { canStart: false, reason: "MEETING_NOT_FOUND" };
     }
 
-    // Nếu phòng đang active → không cần start nữa
-    const isActive = !!(await this.isRoomActive(meeting.meetingCode));
-    if (isActive) {
-      return { canStart: false, reason: "ALREADY_ONGOING" };
+    // Kiểm tra phòng LiveKit thực tế có người tham gia không
+    const livekitRoom = await this.isRoomActive(meeting.meetingCode);
+    if (livekitRoom) {
+      const humanCount = await this.getHumanParticipantsCount(meeting.meetingCode);
+      if (humanCount > 0) {
+        return { canStart: false, reason: "ALREADY_ONGOING" };
+      }
+      // Không có người: dọn dẹp phòng cũ và đóng session cũ để cho phép start mới
+      await this.endMeetingByCode(meeting.meetingCode);
+      await this.forceDeleteLiveKitRoom(meeting.meetingCode);
+    } else {
+      // LiveKit không có phòng, đảm bảo kết thúc mọi session ongoing bị treo
+      await this.sessionModel.updateMany(
+        { meetingCode: meeting.meetingCode, status: "ongoing" },
+        { $set: { status: "ended", endedAt: new Date() } },
+      );
     }
 
     // Kiểm tra quyền theo type
@@ -929,7 +971,28 @@ export class MeetingsService {
       };
     }
 
-    const isActuallyOngoing = !!(await this.isRoomActive(meeting.meetingCode));
+    const livekitRoom = await this.isRoomActive(meeting.meetingCode);
+    let isActuallyOngoing = false;
+
+    if (livekitRoom) {
+      const humanCount = await this.getHumanParticipantsCount(meeting.meetingCode);
+      if (humanCount > 0) {
+        isActuallyOngoing = true;
+      } else {
+        // Phòng tồn tại trên LiveKit nhưng không có người: đóng session và xoá phòng
+        await this.endMeetingByCode(meeting.meetingCode);
+        await this.forceDeleteLiveKitRoom(meeting.meetingCode);
+      }
+    } else {
+      // Không có phòng LiveKit, nếu session vẫn còn ongoing thì đóng lại
+      const ongoingSession = await this.sessionModel.findOne({
+        meetingCode: meeting.meetingCode,
+        status: "ongoing",
+      });
+      if (ongoingSession) {
+        await this.endMeetingByCode(meeting.meetingCode);
+      }
+    }
 
     return {
       isOngoing: isActuallyOngoing,
@@ -1045,6 +1108,8 @@ export class MeetingsService {
       }
     } catch (error) {
       console.log(`Phòng ${meetingCode} có thể đã được dọn dẹp.`, error);
+      // Đảm bảo session trong DB được đóng lại ngay cả khi LiveKit đã xóa phòng trước
+      await this.endMeetingByCode(meetingCode);
     }
   }
 
@@ -1213,6 +1278,31 @@ export class MeetingsService {
         isOngoing: false,
         meetingCode: meeting.meetingCode,
       });
+    }
+  }
+
+  /**
+   * Đếm số lượng người dùng thực tế trong phòng (loại trừ các agent bot/egress)
+   */
+  async getHumanParticipantsCount(meetingCode: string): Promise<number> {
+    if (!this.livekitRoomService) return 0;
+    try {
+      const participants = await this.livekitRoomService.listParticipants(meetingCode);
+      const humanParticipants = participants.filter((p) => {
+        const id = p.identity || '';
+        const name = p.name || '';
+        return (
+          !id.startsWith('EG_') &&
+          !id.startsWith('agent-') &&
+          !id.includes(this.STT_AGENT_NAME) &&
+          !name.includes(this.STT_AGENT_NAME) &&
+          (p as any).kind !== 2 &&
+          !(p as any).isAgent
+        );
+      });
+      return humanParticipants.length;
+    } catch {
+      return 0;
     }
   }
 
