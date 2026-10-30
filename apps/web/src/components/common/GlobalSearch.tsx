@@ -197,10 +197,10 @@ export default function GlobalSearch() {
             if (!isOpen) setIsOpen(true);
           }}
           onFocus={() => setIsOpen(true)}
-          placeholder={t("search_placeholder", { defaultValue: "Tìm kiếm phòng, lịch, người dùng..." })}
-          className="w-full h-9 pl-10 pr-16 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-brand-500/30 rounded-full text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-brand-500/10 transition-all duration-150"
+          placeholder={t("search_placeholder", { defaultValue: "Tìm kiếm..." })}
+          className="w-full h-9 pl-10 pr-9 bg-slate-100/80 hover:bg-slate-100 focus:bg-white border border-transparent focus:border-brand-500/30 rounded-full text-[13px] text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-brand-500/10 transition-all duration-150"
         />
-        {query ? (
+        {query && (
           <button
             onClick={() => {
               setQuery("");
@@ -210,10 +210,6 @@ export default function GlobalSearch() {
           >
             <X className="w-3.5 h-3.5" />
           </button>
-        ) : (
-          <span className="absolute right-3 text-[10px] font-semibold text-slate-400 bg-slate-200/70 px-1.5 py-0.5 rounded-md pointer-events-none">
-            Ctrl K
-          </span>
         )}
       </div>
 

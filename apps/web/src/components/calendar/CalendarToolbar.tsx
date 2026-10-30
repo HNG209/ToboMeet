@@ -11,6 +11,7 @@ import {
   Users2,
   PanelLeftClose,
   PanelLeft,
+  Check,
 } from "lucide-react";
 import { CalendarViewType } from "./types";
 
@@ -39,6 +40,18 @@ export default function CalendarToolbar({
 }: CalendarToolbarProps) {
   const t = useTranslations("calendar");
   const [showCreateDropdown, setShowCreateDropdown] = useState(false);
+  const [showViewDropdown, setShowViewDropdown] = useState(false);
+
+  const viewOptions: { value: CalendarViewType; label: string }[] = [
+    { value: "day", label: t("views.day", { defaultValue: "Ngày" }) },
+    { value: "week", label: t("views.week", { defaultValue: "Tuần" }) },
+    { value: "month", label: t("views.month", { defaultValue: "Tháng" }) },
+    { value: "agenda", label: t("views.year", { defaultValue: "Năm" }) },
+  ];
+
+  const currentViewLabel =
+    viewOptions.find((opt) => opt.value === view)?.label ||
+    t("views.week", { defaultValue: "Tuần" });
 
   const monthYearDisplay = currentDate
     .toLocaleDateString(locale === "vi" ? "vi-VN" : "en-US", {
@@ -110,18 +123,50 @@ export default function CalendarToolbar({
       {/* RIGHT: Input Select Chọn View (Ngày, Tuần, Tháng, Năm) + Cụm nút Tạo Lịch dropdown */}
       <div className="flex items-center gap-2 sm:gap-2.5">
         <div className="relative">
-          <select
-            value={view}
-            onChange={(e) => onSetView(e.target.value as CalendarViewType)}
-            className="appearance-none bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 hover:border-slate-300 rounded-xl px-3 sm:px-3.5 py-2 pr-7 sm:pr-8 text-xs font-bold text-slate-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer transition-all"
+          <button
+            type="button"
+            onClick={() => setShowViewDropdown(!showViewDropdown)}
+            className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 hover:border-slate-300 rounded-xl px-3 sm:px-3.5 py-2 text-xs font-bold text-slate-700 shadow-xs focus:outline-none focus:ring-2 focus:ring-brand-500/20 cursor-pointer transition-all active:scale-[0.98]"
             aria-label="Chọn chế độ xem lịch"
           >
-            <option value="day">{t("views.day", { defaultValue: "Ngày" })}</option>
-            <option value="week">{t("views.week", { defaultValue: "Tuần" })}</option>
-            <option value="month">{t("views.month", { defaultValue: "Tháng" })}</option>
-            <option value="agenda">{t("views.year", { defaultValue: "Năm" })}</option>
-          </select>
-          <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <span>{currentViewLabel}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${
+                showViewDropdown ? "rotate-180 text-brand-500" : ""
+              }`}
+            />
+          </button>
+
+          {showViewDropdown && (
+            <>
+              <div
+                className="fixed inset-0 z-[60]"
+                onClick={() => setShowViewDropdown(false)}
+              />
+              <div className="absolute right-0 sm:left-0 sm:right-auto top-full mt-2 w-36 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] border border-slate-100 p-1.5 z-[70] animate-in fade-in zoom-in-95 duration-150">
+                {viewOptions.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => {
+                      onSetView(opt.value);
+                      setShowViewDropdown(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 text-xs font-semibold rounded-xl transition-all ${
+                      view === opt.value
+                        ? "bg-brand-50 text-brand-600 font-bold"
+                        : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <span>{opt.label}</span>
+                    {view === opt.value && (
+                      <Check className="w-3.5 h-3.5 text-brand-600" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         <div className="relative">
@@ -154,7 +199,9 @@ export default function CalendarToolbar({
                 </div>
                 <div>
                   <p className="font-bold text-slate-800">{t("create.event", { defaultValue: "Sự kiện mới" })}</p>
-                  <p className="text-[10px] text-slate-400 font-normal">Tạo sự kiện hoặc cuộc hẹn cá nhân</p>
+                  <p className="text-[10px] text-slate-400 font-normal">
+                    {t("create.event_desc", { defaultValue: "Tạo sự kiện hoặc cuộc hẹn cá nhân" })}
+                  </p>
                 </div>
               </button>
 
@@ -173,7 +220,9 @@ export default function CalendarToolbar({
                 </div>
                 <div>
                   <p className="font-bold text-slate-800">{t("create.channel_meeting", { defaultValue: "Cuộc họp kênh" })}</p>
-                  <p className="text-[10px] text-slate-400 font-normal">Lên lịch họp cho nhóm hoặc kênh</p>
+                  <p className="text-[10px] text-slate-400 font-normal">
+                    {t("create.channel_meeting_desc", { defaultValue: "Lên lịch họp cho nhóm hoặc kênh" })}
+                  </p>
                 </div>
               </button>
             </div>

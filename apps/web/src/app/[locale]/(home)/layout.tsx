@@ -3,7 +3,7 @@
 import React, { useState, useEffect, createContext, useContext } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
-import { Video, Settings, Calendar, Bell, MessageCircle } from "lucide-react";
+import { Video, Calendar, Bell, MessageCircle } from "lucide-react";
 import NotificationDrawer from "@/components/notification/NotificationDrawer";
 import JoinDialog from "@/components/dashboard/JoinDialog";
 import SettingsDialog from "@/components/dashboard/SettingsDialog";
@@ -49,7 +49,6 @@ function HomeLayoutInner({
   // Các state quản lý UI dùng chung
   const [showJoinDialog, setShowJoinDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -177,47 +176,6 @@ function HomeLayoutInner({
                   </button>
                 );
               })}
-            </div>
-
-            {/* Settings */}
-            <div className="relative">
-              <button
-                onClick={() => setShowSettings(!showSettings)}
-                className={`flex flex-col items-center justify-center w-10 h-10 md:w-11 md:h-11 rounded-xl transition-colors ${showSettings
-                  ? "bg-slate-200/80 text-slate-800"
-                  : "text-slate-400 hover:bg-slate-200/60 hover:text-slate-700"
-                  }`}
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-
-              {showSettings && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setShowSettings(false)}
-                  />
-                  <div className="absolute left-full bottom-0 mb-2 ml-4 w-56 bg-white rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.12)] border border-slate-100 py-2 z-50 flex flex-col text-[14px]">
-                    <button
-                      onClick={() => {
-                        setShowSettings(false);
-                        setShowSettingsDialog(true);
-                      }}
-                      className="flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-slate-50 transition-colors w-full text-left font-medium"
-                    >
-                      <Settings className="w-4.5 h-4.5 text-slate-500" />
-                      <span>{t("settings")}</span>
-                    </button>
-                    <div className="h-px bg-slate-100 my-1.5 w-full"></div>
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-3 px-4 py-2 text-red-600 hover:bg-red-50 transition-colors w-full text-left"
-                    >
-                      <span>{t("logout")}</span>
-                    </button>
-                  </div>
-                </>
-              )}
             </div>
           </aside>
 

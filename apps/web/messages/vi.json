@@ -339,7 +339,7 @@
     "empty_description": "Hãy tạo hoặc tham gia một phòng để bắt đầu",
     "select_room_type": "Chọn loại phòng",
     "step_back": "Quay lại",
-    "search_placeholder": "Tìm kiếm phòng...",
+    "search_placeholder": "Tìm kiếm...",
     "no_results_title": "Không tìm thấy phòng phù hợp",
     "no_results_desc": "Vui lòng thử lại với từ khóa hoặc mã phòng khác.",
     "settings": "Cài đặt",
@@ -355,7 +355,8 @@
     "room_created_title": "Tạo phòng thành công!",
     "room_created_desc": "Chia sẻ mã này để mọi người tham gia phòng của bạn",
     "room_code_label": "Mã phòng",
-    "room_code_share_hint": "Người khác có thể tham gia bằng mã này từ trang chủ"
+    "room_code_share_hint": "Người khác có thể tham gia bằng mã này từ trang chủ",
+    "subtitle": "Quản lý và tham gia các nhóm học tập & cuộc họp của bạn"
   },
   "settings": {
     "title": "Cài đặt",
@@ -2081,11 +2082,6 @@
     "errors": {
       "4001": "Email này đã được sử dụng",
       "4002": "Phòng họp đã đạt số lượng tối đa",
-      "40020": "Cuộc họp đã đầy người tham gia (tối đa 100 người)",
-      "40021": "Bạn chỉ được phép tham gia và tạo tối đa 100 phòng họp",
-      "40022": "Phòng chỉ có thể có tối đa 50 kênh",
-      "40023": "Kênh riêng tư chỉ có thể có tối đa 100 người",
-      "40024": "Phòng đã đạt số lượng tối đa (500 người)",
       "4003": "Cuộc họp hiện không diễn ra",
       "4004": "Không thể truy cập thông tin cuộc họp",
       "4005": "Bạn phải đang tham gia cuộc họp mới có thể gửi lời mời",
@@ -2123,7 +2119,12 @@
       "4045": "Phòng thảo luận không tồn tại hoặc đã đóng",
       "4046": "Không tìm thấy thông tin phòng họp chính",
       "4291": "Bạn đã gửi lời mời cho người này rồi. Vui lòng thử lại sau ít phút",
-      "5011": "Lỗi hệ thống, vui lòng thử lại sau"
+      "5011": "Lỗi hệ thống, vui lòng thử lại sau",
+      "40020": "Cuộc họp đã đầy người tham gia (tối đa 100 người)",
+      "40021": "Bạn chỉ được phép tham gia và tạo tối đa 100 phòng họp",
+      "40022": "Phòng chỉ có thể có tối đa 50 kênh",
+      "40023": "Kênh riêng tư chỉ có thể có tối đa 100 người",
+      "40024": "Phòng đã đạt số lượng tối đa (500 người)"
     }
   },
   "calendar": {
@@ -2144,7 +2145,9 @@
     "create": {
       "button": "Tạo sự kiện",
       "event": "Sự kiện",
-      "channel_meeting": "Sự kiện kênh"
+      "channel_meeting": "Sự kiện kênh",
+      "event_desc": "Tạo sự kiện hoặc cuộc hẹn cá nhân",
+      "channel_meeting_desc": "Lên lịch họp cho nhóm hoặc kênh"
     },
     "days": {
       "short": [
@@ -2350,6 +2353,11 @@
       "notification_enabled_success": "Đã bật thông báo cho sự kiện thành công!",
       "notification_disabled_success": "Đã tắt thông báo cho sự kiện thành công!",
       "notification_toggle_error": "Không thể cập nhật trạng thái thông báo. Vui lòng thử lại!"
+    },
+    "today_schedule": {
+      "title": "Lịch hôm nay",
+      "no_events": "Không có sự kiện nào hôm nay",
+      "all_day": "Cả ngày"
     }
   },
   "ai_agent": {

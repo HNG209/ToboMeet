@@ -352,7 +352,7 @@
     "empty_description": "Create or join a team to get started",
     "select_room_type": "Select team type",
     "step_back": "Back",
-    "search_placeholder": "Search rooms...",
+    "search_placeholder": "Search...",
     "no_results_title": "No matching rooms found",
     "no_results_desc": "Please try again with a different keyword or room code.",
     "settings": "Settings",
@@ -368,7 +368,8 @@
     "room_created_title": "Room Created!",
     "room_created_desc": "Share this code so others can join your room",
     "room_code_label": "Room Code",
-    "room_code_share_hint": "Others can join using this code from the dashboard"
+    "room_code_share_hint": "Others can join using this code from the dashboard",
+    "subtitle": "Manage and join your study groups & meetings"
   },
   "settings": {
     "title": "Settings",
@@ -2096,11 +2097,6 @@
     "errors": {
       "4001": "This email is already in use",
       "4002": "The meeting room has reached maximum capacity",
-      "40020": "The meeting is full (maximum 100 participants)",
-      "40021": "You can only join and create up to 100 rooms",
-      "40022": "A room can have a maximum of 50 channels",
-      "40023": "A private channel can have a maximum of 100 members",
-      "40024": "The room has reached the maximum number of participants (500 members)",
       "4003": "The meeting is not currently active",
       "4004": "Unable to access meeting information",
       "4005": "You must be in the meeting to send invitations",
@@ -2138,7 +2134,12 @@
       "4045": "Breakout room does not exist or has closed",
       "4046": "Main meeting room information not found",
       "4291": "You have already sent an invitation to this person. Please try again in a few minutes",
-      "5011": "System error, please try again later"
+      "5011": "System error, please try again later",
+      "40020": "The meeting is full (maximum 100 participants)",
+      "40021": "You can only join and create up to 100 rooms",
+      "40022": "A room can have a maximum of 50 channels",
+      "40023": "A private channel can have a maximum of 100 members",
+      "40024": "The room has reached the maximum number of participants (500 members)"
     }
   },
   "calendar": {
@@ -2159,7 +2160,9 @@
     "create": {
       "button": "Create Event",
       "event": "Event",
-      "channel_meeting": "Channel Event"
+      "channel_meeting": "Channel Event",
+      "event_desc": "Create personal events or appointments",
+      "channel_meeting_desc": "Schedule a meeting for a team or channel"
     },
     "days": {
       "short": [
@@ -2365,6 +2368,11 @@
       "notification_enabled_success": "Event notifications turned on!",
       "notification_disabled_success": "Event notifications turned off!",
       "notification_toggle_error": "Failed to update notification settings. Please try again!"
+    },
+    "today_schedule": {
+      "title": "Today's Schedule",
+      "no_events": "No events scheduled today",
+      "all_day": "All day"
     }
   },
   "ai_agent": {

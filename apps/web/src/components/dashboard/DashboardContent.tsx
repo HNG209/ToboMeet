@@ -48,7 +48,7 @@ export default function DashboardContent({
                   </h1>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Quản lý và tham gia các nhóm học tập & cuộc họp của bạn
+                  {t("subtitle", { defaultValue: "Quản lý và tham gia các nhóm học tập & cuộc họp của bạn" })}
                 </p>
               </div>
             </div>

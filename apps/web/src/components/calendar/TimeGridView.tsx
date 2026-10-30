@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
-import { Repeat, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { Repeat } from "lucide-react";
 import {
   CalendarEvent,
   getDaysOfWeek,
@@ -215,9 +215,6 @@ export default function TimeGridView({
   const t = useTranslations("calendar");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
-  const [scrollLeft, setScrollLeft] = useState(0);
-  const [maxScrollLeft, setMaxScrollLeft] = useState(0);
-  const [hasHorizontalOverflow, setHasHorizontalOverflow] = useState(false);
 
   const daysOfWeek = getDaysOfWeek(currentDate);
 
@@ -268,29 +265,6 @@ export default function TimeGridView({
     return () => clearInterval(timer);
   }, []);
 
-  // Đo lường độ tràn ngang và thiết lập trạng thái cho thanh slider
-  const updateScrollMetrics = () => {
-    if (!scrollContainerRef.current) return;
-    const { scrollLeft: sLeft, scrollWidth, clientWidth } =
-      scrollContainerRef.current;
-    const maxScroll = Math.max(0, scrollWidth - clientWidth);
-    setScrollLeft(sLeft);
-    setMaxScrollLeft(maxScroll);
-    setHasHorizontalOverflow(maxScroll > 10);
-  };
-
-  useEffect(() => {
-    updateScrollMetrics();
-    const el = scrollContainerRef.current;
-    if (!el) return;
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateScrollMetrics();
-    });
-    resizeObserver.observe(el);
-    return () => resizeObserver.disconnect();
-  }, [displayedDays, filteredEvents, view, totalGridMinWidth]);
-
   // Tự động cuộn đến khung giờ hiện tại (hoặc 8:00 AM) khi mở/đổi view như Teams
   useEffect(() => {
     if (!scrollContainerRef.current) return;
@@ -301,30 +275,6 @@ export default function TimeGridView({
       behavior: "smooth",
     });
   }, [view, currentDate]);
-
-  const handleScroll = () => {
-    if (!scrollContainerRef.current) return;
-    const sLeft = scrollContainerRef.current.scrollLeft;
-    const maxScroll = Math.max(
-      0,
-      scrollContainerRef.current.scrollWidth -
-      scrollContainerRef.current.clientWidth,
-    );
-    setScrollLeft(sLeft);
-    setMaxScrollLeft(maxScroll);
-    setHasHorizontalOverflow(maxScroll > 10);
-  };
-
-  const handleSliderChange = (newVal: number) => {
-    if (!scrollContainerRef.current) return;
-    scrollContainerRef.current.scrollLeft = newVal;
-    setScrollLeft(newVal);
-  };
-
-  const handleScrollStep = (delta: number) => {
-    if (!scrollContainerRef.current) return;
-    scrollContainerRef.current.scrollBy({ left: delta, behavior: "smooth" });
-  };
 
   const formatHourLabel = (hour: number) => {
     const pad = (n: number) => n.toString().padStart(2, "0");
@@ -372,7 +322,6 @@ export default function TimeGridView({
       {/* ── Scrollable Time Grid Container ── */}
       <div
         ref={scrollContainerRef}
-        onScroll={handleScroll}
         className="flex-1 overflow-y-auto overflow-x-auto relative custom-horizontal-scrollbar"
       >
         <div
@@ -597,50 +546,6 @@ export default function TimeGridView({
           </div>
         </div>
       </div>
-
-      {/* ── Horizontal Scroll Slider Bar (Hiện thanh trượt khi có quá nhiều lịch chèn nhau gây tràn ngang) ── */}
-      {hasHorizontalOverflow && (
-        <div className="border-t border-slate-200 bg-slate-50/95 backdrop-blur-xs px-4 py-2 flex items-center justify-between gap-4 z-40 shrink-0 shadow-xs">
-          <div className="flex items-center gap-2 text-xs font-semibold text-slate-600 shrink-0">
-            <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-600" />
-          </div>
-
-          <div className="flex-1 flex items-center gap-2 max-w-md mx-auto">
-            <button
-              type="button"
-              onClick={() => handleScrollStep(-250)}
-              className="p-1 rounded-lg hover:bg-slate-200/70 text-slate-600 transition-colors cursor-pointer"
-              title={locale === "vi" ? "Cuộn sang trái" : "Scroll left"}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-
-            <input
-              type="range"
-              min={0}
-              max={maxScrollLeft}
-              value={scrollLeft}
-              onChange={(e) => handleSliderChange(Number(e.target.value))}
-              className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
-            />
-
-            <button
-              type="button"
-              onClick={() => handleScrollStep(250)}
-              className="p-1 rounded-lg hover:bg-slate-200/70 text-slate-600 transition-colors cursor-pointer"
-              title={locale === "vi" ? "Cuộn sang phải" : "Scroll right"}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="text-[11px] text-slate-400 font-medium shrink-0 hidden sm:block">
-            {locale === "vi"
-              ? "Kéo thanh trượt để xem toàn bộ lịch"
-              : "Drag slider to view all schedules"}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

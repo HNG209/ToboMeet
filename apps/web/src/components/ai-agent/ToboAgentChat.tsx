@@ -48,7 +48,7 @@ function getCornerPosition(
   const isDesktop = w >= 768;
   const leftMargin = isDesktop ? 96 : 80;
   const rightMargin = 24;
-  const topMargin = 24;
+  const topMargin = 64; // Chừa đủ khoảng trống bên dưới header chính (h-12 = 48px + 16px padding)
   const bottomMargin = 24;
 
   switch (corner) {
@@ -73,9 +73,9 @@ function getCornerPosition(
 function getDialogPositionClass(corner: Corner) {
   switch (corner) {
     case "top-left":
-      return "fixed top-6 left-20 md:left-24 animate-in fade-in slide-in-from-top-4";
+      return "fixed top-16 left-20 md:left-24 animate-in fade-in slide-in-from-top-4";
     case "top-right":
-      return "fixed top-6 right-6 animate-in fade-in slide-in-from-top-4";
+      return "fixed top-16 right-6 animate-in fade-in slide-in-from-top-4";
     case "bottom-left":
       return "fixed bottom-6 left-20 md:left-24 animate-in fade-in slide-in-from-bottom-4";
     case "bottom-right":
@@ -202,7 +202,7 @@ export default function ToboAgentChat() {
       const isDesktop = window.innerWidth >= 768;
       const minLeft = isDesktop ? 96 : 80;
       const maxRight = window.innerWidth - BUTTON_SIZE - 16;
-      const minTop = 16;
+      const minTop = 64; // Bên dưới header (48px)
       const maxBottom = window.innerHeight - BUTTON_SIZE - 16;
 
       const rawX = dragRef.current.origX + dx;
@@ -398,7 +398,7 @@ export default function ToboAgentChat() {
               ? "none"
               : "transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
           }}
-          className="fixed top-0 left-0 z-40 w-14 h-14 select-none touch-none"
+          className="fixed top-0 left-0 z-[60] w-14 h-14 select-none touch-none"
         >
           <button
             onPointerDown={handlePointerDown}
@@ -447,7 +447,7 @@ export default function ToboAgentChat() {
         <div
           className={`${getDialogPositionClass(
             corner,
-          )} z-50 w-[92vw] sm:w-[410px] h-[580px] max-h-[85vh] bg-white rounded-2xl shadow-[0_12px_45px_rgba(15,23,42,0.18)] border border-slate-200/90 flex flex-col overflow-hidden duration-200`}
+          )} z-[70] w-[92vw] sm:w-[410px] h-[580px] max-h-[85vh] bg-white rounded-2xl shadow-[0_12px_45px_rgba(15,23,42,0.18)] border border-slate-200/90 flex flex-col overflow-hidden duration-200`}
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-4 py-3.5 flex items-center justify-between text-white shrink-0 border-b border-indigo-900/50">
