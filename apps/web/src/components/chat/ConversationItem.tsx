@@ -52,7 +52,6 @@ export default function ConversationItem({
     conversation;
 
   const timeFormatted = formatRelativeTime(lastMessageAt, t("yesterday"));
-  const isOnline = recipient?.status === "ACTIVE";
 
   const renderPreview = () => {
     if (
@@ -73,20 +72,20 @@ export default function ConversationItem({
 
   return (
     <button
+      type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-150 text-left border ${
+      style={{ border: "none", outline: "none", boxShadow: "none" }}
+      className={`relative w-full flex items-center gap-3 p-3 rounded-2xl transition-all duration-150 text-left border-0 outline-none ring-0 shadow-none focus:outline-none focus:ring-0 focus-visible:outline-none select-none ${
         isActive
-          ? "bg-brand-50/70 border-brand-200/80 shadow-xs"
-          : "bg-transparent border-transparent hover:bg-slate-100/70"
+          ? "bg-brand-100/70"
+          : "bg-transparent hover:bg-slate-100/70"
       }`}
     >
-      {/* Avatar with presence badge */}
+      {/* Avatar without presence badge */}
       <UserAvatar
         avatarUrl={recipient?.avatarUrl}
         displayName={recipient?.displayName}
         size="w-12 h-12"
-        showOnlineBadge
-        isOnline={isOnline}
       />
 
       {/* Info */}
@@ -94,9 +93,11 @@ export default function ConversationItem({
         <div className="flex items-center justify-between gap-1 mb-1">
           <p
             className={`text-sm truncate ${
-              unreadCount > 0
-                ? "font-bold text-slate-900"
-                : "font-semibold text-slate-800"
+              isActive
+                ? "font-bold text-navy"
+                : unreadCount > 0
+                  ? "font-bold text-slate-900"
+                  : "font-semibold text-slate-800"
             }`}
           >
             {recipient?.displayName || t("user_fallback")}
@@ -104,9 +105,11 @@ export default function ConversationItem({
           {timeFormatted && (
             <span
               className={`text-[11px] shrink-0 ${
-                unreadCount > 0
-                  ? "text-brand-600 font-bold"
-                  : "text-slate-400 font-normal"
+                isActive
+                  ? "text-brand-600 font-semibold"
+                  : unreadCount > 0
+                    ? "text-brand-600 font-bold"
+                    : "text-slate-400 font-normal"
               }`}
             >
               {timeFormatted}
@@ -117,9 +120,11 @@ export default function ConversationItem({
         <div className="flex items-center justify-between gap-2">
           <p
             className={`text-xs truncate ${
-              unreadCount > 0
-                ? "font-semibold text-slate-800"
-                : "text-slate-500"
+              isActive
+                ? "text-slate-600 font-medium"
+                : unreadCount > 0
+                  ? "font-semibold text-slate-800"
+                  : "text-slate-500"
             }`}
           >
             {renderPreview()}

@@ -9,6 +9,16 @@ export const roomsApi = baseApi.injectEndpoints({
         method: "GET",
       }),
       providesTags: ["Room"],
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          data.forEach((room) => {
+            dispatch(
+              roomsApi.util.upsertQueryData("getRoomById", room._id, room),
+            );
+          });
+        } catch {}
+      },
     }),
 
     getRoomMembers: builder.query<RoomMemberResponse[], string>({
@@ -42,6 +52,7 @@ export const roomsApi = baseApi.injectEndpoints({
         url: `/rooms/${id}`,
         method: "GET",
       }),
+      keepUnusedDataFor: 300,
       providesTags: (_result, _error, id) => [{ type: "Room", id }],
     }),
 

@@ -113,17 +113,23 @@ export default function ConversationList({
       {/* List Area */}
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {isLoading ? (
-          <div className="p-4 space-y-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div key={i} className="flex items-center gap-3 animate-pulse">
-                <div className="w-12 h-12 rounded-full bg-slate-200" />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3.5 bg-slate-200 rounded-md w-3/4" />
-                  <div className="h-3 bg-slate-100 rounded-md w-1/2" />
+          Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className={`w-full flex items-center gap-3 p-3 rounded-2xl animate-pulse ${
+                i === 0 ? "bg-slate-100/60" : "bg-transparent"
+              }`}
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-200 shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="h-3.5 w-28 bg-slate-300 rounded" />
+                  <div className="h-2.5 w-10 bg-slate-200 rounded" />
                 </div>
+                <div className="h-3 w-40 bg-slate-200 rounded" />
               </div>
-            ))}
-          </div>
+            </div>
+          ))
         ) : hasNoResults ? (
           <div className="flex flex-col items-center justify-center h-64 p-6 text-center text-slate-400">
             <MessageSquareDashed className="w-10 h-10 text-slate-300 stroke-1 mb-2" />

@@ -243,7 +243,6 @@ export default function MessageThread({
   }, [scrollToBottom]);
 
   const { recipient } = conversation;
-  const isOnline = recipient?.status === "ACTIVE";
 
   // Group messages by day for date dividers
   let lastDateStr = "";
@@ -287,21 +286,13 @@ export default function MessageThread({
                 recipient?.displayName?.charAt(0).toUpperCase() || "U"
               )}
             </div>
-            <span
-              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
-                isOnline ? "bg-emerald-500" : "bg-slate-300"
-              }`}
-            />
           </div>
 
-          {/* Recipient Name and Status */}
+          {/* Recipient Name */}
           <div>
             <h3 className="text-sm font-bold text-slate-800 leading-tight">
               {recipient?.displayName || t("user_fallback")}
             </h3>
-            <p className="text-[11px] text-slate-400 font-medium">
-              {isOnline ? t("online") : t("offline")}
-            </p>
           </div>
         </div>
 

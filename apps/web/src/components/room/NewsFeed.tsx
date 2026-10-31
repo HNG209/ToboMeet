@@ -96,9 +96,28 @@ export default function NewsFeed({
         </div>
 
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400 text-sm gap-2">
-            <Loader2 className="animate-spin text-brand-600" size={24} />
-            <span>{t("loading_posts")}</span>
+          <div className="max-w-5xl mx-auto space-y-4 pt-2">
+            {[1, 2].map((i) => (
+              <div
+                key={i}
+                className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-sm space-y-4 animate-pulse"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-200 shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-4 w-32 bg-slate-200 rounded" />
+                    <div className="h-2.5 w-20 bg-slate-100 rounded" />
+                  </div>
+                </div>
+                <div className="space-y-2 pl-13">
+                  <div className="h-4 w-3/4 bg-slate-200/80 rounded" />
+                  <div className="h-4 w-1/2 bg-slate-200/60 rounded" />
+                </div>
+                <div className="pt-2 pl-13">
+                  <div className="h-8 w-32 rounded-lg bg-slate-100" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : isError ? (
           <div className="text-center text-red-500 py-20 text-sm font-semibold">

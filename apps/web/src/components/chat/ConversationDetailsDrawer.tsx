@@ -116,17 +116,6 @@ export default function ConversationDetailsDrawer({
           {recipient?.displayName || "Người dùng"}
         </h4>
         <p className="text-xs text-slate-400 mt-0.5">{recipient?.email}</p>
-
-        <div className="flex items-center gap-1.5 mt-2">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              recipient?.status === "ACTIVE" ? "bg-emerald-500" : "bg-slate-300"
-            }`}
-          />
-          <span className="text-xs text-slate-500 font-medium">
-            {recipient?.status === "ACTIVE" ? t("online") : t("offline")}
-          </span>
-        </div>
       </div>
 
       {/* Media & Files Tabs */}

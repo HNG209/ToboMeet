@@ -19,7 +19,6 @@ import {
   MeetingSessionProvider,
   useMeetingSessionContext,
 } from "@/components/meeting/contexts/MeetingSessionContext";
-import { LivekitRoomMetadata } from "@tobomeet/shared/types";
 import { useBreakoutSync } from "@/hooks/useBreakoutSync";
 import { MeetingWhiteboardProvider } from "@/components/meeting/contexts/MeetingWhiteboardContext";
 

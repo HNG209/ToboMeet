@@ -3,11 +3,11 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   useGetRoomByIdQuery,
+  useGetMyRoomsQuery,
   useGetRoomMembersQuery,
   useRemoveMemberMutation,
 } from "@/lib/redux/api/roomsApi";
 import Sidebar from "./Sidebar";
-import RoomSkeleton from "./RoomSkeleton";
 import { Loader2, Menu, X, Info, Plus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSocket } from "@/hooks/useSocket";
@@ -41,10 +41,12 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
   const dispatch = useDispatch<AppDispatch>();
 
   const {
-    data: room,
+    data: fetchedRoom,
     isLoading: roomLoading,
     error: roomError,
   } = useGetRoomByIdQuery(roomId);
+  const { data: myRooms } = useGetMyRoomsQuery();
+  const room = fetchedRoom || myRooms?.find((r) => r._id === roomId);
   const { data: membersResponse, isLoading: membersLoading } =
     useGetRoomMembersQuery(roomId, { refetchOnMountOrArgChange: true });
   const members = membersResponse || [];
@@ -291,8 +293,12 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
     }
   };
 
-  if (roomLoading) {
-    return <RoomSkeleton />;
+  if (roomLoading && !room) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-white">
+        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
+      </div>
+    );
   }
 
   if (roomError) {

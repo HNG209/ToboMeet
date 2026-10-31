@@ -224,7 +224,7 @@ export function useMeetingSession() {
   );
 
   // Tham gia/bắt đầu cuộc họp
-  const handleJoinByCode = useCallback(async (allowStart = false) => {
+  const handleJoinByCode = useCallback(async (allowStart = false, forceSwitch = false) => {
     if (!meetingCode) return;
     if (!deviceId) {
       console.log("[Meeting] Waiting for deviceId...");
@@ -240,6 +240,7 @@ export function useMeetingSession() {
         deviceId: deviceId,
         displayName: finalName,
         allowStart: allowStart,
+        forceSwitch: forceSwitch,
       }).unwrap();
 
       sessionStorage.setItem(`is_joined_${meetingCode}`, "true");
@@ -273,9 +274,15 @@ export function useMeetingSession() {
       const errorCode = String(error.code);
 
       if (error?.code === 4013) {
-        toast.error(
-          t(errorCode) || "Bạn đang ở trong phòng này trên thiết bị/tab khác.",
-        );
+        toast(tSession("already_in_meeting"), {
+          description: tSession("switch_device_desc"),
+          action: {
+            label: tSession("switch_device_btn"),
+            onClick: () => handleJoinByCode(allowStart, true),
+          },
+          duration: 10000,
+        });
+        setStatus("IN_LOBBY");
       } else if (error?.code === 4014) {
         toast.error(t(errorCode) || "Cuộc họp chưa bắt đầu hoặc đã kết thúc");
         await handleSmartRedirect();
@@ -287,7 +294,18 @@ export function useMeetingSession() {
         setStatus("IN_LOBBY");
       }
     }
-  }, [meetingCode, displayName, deviceId, joinMeetingApi, t, tSession]);
+  }, [
+    meetingCode,
+    displayName,
+    deviceId,
+    joinMeetingApi,
+    camOn,
+    micOn,
+    hardwareConfig,
+    t,
+    tSession,
+    handleSmartRedirect,
+  ]);
 
   // Kiểm tra Session khi tải trang (F5 / Reconnect)
   useEffect(() => {

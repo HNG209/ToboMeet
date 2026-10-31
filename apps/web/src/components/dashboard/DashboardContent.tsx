@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { useGetMyRoomsQuery } from "@/lib/redux/api/roomsApi";
 import { RoomResponse } from "@tobomeet/shared/types";
-import { Plus, Loader2, FolderOpen, Search, X, Users } from "lucide-react";
+import { Plus, FolderOpen, Search, X, Users } from "lucide-react";
 import RoomCard from "./RoomCard";
 import { useHomeContext } from "@/app/[locale]/(home)/layout";
 
@@ -74,11 +74,25 @@ export default function DashboardContent({
           </div>
           <div className="w-full">
             {isLoading && (
-              <div className="flex flex-col items-center justify-center py-32 gap-4">
-                <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
-                <p className="text-slate-500 text-sm font-medium">
-                  {t("loading_rooms")}
-                </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-pulse">
+                {Array.from({ length: 8 }).map((_, idx) => (
+                  <div
+                    key={idx}
+                    className="bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs flex flex-col h-56"
+                  >
+                    <div className="h-28 bg-slate-200/80" />
+                    <div className="p-4 flex-1 flex flex-col justify-between">
+                      <div className="space-y-2">
+                        <div className="h-4 w-3/4 bg-slate-300 rounded" />
+                        <div className="h-3 w-1/2 bg-slate-200 rounded" />
+                      </div>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <div className="h-3 w-16 bg-slate-200 rounded" />
+                        <div className="h-5 w-14 bg-slate-200 rounded-full" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 

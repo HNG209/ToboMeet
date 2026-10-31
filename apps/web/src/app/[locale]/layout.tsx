@@ -1,6 +1,7 @@
 // ─── [locale] Layout ──────────────────────────────────────────────────────────
 // Root locale layout: thiết lập html lang, font, metadata SEO và NextIntlClientProvider.
 
+import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { notFound } from 'next/navigation';
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
@@ -8,6 +9,7 @@ import { getMessages } from 'next-intl/server';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 import { routing } from '@/i18n/routing';
 import { GlobalSocketListeners } from '@/providers/GlobalSocketListeners';
+import TopLoadingBar from '@/components/common/TopLoadingBar';
 import '../globals.css';
 
 // ─── Viewport Configuration ───────────────────────────────────────────────────
@@ -91,6 +93,9 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
     <html lang={locale} className={`scroll-smooth ${plusJakartaSans.variable}`}>
       <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
+          <Suspense fallback={null}>
+            <TopLoadingBar />
+          </Suspense>
           <GlobalSocketListeners />
           {children}
         </NextIntlClientProvider>

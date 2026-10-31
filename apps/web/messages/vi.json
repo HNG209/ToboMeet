@@ -1988,7 +1988,10 @@
       "join_breakout_error": "Không thể tham gia phiên thảo luận lúc này.",
       "return_main_error": "Không thể quay về phòng chính lúc này.",
       "reconnect_error": "Không thể kết nối lại cuộc họp. Vui lòng thử lại.",
-      "general_action_error": "Chưa thể thực hiện thao tác này"
+      "general_action_error": "Chưa thể thực hiện thao tác này",
+      "already_in_meeting": "Đang ở cuộc họp trên thiết bị khác",
+      "switch_device_desc": "Chuyển cuộc họp sang thiết bị này?",
+      "switch_device_btn": "Chuyển thiết bị"
     },
     "screen_share_modal": {
       "title": "Chọn nội dung chia sẻ",

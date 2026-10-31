@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, createContext, useContext } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import React, { useState, useEffect, createContext, useContext, Suspense } from "react";
+import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { Video, Calendar, Bell, MessageCircle } from "lucide-react";
 import NotificationDrawer from "@/components/notification/NotificationDrawer";
@@ -10,10 +10,24 @@ import SettingsDialog from "@/components/dashboard/SettingsDialog";
 import CreateRoomDialog from "@/components/dashboard/CreateRoomDialog";
 import { useNotificationCacheManager } from "@/hooks/useNotificationCacheManager";
 import { useGetMeQuery } from "@/lib/redux/api/usersApi";
+import { useGetMyRoomsQuery } from "@/lib/redux/api/roomsApi";
 import StoreProvider from "@/lib/redux/StoreProvider";
 import ToboAgentChat from "@/components/ai-agent/ToboAgentChat";
 import GlobalSearch from "@/components/common/GlobalSearch";
 import UserProfileMenu from "@/components/common/UserProfileMenu";
+
+// Persistent Tab Views
+import DashboardContent from "@/components/dashboard/DashboardContent";
+import CalendarView from "@/components/calendar/CalendarView";
+import ChatLayout from "@/components/chat/ChatLayout";
+
+type TabType = "teams" | "calendar" | "chat";
+
+function getTabFromPath(path: string): TabType {
+  if (path.includes("/chat")) return "chat";
+  if (path.includes("/calendar")) return "calendar";
+  return "teams";
+}
 
 // Context để các trang con (children) gọi lệnh mở Modal dùng chung
 interface HomeContextType {
@@ -23,6 +37,19 @@ interface HomeContextType {
 
 const HomeContext = createContext<HomeContextType>({} as HomeContextType);
 export const useHomeContext = () => useContext(HomeContext);
+
+function DashboardTab() {
+  const { data: initialRooms } = useGetMyRoomsQuery();
+  return <DashboardContent initialRooms={initialRooms} />;
+}
+
+function TabFallback() {
+  return (
+    <div className="h-full w-full flex items-center justify-center">
+      <div className="w-8 h-8 rounded-full border-2 border-brand-500 border-t-transparent animate-spin" />
+    </div>
+  );
+}
 
 // ─── Inner Layout (cần Redux context) ────────────────────────────────────────
 function HomeLayoutInner({
@@ -36,6 +63,53 @@ function HomeLayoutInner({
   const pathname = usePathname(); // Lấy đường dẫn hiện tại
   const { data: myProfile } = useGetMeQuery();
   const { updateUnreadNotificationBadge } = useNotificationCacheManager();
+
+  // Xác định tab ban đầu dựa vào URL
+  const initialTab = getTabFromPath(pathname);
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  const [mountedTabs, setMountedTabs] = useState<Record<TabType, boolean>>({
+    teams: initialTab === "teams",
+    calendar: initialTab === "calendar",
+    chat: initialTab === "chat",
+  });
+
+  // Đồng bộ khi pathname thay đổi từ bên ngoài (ví dụ router.push từ GlobalSearch hoặc Header)
+  useEffect(() => {
+    const tab = getTabFromPath(pathname);
+    setActiveTab(tab);
+    setMountedTabs((prev) => ({ ...prev, [tab]: true }));
+  }, [pathname]);
+
+  // Đồng bộ khi người dùng bấm nút Back / Forward trên trình duyệt
+  useEffect(() => {
+    const handlePopState = () => {
+      const tab = getTabFromPath(window.location.pathname);
+      setActiveTab(tab);
+      setMountedTabs((prev) => ({ ...prev, [tab]: true }));
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Chuyển tab lập tức (0ms) và đồng bộ URL bằng pushState (không gọi request server _rsc)
+  const handleTabClick = (
+    e: React.MouseEvent<HTMLAnchorElement>,
+    targetTab: TabType,
+    href: string,
+  ) => {
+    // Nếu click chuột giữa hoặc giữ Ctrl/Cmd để mở tab mới -> để trình duyệt xử lý bình thường
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+
+    e.preventDefault();
+    if (activeTab === targetTab) return;
+
+    setActiveTab(targetTab);
+    setMountedTabs((prev) => ({ ...prev, [targetTab]: true }));
+
+    const targetUrl = `/${locale}${href}`;
+    window.history.pushState({ tab: targetTab }, "", targetUrl);
+  };
 
   // Chuyển hướng nếu có link mời tham gia
   useEffect(() => {
@@ -58,28 +132,25 @@ function HomeLayoutInner({
 
   const navItems = [
     {
-      id: "teams",
+      id: "teams" as const,
       icon: Video,
       label: t("tab_teams", { defaultValue: "Teams" }),
-      href: `/${locale}/dashboard`,
-      // Bật active nếu đúng trang chủ dashboard
-      isActive: pathname === `/${locale}/dashboard`,
+      href: "/dashboard",
+      isActive: activeTab === "teams",
     },
     {
-      id: "calendar",
+      id: "calendar" as const,
       icon: Calendar,
       label: t("tab_calendar", { defaultValue: "Calendar" }),
-      href: `/${locale}/calendar`,
-      // Bật active nếu đường dẫn bắt đầu bằng /calendar (hỗ trợ cho cả các route con bên trong calendar nếu có)
-      isActive: pathname.startsWith(`/${locale}/calendar`),
+      href: "/calendar",
+      isActive: activeTab === "calendar",
     },
     {
-      id: "chat",
+      id: "chat" as const,
       icon: MessageCircle,
       label: t("tab_chat", { defaultValue: "Chat" }),
-      href: `/${locale}/chat`,
-      // Bật active nếu đường dẫn bắt đầu bằng /chat
-      isActive: pathname.startsWith(`/${locale}/chat`),
+      href: "/chat",
+      isActive: activeTab === "chat",
     },
   ];
 
@@ -91,8 +162,9 @@ function HomeLayoutInner({
         <header className="h-12 bg-white border-b border-slate-200/80 px-3 md:px-5 flex items-center justify-between shrink-0 z-50 select-none">
           {/* Góc trái: Logo ToboMeet */}
           <div className="flex items-center gap-2.5 w-44 md:w-56 shrink-0">
-            <button
-              onClick={() => router.push(`/${locale}/dashboard`)}
+            <Link
+              href="/dashboard"
+              onClick={(e) => handleTabClick(e, "teams", "/dashboard")}
               className="flex items-center gap-2.5 group text-left hover:opacity-90 transition-opacity"
             >
               <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-brand-600 to-brand-500 flex items-center justify-center text-white shadow-sm shadow-brand-500/20 group-hover:scale-105 transition-transform">
@@ -103,7 +175,7 @@ function HomeLayoutInner({
                   Tobo<span className="text-brand-600">Meet</span>
                 </span>
               </div>
-            </button>
+            </Link>
           </div>
 
           {/* Ở giữa: Thanh tìm kiếm chung (Global Search) */}
@@ -158,9 +230,11 @@ function HomeLayoutInner({
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <button
+                  <Link
                     key={item.id}
-                    onClick={() => router.push(item.href)}
+                    href={item.href}
+                    prefetch={true}
+                    onClick={(e) => handleTabClick(e, item.id, item.href)}
                     className={`flex flex-col items-center justify-center gap-1.5 w-full py-3 px-1 md:px-1.5 transition-all group border-l-2 ${
                       item.isActive
                         ? "text-brand-600 bg-brand-50/50 border-brand-500 font-semibold"
@@ -173,15 +247,51 @@ function HomeLayoutInner({
                     <span className="hidden md:block text-[10px] tracking-tight text-center leading-tight truncate max-w-[72px]">
                       {item.label}
                     </span>
-                  </button>
+                  </Link>
                 );
               })}
             </div>
           </aside>
 
-          {/* ── Main Content Area ── */}
+          {/* ── Main Content Area (Persistent Tabs Shell) ── */}
           <div className="flex-1 flex flex-col relative min-w-0 overflow-hidden bg-[#fcfcfc]">
-            {children}
+            {/* Tab 1: Teams / Dashboard */}
+            <div
+              className={`h-full w-full flex-col min-h-0 ${
+                activeTab === "teams" ? "flex" : "hidden"
+              }`}
+            >
+              {mountedTabs.teams && <DashboardTab />}
+            </div>
+
+            {/* Tab 2: Calendar */}
+            <div
+              className={`h-full w-full flex-col min-h-0 ${
+                activeTab === "calendar" ? "flex" : "hidden"
+              }`}
+            >
+              {mountedTabs.calendar && (
+                <Suspense fallback={<TabFallback />}>
+                  <CalendarView />
+                </Suspense>
+              )}
+            </div>
+
+            {/* Tab 3: Chat */}
+            <div
+              className={`h-full w-full flex-col min-h-0 ${
+                activeTab === "chat" ? "flex" : "hidden"
+              }`}
+            >
+              {mountedTabs.chat && (
+                <Suspense fallback={<TabFallback />}>
+                  <ChatLayout />
+                </Suspense>
+              )}
+            </div>
+
+            {/* Nếu là route con khác ngoài 3 tab chính */}
+            {!["teams", "calendar", "chat"].includes(activeTab) && children}
           </div>
         </div>
 

@@ -2003,7 +2003,10 @@
       "join_breakout_error": "Cannot join breakout session at this time.",
       "return_main_error": "Cannot return to main room at this time.",
       "reconnect_error": "Cannot reconnect to meeting. Please try again.",
-      "general_action_error": "Cannot perform this action at this time"
+      "general_action_error": "Cannot perform this action at this time",
+      "already_in_meeting": "Already in meeting on another device",
+      "switch_device_desc": "Switch meeting to this device?",
+      "switch_device_btn": "Switch device"
     },
     "screen_share_modal": {
       "title": "Select content to share",

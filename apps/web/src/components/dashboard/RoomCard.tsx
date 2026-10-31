@@ -4,6 +4,9 @@ import { useState } from "react";
 import { Link } from "@/i18n/navigation";
 import { useTranslations } from "next-intl";
 import { RoomResponse } from "@tobomeet/shared/types";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "@/lib/redux/store";
+import { roomsApi } from "@/lib/redux/api/roomsApi";
 import { Users, Hash, Layers, Copy, Check } from "lucide-react";
 
 // Gradient presets nâng cấp tương tự Microsoft Teams / Slack
@@ -35,6 +38,11 @@ export default function RoomCard({ room }: RoomCardProps) {
   const gradient = getGradient(room._id);
 
   const [copied, setCopied] = useState(false);
+  const dispatch = useDispatch<AppDispatch>();
+
+  const handleWarmCache = () => {
+    dispatch(roomsApi.util.upsertQueryData("getRoomById", room._id, room));
+  };
 
   const handleCopyCode = (e: React.MouseEvent) => {
     e.stopPropagation(); // Ngăn không cho click lan ra ngoài thẻ card
@@ -52,6 +60,8 @@ export default function RoomCard({ room }: RoomCardProps) {
       id={`room-card-${room._id}`}
       href={`/room/${room._id}`}
       prefetch={true}
+      onMouseEnter={handleWarmCache}
+      onClick={handleWarmCache}
       className="group relative text-left w-full bg-white rounded-2xl overflow-hidden border border-slate-200/80
                  shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-slate-300
                  hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between block"
@@ -65,8 +75,15 @@ export default function RoomCard({ room }: RoomCardProps) {
         <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-black/10 blur-md" />
 
         {room.code && (
-          <div className="self-end relative z-10">
+          <div
+            className="self-end relative z-10"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+          >
             <button
+              type="button"
               onClick={handleCopyCode}
               title="Sao chép mã phòng"
               className="group/code inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 hover:bg-black/40 backdrop-blur-md text-[11px] font-mono text-white/90 border border-white/10 hover:border-white/30 font-semibold tracking-wider shadow-sm transition-all"
