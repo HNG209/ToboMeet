@@ -400,6 +400,7 @@ export default function CalendarView() {
         onDelete={() => setShowDeleteConfirmModal(true)}
         onJoinMeeting={handleJoinMeeting}
         onRestoreOccurrence={handleRestoreOccurrenceSuccess}
+        onSuccess={() => refetchEvents()}
       />
 
       <DeleteEventConfirmModal

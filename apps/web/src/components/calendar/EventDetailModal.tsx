@@ -26,7 +26,8 @@ import {
   useLeaveCalendarEventMutation,
   useToggleCalendarNotificationMutation,
 } from "@/lib/redux/api/calendarApi";
-import InviteMembersModal from "./InviteMembersModal";
+import EventInviteView from "./EventInviteView";
+import EventEditView from "./EventEditView";
 import ToggleNotificationConfirmModal from "./ToggleNotificationConfirmModal";
 import { toast } from "sonner";
 
@@ -38,7 +39,8 @@ interface EventDetailModalProps {
   rsvpList: RsvpMember[];
   currentUserId?: string;
   currentSupabaseId?: string;
-  onEdit: (event: CalendarEvent) => void;
+  onEdit?: (event: CalendarEvent) => void;
+  onSuccess?: () => void;
   onDelete: (event: CalendarEvent) => void;
   onJoinMeeting: (meetingCode: string) => void;
   onRestoreOccurrence?: (eventId: string, occurrenceDate: string) => void;
@@ -56,6 +58,7 @@ export default function EventDetailModal({
   onDelete,
   onJoinMeeting,
   onRestoreOccurrence,
+  onSuccess,
 }: EventDetailModalProps) {
   const t = useTranslations("calendar");
   const [restoreCalendarOccurrence] = useRestoreCalendarOccurrenceMutation();
@@ -63,8 +66,8 @@ export default function EventDetailModal({
     useLeaveCalendarEventMutation();
   const [toggleCalendarNotification, { isLoading: isTogglingNotification }] =
     useToggleCalendarNotificationMutation();
+  const [view, setView] = useState<"detail" | "invite" | "edit">("detail");
   const [restoringDate, setRestoringDate] = useState<string | null>(null);
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [showNotificationConfirmModal, setShowNotificationConfirmModal] =
     useState(false);
@@ -85,7 +88,7 @@ export default function EventDetailModal({
 
   useEffect(() => {
     if (!isOpen) {
-      setIsInviteModalOpen(false);
+      setView("detail");
       setShowLeaveConfirm(false);
       setShowNotificationConfirmModal(false);
     }
@@ -367,28 +370,37 @@ export default function EventDetailModal({
     }
   };
 
+  const maxWidthClass =
+    view === "invite" || view === "edit" ? "max-w-lg" : "max-w-md";
+
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
-    >
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200"
+        onClick={onClose}
+      />
+
+      {/* Modal Dialog Shell with Dynamic Sizing Transition */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className={`relative bg-white border border-slate-200/70 rounded-3xl shadow-[0_24px_50px_rgba(15,23,42,0.18)] w-full ${maxWidthClass} max-h-[85vh] overflow-hidden flex flex-col transition-all duration-300 ease-in-out`}
       >
-        <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-          <h3 className="font-bold text-slate-800 text-[17px]">
-            {t("detail_modal.title")}
-          </h3>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+        {view === "detail" && (
+          <div className="flex flex-col h-full overflow-hidden animate-in fade-in duration-200">
+            <div className="px-6 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between shrink-0">
+              <h3 className="font-bold text-slate-800 text-[17px]">
+                {t("detail_modal.title")}
+              </h3>
+              <button
+                onClick={onClose}
+                className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-        <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto flex-1">
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <h4 className="text-lg font-bold text-slate-900 tracking-tight">
@@ -577,7 +589,7 @@ export default function EventDetailModal({
                 </h5>
                 <button
                   type="button"
-                  onClick={() => setIsInviteModalOpen(true)}
+                  onClick={() => setView("invite")}
                   className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors cursor-pointer"
                   title={t("detail_modal.invite_button")}
                 >
@@ -680,13 +692,15 @@ export default function EventDetailModal({
             </div>
           )}
 
+          </div>
+
           {/* Action Buttons ở Footer */}
-          <div className="flex gap-2 pt-4 w-full border-t border-slate-50 justify-between items-center">
+          <div className="px-6 py-4 border-t border-slate-100 flex gap-2 w-full justify-between items-center bg-white shrink-0">
             <div className="flex gap-2">
               {isHost && (
                 <button
                   type="button"
-                  onClick={() => onEdit(event)}
+                  onClick={() => setView("edit")}
                   className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors flex items-center gap-1.5 text-xs font-semibold text-slate-700 cursor-pointer"
                   title={t("detail_modal.edit")}
                 >
@@ -719,7 +733,51 @@ export default function EventDetailModal({
             )}
           </div>
         </div>
-      </div>
+      )}
+
+      {view === "invite" && (
+        <EventInviteView
+          event={event}
+          locale={locale}
+          onBack={() => setView("detail")}
+          onClose={onClose}
+          existingMemberIds={[
+            ...(event.hostId ? [event.hostId] : []),
+            ...(event.acceptedUserIds || []),
+            ...(event.pendingUserIds || []),
+            ...((rsvpList || [])
+              .filter((m) => m.status === "ACCEPTED" || m.status === "PENDING")
+              .map((m) => m.userId)
+              .filter(Boolean) as string[]),
+          ]}
+          existingEmails={[
+            ...(event.hostEmail ? [event.hostEmail] : []),
+            ...((event.invitees || []).map((i) => i.email).filter(Boolean) as string[]),
+            ...((rsvpList || [])
+              .filter((m) => m.status === "ACCEPTED" || m.status === "PENDING")
+              .map((m) => m.email)
+              .filter(Boolean) as string[]),
+          ]}
+          onSuccess={() => {
+            setView("detail");
+            onSuccess?.();
+          }}
+        />
+      )}
+
+      {view === "edit" && (
+        <EventEditView
+          event={event}
+          locale={locale}
+          onBack={() => setView("detail")}
+          onClose={onClose}
+          onSuccess={() => {
+            setView("detail");
+            onSuccess?.();
+          }}
+        />
+      )}
+    </div>
 
       {/* Modal xác nhận hủy tham gia */}
       {showLeaveConfirm && (
@@ -765,31 +823,6 @@ export default function EventDetailModal({
             </div>
           </div>
         </div>
-      )}
-
-      {isInviteModalOpen && event && (
-        <InviteMembersModal
-          isOpen={isInviteModalOpen}
-          onClose={() => setIsInviteModalOpen(false)}
-          eventId={event._id}
-          existingMemberIds={[
-            ...(event.hostId ? [event.hostId] : []),
-            ...(event.acceptedUserIds || []),
-            ...(event.pendingUserIds || []),
-            ...((rsvpList || [])
-              .filter((m) => m.status === "ACCEPTED" || m.status === "PENDING")
-              .map((m) => m.userId)
-              .filter(Boolean) as string[]),
-          ]}
-          existingEmails={[
-            ...(event.hostEmail ? [event.hostEmail] : []),
-            ...((event.invitees || []).map((i) => i.email).filter(Boolean) as string[]),
-            ...((rsvpList || [])
-              .filter((m) => m.status === "ACCEPTED" || m.status === "PENDING")
-              .map((m) => m.email)
-              .filter(Boolean) as string[]),
-          ]}
-        />
       )}
 
       {showNotificationConfirmModal && event && (

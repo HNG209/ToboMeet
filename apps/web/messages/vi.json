@@ -1091,6 +1091,9 @@
     "role_vice_leader": "Phó nhóm",
     "role_member": "Thành viên",
     "view_profile": "Xem trang cá nhân",
+    "send_message": "Nhắn tin",
+    "joined_date": "Tham gia ngày",
+    "user_profile_title": "Thông tin cá nhân",
     "remove_from_room": "Xóa khỏi phòng",
     "report_user": "Báo cáo người dùng",
     "report_user_modal_title": "Báo cáo người dùng",
@@ -1216,7 +1219,8 @@
     "room_name_empty_error": "Tên phòng không được để trống",
     "not_a_member_anymore": "Bạn không còn là thành viên của phòng này",
     "user_already_in_room": "Người dùng này đã là thành viên của phòng",
-    "user_already_in_channel": "Người dùng này đã là thành viên của kênh"
+    "user_already_in_channel": "Người dùng này đã là thành viên của kênh",
+    "channel_role": "Vai trò trong kênh"
   },
   "admin": {
     "title": "Tổng quan hệ thống",
@@ -2298,7 +2302,30 @@
           "closed": "Đã khóa/đóng",
           "in_progress": "Đang thực hiện"
         }
-      }
+      },
+      "invite_title": "Mời người tham gia",
+      "invite_subtitle": "Thêm thành viên vào sự kiện này",
+      "edit_modal_title": "Chỉnh sửa sự kiện",
+      "edit_modal_subtitle": "Cập nhật tiêu đề, chu kỳ lặp lại và mô tả sự kiện",
+      "back": "Quay lại",
+      "sending_invites": "Đang gửi...",
+      "send_invites_count": "Gửi lời mời ({count})",
+      "time_not_specified": "Chưa xác định thời gian",
+      "event_summary": "Thông tin sự kiện",
+      "title_required": "Vui lòng nhập tiêu đề sự kiện",
+      "save_changes": "Lưu thay đổi",
+      "saving_changes": "Đang lưu...",
+      "search_placeholder": "Tìm kiếm theo tên hoặc email...",
+      "selected_count": "Đã chọn ({count})",
+      "clear_all": "Bỏ chọn tất cả",
+      "joined": "Đã tham gia",
+      "loading_more": "Đang tải thêm...",
+      "load_more": "Xem thêm",
+      "cancel": "Hủy",
+      "search_results": "Kết quả tìm kiếm",
+      "suggested_users": "Người dùng gợi ý",
+      "searching": "Đang tìm kiếm...",
+      "empty_users": "Chưa có danh sách gợi ý"
     },
     "delete_modal": {
       "recurring_title": "Hủy sự kiện định kỳ",
@@ -2355,7 +2382,8 @@
       "delete_error": "Không thể xóa sự kiện. Vui lòng thử lại!",
       "notification_enabled_success": "Đã bật thông báo cho sự kiện thành công!",
       "notification_disabled_success": "Đã tắt thông báo cho sự kiện thành công!",
-      "notification_toggle_error": "Không thể cập nhật trạng thái thông báo. Vui lòng thử lại!"
+      "notification_toggle_error": "Không thể cập nhật trạng thái thông báo. Vui lòng thử lại!",
+      "update_success": "Đã cập nhật sự kiện thành công!"
     },
     "today_schedule": {
       "title": "Lịch hôm nay",

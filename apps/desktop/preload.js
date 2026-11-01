@@ -20,6 +20,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveVideoChunk: (buffer) => ipcRenderer.send("save-video-chunk", buffer),
   stopRecording: () => ipcRenderer.send("stop-recording"),
 
+  // Meeting window close confirmation
+  onTriggerLeaveMeeting: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on("trigger-leave-meeting", listener);
+    return () => ipcRenderer.removeListener("trigger-leave-meeting", listener);
+  },
+  confirmCloseMeetingWindow: () => {
+    return ipcRenderer.invoke("meeting:close-window");
+  },
+
   // Navigation listener triggered by desktop notification click
   onNavigate: (callback) => {
     const listener = (_event, url) => callback(url);

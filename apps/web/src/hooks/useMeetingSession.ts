@@ -114,18 +114,60 @@ export function useMeetingSession() {
     }
   }, [meetingCode]);
 
-  // Lắng nghe sự kiện F5 hoặc tắt Tab
+  // Lắng nghe sự kiện F5 hoặc tắt Tab (Xác nhận khi đang trong phòng họp)
   useEffect(() => {
-    const handleBeforeUnload = () => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      // Trên desktop, Electron đã chặn và xử lý close event riêng
+      if (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI?.isDesktop
+      ) {
+        isUnloadingRef.current = true;
+        return;
+      }
+
+      // Trên Web: Nếu đang trong phòng họp thì kích hoạt dialog xác nhận của trình duyệt
+      if (status === "JOINED") {
+        e.preventDefault();
+        e.returnValue = "";
+        return "";
+      }
+
       isUnloadingRef.current = true;
     };
+
     window.addEventListener("beforeunload", handleBeforeUnload);
-    window.addEventListener("pagehide", handleBeforeUnload);
+    window.addEventListener("pagehide", () => {
+      isUnloadingRef.current = true;
+    });
+
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      window.removeEventListener("pagehide", handleBeforeUnload);
+      window.removeEventListener("pagehide", () => {
+        isUnloadingRef.current = true;
+      });
     };
-  }, []);
+  }, [status]);
+
+  // Xử lý khi người dùng bấm [X] ở Desktop lúc đang ở Lobby hoặc chưa vào phòng
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      (window as any).electronAPI?.onTriggerLeaveMeeting
+    ) {
+      const cleanup = (window as any).electronAPI.onTriggerLeaveMeeting(() => {
+        // Nếu đang ở Lobby (chuẩn bị mic/cam) hoặc Reconnecting -> Tắt thẳng cửa sổ luôn
+        if (status === "IN_LOBBY" || status === "RECONNECTING") {
+          if ((window as any).electronAPI?.confirmCloseMeetingWindow) {
+            (window as any).electronAPI.confirmCloseMeetingWindow();
+          } else {
+            window.close();
+          }
+        }
+      });
+      return cleanup;
+    }
+  }, [status]);
 
   const handleSmartRedirect = async (
     fallbackRoomId?: string,
@@ -176,7 +218,7 @@ export function useMeetingSession() {
           };
         });
 
-        setTimeout(() => {
+        setTimeout(async () => {
           setStatus("JOINED");
         }, 1000);
       } catch (error: any) {
@@ -336,7 +378,7 @@ export function useMeetingSession() {
 
     setIsDisconnecting(true);
 
-    setTimeout(() => {
+    setTimeout(async () => {
       sessionStorage.removeItem(`is_joined_${meetingCode}`);
       sessionStorage.removeItem(`meeting_name_${meetingCode}`);
       // Xoá cấu hình thiết bị khi rời khỏi phòng
@@ -355,6 +397,16 @@ export function useMeetingSession() {
           meetingCode,
         });
         syncChannel.close();
+      }
+
+      if (
+        typeof window !== "undefined" &&
+        (window as any).electronAPI?.confirmCloseMeetingWindow
+      ) {
+        const result = await (window as any).electronAPI.confirmCloseMeetingWindow();
+        if (result?.isPopup) {
+          return;
+        }
       }
 
       handleSmartRedirect(meetingData?.roomId, true);

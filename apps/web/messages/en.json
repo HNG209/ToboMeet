@@ -1104,6 +1104,9 @@
     "role_vice_leader": "Vice Leader",
     "role_member": "Member",
     "view_profile": "View profile",
+    "send_message": "Message",
+    "joined_date": "Joined on",
+    "user_profile_title": "User profile",
     "remove_from_room": "Remove from room",
     "report_user": "Report user",
     "report_user_modal_title": "Report User",
@@ -1229,7 +1232,8 @@
     "room_name_empty_error": "Room name cannot be empty",
     "not_a_member_anymore": "You are no longer a member of this room",
     "user_already_in_room": "This user is already a member of the room",
-    "user_already_in_channel": "This user is already a member of the channel"
+    "user_already_in_channel": "This user is already a member of the channel",
+    "channel_role": "Channel Role"
   },
   "admin": {
     "title": "System Overview",
@@ -2313,7 +2317,30 @@
           "closed": "Closed",
           "in_progress": "In Progress"
         }
-      }
+      },
+      "invite_title": "Invite Participants",
+      "invite_subtitle": "Add members to this event",
+      "edit_modal_title": "Edit Event",
+      "edit_modal_subtitle": "Update event title, recurrence, and description",
+      "back": "Back",
+      "sending_invites": "Sending...",
+      "send_invites_count": "Send Invites ({count})",
+      "time_not_specified": "Time not specified",
+      "event_summary": "Event Information",
+      "title_required": "Please enter event title",
+      "save_changes": "Save Changes",
+      "saving_changes": "Saving...",
+      "search_placeholder": "Search by name or email...",
+      "selected_count": "Selected ({count})",
+      "clear_all": "Clear all",
+      "joined": "Joined",
+      "loading_more": "Loading more...",
+      "load_more": "Load more",
+      "cancel": "Cancel",
+      "search_results": "Search results",
+      "suggested_users": "Suggested users",
+      "searching": "Searching...",
+      "empty_users": "No suggested users"
     },
     "delete_modal": {
       "recurring_title": "Cancel Recurring Event",
@@ -2370,7 +2397,8 @@
       "delete_error": "Failed to delete event. Please try again!",
       "notification_enabled_success": "Event notifications turned on!",
       "notification_disabled_success": "Event notifications turned off!",
-      "notification_toggle_error": "Failed to update notification settings. Please try again!"
+      "notification_toggle_error": "Failed to update notification settings. Please try again!",
+      "update_success": "Event updated successfully!"
     },
     "today_schedule": {
       "title": "Today's Schedule",

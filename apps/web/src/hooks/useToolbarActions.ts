@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useLocalParticipant, useRoomContext } from "@livekit/components-react";
 import localforage from "localforage";
 import { toast } from "sonner";
@@ -95,19 +95,38 @@ export function useToolbarActions() {
     }
   };
 
-  const leaveMeeting = async () => {
+  const leaveMeeting = useCallback(async () => {
     await localforage.removeItem(`meeting_chat_${code}`);
     room.disconnect();
-  };
+    if (
+      typeof window !== "undefined" &&
+      (window as any).electronAPI?.confirmCloseMeetingWindow
+    ) {
+      (window as any).electronAPI.confirmCloseMeetingWindow();
+    }
+  }, [code, room]);
 
-  const handleLeaveClick = () => {
+  const handleLeaveClick = useCallback(() => {
     toast(t("confirm_leave_title"), {
       description: t("confirm_leave_description"),
       action: { label: t("confirm_leave_action"), onClick: leaveMeeting },
       cancel: { label: t("cancel"), onClick: () => {} },
-      duration: 5000,
+      duration: 8000,
     });
-  };
+  }, [t, leaveMeeting]);
+
+  // Lắng nghe sự kiện bấm nút [X] ở cửa sổ Desktop để kích hoạt toast xác nhận rời
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      (window as any).electronAPI?.onTriggerLeaveMeeting
+    ) {
+      const cleanup = (window as any).electronAPI.onTriggerLeaveMeeting(() => {
+        handleLeaveClick();
+      });
+      return cleanup;
+    }
+  }, [handleLeaveClick]);
 
   const handleCopyLink = () => {
     const pathName = window.location.pathname;

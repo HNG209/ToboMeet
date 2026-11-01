@@ -212,6 +212,20 @@ function RoomContentGuard({ meetingData, meetingCode }: any) {
     return "joined";
   });
 
+  // Nếu đang ở phòng chờ (waiting room), người dùng bấm [X] thì rời phòng và tắt luôn cửa sổ
+  useEffect(() => {
+    if (
+      participantStatus === "waiting" &&
+      typeof window !== "undefined" &&
+      (window as any).electronAPI?.onTriggerLeaveMeeting
+    ) {
+      const cleanup = (window as any).electronAPI.onTriggerLeaveMeeting(() => {
+        handleDisconnect();
+      });
+      return cleanup;
+    }
+  }, [participantStatus, handleDisconnect]);
+
   useEffect(() => {
     const handleMetadataChanged = (
       prevMetadata: string | undefined,

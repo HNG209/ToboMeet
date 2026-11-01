@@ -29,6 +29,7 @@ interface MemberActionMenuProps {
   isCurrentUserRoomAdmin: boolean;
   canUserManageChannel: boolean;
   onClose: () => void;
+  onViewProfile?: () => void;
   onReportUser: (member: { userId: string; displayName: string }) => void;
   onTransferOwnership: (member: {
     userId: string;
@@ -47,6 +48,7 @@ export default function MemberActionMenu({
   isCurrentUserRoomAdmin,
   canUserManageChannel,
   onClose,
+  onViewProfile,
   onReportUser,
   onTransferOwnership,
   onRemoveMember,
@@ -190,7 +192,10 @@ export default function MemberActionMenu({
     <div ref={menuRef} className="absolute right-4 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl py-1 mt-1 text-xs">
         {/* Xem hồ sơ & Report */}
         <button
-          onClick={onClose}
+          onClick={() => {
+            onClose();
+            if (onViewProfile) onViewProfile();
+          }}
           className="w-full text-left px-4 py-2 font-medium text-slate-700 hover:bg-slate-50 flex items-center gap-2"
         >
           {t("view_profile")}

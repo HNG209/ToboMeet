@@ -1,11 +1,31 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { X, Loader2, Bold, Italic, Underline, List, ListOrdered, Smile, Paperclip, Image as ImageIcon, Video as VideoIcon, FileText, AlertCircle, RefreshCw } from "lucide-react";
+import {
+  X,
+  Loader2,
+  Bold,
+  Italic,
+  Underline as UnderlineIcon,
+  List,
+  ListOrdered,
+  Smile,
+  Paperclip,
+  Image as ImageIcon,
+  Video as VideoIcon,
+  FileText,
+  AlertCircle,
+  RefreshCw,
+} from "lucide-react";
 import { useGetRoomMembersQuery } from "@/lib/redux/api/roomsApi";
 import { useGetSignedUploadUrlMutation } from "@/lib/redux/api/newsFeedApi";
 import axios from "axios";
 import { useTranslations } from "next-intl";
+import { useEditor, EditorContent } from "@tiptap/react";
+import StarterKit from "@tiptap/starter-kit";
+import Underline from "@tiptap/extension-underline";
+import Placeholder from "@tiptap/extension-placeholder";
+import { parseMarkdownToHtml, htmlToMarkdown } from "@/utils/markdownParser";
 
 interface CreatePostModalProps {
   isOpen: boolean;
@@ -56,17 +76,73 @@ export default function CreatePostModal({
   const [mentionQuery, setMentionQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(-1);
 
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: members = [] } = useGetRoomMembersQuery(roomId, { skip: !isOpen });
   const [getSignedUrl] = useGetSignedUploadUrlMutation();
 
-  // Populate data if in edit mode
+  // TipTap Rich Text Editor Configuration
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        bulletList: {
+          HTMLAttributes: {
+            class: "list-disc pl-5 my-1",
+          },
+        },
+        orderedList: {
+          HTMLAttributes: {
+            class: "list-decimal pl-5 my-1",
+          },
+        },
+      }),
+      Underline,
+      Placeholder.configure({
+        placeholder: t("comment_placeholder"),
+      }),
+    ],
+    content: "",
+    editorProps: {
+      attributes: {
+        class:
+          "outline-none min-h-[140px] w-full text-sm text-slate-800 placeholder-slate-400 focus:outline-none prose prose-slate max-w-none [&_.is-editor-empty:first-child::before]:content-[attr(data-placeholder)] [&_.is-editor-empty:first-child::before]:text-slate-400 [&_.is-editor-empty:first-child::before]:float-left [&_.is-editor-empty:first-child::before]:pointer-events-none [&_.is-editor-empty:first-child::before]:h-0 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:my-0.5",
+      },
+    },
+    onUpdate: ({ editor }) => {
+      setContent(editor.getHTML());
+
+      // Check for @ mention trigger
+      const { from } = editor.state.selection;
+      const textBefore = editor.state.doc.textBetween(0, from, "\n");
+      const lastAtPos = textBefore.lastIndexOf("@");
+
+      if (
+        lastAtPos !== -1 &&
+        (lastAtPos === 0 ||
+          textBefore[lastAtPos - 1] === " " ||
+          textBefore[lastAtPos - 1] === "\n")
+      ) {
+        const query = textBefore.substring(lastAtPos + 1);
+        if (!query.includes(" ")) {
+          setMentionQuery(query);
+          setMentionIndex(lastAtPos);
+          setShowMentionDropdown(true);
+          return;
+        }
+      }
+      setShowMentionDropdown(false);
+    },
+  });
+
+  // Populate data if in edit mode or reset on open
   useEffect(() => {
     if (isOpen) {
       if (editPostData) {
-        setContent(editPostData.content);
+        const initialHtml = parseMarkdownToHtml(editPostData.content);
+        setContent(initialHtml || editPostData.content);
+        if (editor) {
+          editor.commands.setContent(initialHtml || editPostData.content);
+        }
         setFiles(
           editPostData.attachments.map((att, idx) => ({
             id: `edit-${idx}`,
@@ -80,87 +156,33 @@ export default function CreatePostModal({
         );
       } else {
         setContent("");
+        if (editor) {
+          editor.commands.setContent("");
+        }
         setFiles([]);
       }
       setValidationError(null);
       setShowEmojiPicker(false);
       setShowMentionDropdown(false);
     }
-  }, [isOpen, editPostData]);
+  }, [isOpen, editPostData, editor]);
 
   if (!isOpen) return null;
 
-  // Insert markdown tag or text at cursor
-  const insertText = (before: string, after: string = "") => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const text = textarea.value;
-    const selectedText = text.substring(start, end);
-    const replacement = before + selectedText + after;
-    const newContent = text.substring(0, start) + replacement + text.substring(end);
-    setContent(newContent);
-    setShowEmojiPicker(false);
-
-    setTimeout(() => {
-      textarea.focus();
-      textarea.setSelectionRange(
-        start + before.length,
-        start + before.length + selectedText.length
-      );
-    }, 0);
-  };
-
-  const insertNumberedList = () => {
-    const textarea = textareaRef.current;
-    const start = textarea?.selectionStart || content.length;
-    const textBefore = content.substring(0, start);
-    const lines = textBefore.split("\n");
-    let lastNum = 0;
-
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const match = lines[i].match(/^\s*(\d+)\.\s/);
-      if (match) {
-        lastNum = parseInt(match[1], 10);
-        break;
-      }
-    }
-
-    const nextNum = lastNum + 1;
-    const prefix = textBefore.endsWith("\n") || textBefore.length === 0 ? "" : "\n";
-    insertText(`${prefix}${nextNum}. `);
-  };
-
-  // Handle Mention Trigger
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setContent(val);
-
-    const selectionStart = e.target.selectionStart;
-    const textBeforeCursor = val.substring(0, selectionStart);
-    const lastAtPos = textBeforeCursor.lastIndexOf("@");
-
-    // Hiển thị dropdown nhắc tên nếu gõ @ đứng sau khoảng trắng hoặc ở đầu dòng
-    if (lastAtPos !== -1 && (lastAtPos === 0 || textBeforeCursor[lastAtPos - 1] === " " || textBeforeCursor[lastAtPos - 1] === "\n")) {
-      const query = textBeforeCursor.substring(lastAtPos + 1);
-      if (!query.includes(" ")) {
-        setMentionQuery(query);
-        setMentionIndex(lastAtPos);
-        setShowMentionDropdown(true);
-        return;
-      }
-    }
-    setShowMentionDropdown(false);
-  };
-
   const selectMention = (member: any) => {
-    const before = content.substring(0, mentionIndex);
-    const after = content.substring(textareaRef.current?.selectionStart || 0);
-    const insert = `@${member.displayName} `;
-    setContent(before + insert + after);
+    if (!editor) return;
+    const { from } = editor.state.selection;
+    const textBefore = editor.state.doc.textBetween(0, from, "\n");
+    const lastAtPos = textBefore.lastIndexOf("@");
+    if (lastAtPos !== -1) {
+      editor
+        .chain()
+        .focus()
+        .deleteRange({ from: lastAtPos + 1, to: from + 1 })
+        .insertContent(`@${member.displayName} `)
+        .run();
+    }
     setShowMentionDropdown(false);
-    textareaRef.current?.focus();
   };
 
   // Filter members for mention
@@ -260,12 +282,10 @@ export default function CreatePostModal({
 
     const newFiles: UploadingFile[] = [];
 
-    for (let i = 0; i < fileList.length; i++) {
-      const file = fileList[i];
+    Array.from(fileList).forEach((file) => {
       const validation = validateFile(file);
-
       if (!validation.valid) {
-        setValidationError(validation.error || "Tệp không hợp lệ");
+        setValidationError(validation.error || "File không hợp lệ");
         return;
       }
 
@@ -275,7 +295,7 @@ export default function CreatePostModal({
       else if ([".mp4", ".mov", ".avi"].includes(ext)) fileType = "video";
 
       const fileObj: UploadingFile = {
-        id: Math.random().toString(36).substring(2, 9),
+        id: `${file.name}-${Date.now()}-${Math.random()}`,
         file,
         progress: 0,
         status: "uploading",
@@ -283,12 +303,12 @@ export default function CreatePostModal({
       };
 
       newFiles.push(fileObj);
+    });
+
+    if (newFiles.length > 0) {
+      setFiles((prev) => [...prev, ...newFiles]);
+      newFiles.forEach((f) => startUpload(f));
     }
-
-    setFiles((prev) => [...prev, ...newFiles]);
-
-    // Trực tiếp upload
-    newFiles.forEach((fileObj) => startUpload(fileObj));
   };
 
   const removeFile = (id: string) => {
@@ -314,7 +334,8 @@ export default function CreatePostModal({
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       addFiles(e.dataTransfer.files);
     }
   };
@@ -324,35 +345,41 @@ export default function CreatePostModal({
     e.preventDefault();
     setValidationError(null);
 
-    const isUploading = files.some((f) => f.status === "uploading");
-    if (isUploading) {
+    // Kiểm tra có file nào đang upload dở không
+    const hasUploading = files.some((f) => f.status === "uploading");
+    if (hasUploading) {
       setValidationError(t("wait_upload_error"));
       return;
     }
 
-    const hasUploadErrors = files.some((f) => f.status === "error");
-    if (hasUploadErrors) {
+    // Kiểm tra có file nào bị lỗi upload không
+    const hasError = files.some((f) => f.status === "error");
+    if (hasError) {
       setValidationError(t("upload_error_retry"));
       return;
     }
 
-    if (!content.trim() && files.length === 0) {
+    const htmlContent = editor?.getHTML() || content;
+    const markdownContent = htmlToMarkdown(htmlContent);
+
+    // Kiểm tra nội dung rỗng
+    if (!markdownContent.trim() && files.length === 0) {
       setValidationError(t("content_required_error"));
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
+      setIsSubmitting(true);
+
       const attachments = files.map((f) => ({
-        url: f.url!,
+        url: f.url || "",
         fileName: f.fileName || f.file.name,
         fileType: f.fileType,
         fileSize: f.file.size || 0,
       }));
 
       onSuccess({
-        content: content.trim(),
+        content: markdownContent,
         attachments,
       });
       onClose();
@@ -385,24 +412,19 @@ export default function CreatePostModal({
           <button
             disabled={isSubmitting}
             onClick={onClose}
-            className="p-1 hover:bg-slate-100 rounded text-slate-500 transition-colors"
+            className="p-1 hover:bg-slate-100 rounded text-slate-500 transition-colors cursor-pointer"
           >
             <X size={18} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-y-auto max-h-[80vh] p-6 space-y-4">
-          {/* Main Input Textarea */}
-          <div className="relative flex-1 min-h-[140px]">
-            <textarea
-              ref={textareaRef}
-              rows={5}
-              placeholder={t("comment_placeholder")}
-              value={content}
-              onChange={handleTextareaChange}
-              disabled={isSubmitting}
-              className="w-full h-full text-sm text-slate-800 placeholder-slate-400 bg-transparent focus:outline-none resize-none"
-            />
+          {/* Main Input TipTap Rich Text Area */}
+          <div
+            onClick={() => editor?.commands.focus()}
+            className="relative flex-1 min-h-[140px] cursor-text"
+          >
+            <EditorContent editor={editor} />
 
             {/* Mention Dropdown */}
             {showMentionDropdown && filteredMembers.length > 0 && (
@@ -412,7 +434,7 @@ export default function CreatePostModal({
                     key={m.userId}
                     type="button"
                     onClick={() => selectMention(m)}
-                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-slate-700"
+                    className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center gap-2 text-slate-700 cursor-pointer"
                   >
                     {m.avatarUrl ? (
                       <img src={m.avatarUrl} alt="" className="w-5 h-5 rounded-full object-cover" />
@@ -485,7 +507,7 @@ export default function CreatePostModal({
                           type="button"
                           onClick={() => retryUpload(fileObj)}
                           title="Tải lại file"
-                          className="p-0.5 text-slate-500 hover:text-brand-600 rounded"
+                          className="p-0.5 text-slate-500 hover:text-brand-600 rounded cursor-pointer"
                         >
                           <RefreshCw size={10} />
                         </button>
@@ -497,7 +519,7 @@ export default function CreatePostModal({
                   <button
                     type="button"
                     onClick={() => removeFile(fileObj.id)}
-                    className="absolute top-2.5 right-2.5 p-1 bg-white border border-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full shadow-sm transition-colors"
+                    className="absolute top-2.5 right-2.5 p-1 bg-white border border-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full shadow-sm transition-colors cursor-pointer"
                   >
                     <X size={12} />
                   </button>
@@ -512,54 +534,78 @@ export default function CreatePostModal({
             <div className="flex items-center gap-0.5 border border-slate-200 rounded-lg p-0.5 bg-slate-50">
               <button
                 type="button"
-                onClick={() => insertText("**", "**")}
+                onClick={() => editor?.chain().focus().toggleBold().run()}
                 title={t("bold")}
-                className="p-1.5 hover:bg-white hover:shadow-sm text-slate-600 rounded"
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  editor?.isActive("bold")
+                    ? "bg-white shadow-xs text-brand-600 font-bold"
+                    : "hover:bg-white hover:shadow-xs text-slate-600"
+                }`}
               >
                 <Bold size={16} />
               </button>
               <button
                 type="button"
-                onClick={() => insertText("*", "*")}
+                onClick={() => editor?.chain().focus().toggleItalic().run()}
                 title={t("italic")}
-                className="p-1.5 hover:bg-white hover:shadow-sm text-slate-600 rounded"
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  editor?.isActive("italic")
+                    ? "bg-white shadow-xs text-brand-600 font-bold"
+                    : "hover:bg-white hover:shadow-xs text-slate-600"
+                }`}
               >
                 <Italic size={16} />
               </button>
               <button
                 type="button"
-                onClick={() => insertText("__", "__")}
+                onClick={() => editor?.chain().focus().toggleUnderline().run()}
                 title={t("underline")}
-                className="p-1.5 hover:bg-white hover:shadow-sm text-slate-600 rounded"
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  editor?.isActive("underline")
+                    ? "bg-white shadow-xs text-brand-600 font-bold"
+                    : "hover:bg-white hover:shadow-xs text-slate-600"
+                }`}
               >
-                <Underline size={16} />
+                <UnderlineIcon size={16} />
               </button>
               <div className="h-4 w-[1px] bg-slate-200 mx-1" />
               <button
                 type="button"
-                onClick={() => insertText("\n- ")}
+                onClick={() => editor?.chain().focus().toggleBulletList().run()}
                 title={t("list")}
-                className="p-1.5 hover:bg-white hover:shadow-sm text-slate-600 rounded"
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  editor?.isActive("bulletList")
+                    ? "bg-white shadow-xs text-brand-600 font-bold"
+                    : "hover:bg-white hover:shadow-xs text-slate-600"
+                }`}
               >
                 <List size={16} />
               </button>
               <button
                 type="button"
-                onClick={insertNumberedList}
+                onClick={() => editor?.chain().focus().toggleOrderedList().run()}
                 title={t("ordered_list")}
-                className="p-1.5 hover:bg-white hover:shadow-sm text-slate-600 rounded"
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  editor?.isActive("orderedList")
+                    ? "bg-white shadow-xs text-brand-600 font-bold"
+                    : "hover:bg-white hover:shadow-xs text-slate-600"
+                }`}
               >
                 <ListOrdered size={16} />
               </button>
               <div className="h-4 w-[1px] bg-slate-200 mx-1" />
-              
+
               {/* Emojis Trigger */}
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   title={t("add_emoji")}
-                  className={`p-1.5 rounded transition-colors ${showEmojiPicker ? "bg-white shadow-sm text-brand-600" : "hover:bg-white hover:shadow-sm text-slate-600"}`}
+                  className={`p-1.5 rounded transition-colors cursor-pointer ${
+                    showEmojiPicker
+                      ? "bg-white shadow-xs text-brand-600"
+                      : "hover:bg-white hover:shadow-xs text-slate-600"
+                  }`}
                 >
                   <Smile size={16} />
                 </button>
@@ -569,8 +615,11 @@ export default function CreatePostModal({
                       <button
                         key={emoji}
                         type="button"
-                        onClick={() => insertText(emoji)}
-                        className="w-6 h-6 flex items-center justify-center text-sm hover:bg-slate-100 rounded"
+                        onClick={() => {
+                          editor?.chain().focus().insertContent(emoji).run();
+                          setShowEmojiPicker(false);
+                        }}
+                        className="w-6 h-6 flex items-center justify-center text-sm hover:bg-slate-100 rounded cursor-pointer"
                       >
                         {emoji}
                       </button>
@@ -594,7 +643,7 @@ export default function CreatePostModal({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 title={t("attach_files")}
-                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-600 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
               >
                 <Paperclip size={14} />
                 <span>{t("attach_files")}</span>
@@ -603,7 +652,7 @@ export default function CreatePostModal({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50"
+                className="px-4 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 {isSubmitting ? (
                   <>

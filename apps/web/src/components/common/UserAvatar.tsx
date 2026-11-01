@@ -37,7 +37,7 @@ export default function UserAvatar({
   const showImage = Boolean(avatarUrl) && !imgError;
 
   return (
-    <div className={`relative shrink-0 ${className}`}>
+    <div className={`relative shrink-0 rounded-full ${className}`}>
       <div
         className={`${size} rounded-full bg-slate-200 border border-slate-300 overflow-hidden flex items-center justify-center text-sm font-semibold text-slate-600 shadow-xs select-none`}
       >

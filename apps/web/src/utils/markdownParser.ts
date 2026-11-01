@@ -89,3 +89,60 @@ export function parseMarkdownToHtml(text: string): string {
     })
     .join("");
 }
+
+/**
+ * Convert HTML from rich text editor back to Markdown syntax
+ */
+export function htmlToMarkdown(html: string): string {
+  if (!html) return "";
+  if (html === "<p></p>") return "";
+
+  let md = html;
+
+  // Process bold: <strong> or <b>
+  md = md.replace(/<(strong|b)>([\s\S]*?)<\/\1>/gi, "**$2**");
+
+  // Process italic: <em> or <i>
+  md = md.replace(/<(em|i)>([\s\S]*?)<\/\1>/gi, "*$2*");
+
+  // Process underline: <u>
+  md = md.replace(/<u>([\s\S]*?)<\/u>/gi, "__$1__");
+
+  // Process unordered lists: <ul><li>...</li></ul>
+  md = md.replace(/<ul>([\s\S]*?)<\/ul>/gi, (_, listContent) => {
+    return (
+      listContent.replace(
+        /<li>([\s\S]*?)<\/li>/gi,
+        (_: any, item: string) => `- ${item.trim()}\n`,
+      ) + "\n"
+    );
+  });
+
+  // Process ordered lists: <ol><li>...</li></ol>
+  md = md.replace(/<ol>([\s\S]*?)<\/ol>/gi, (_, listContent) => {
+    let index = 1;
+    return (
+      listContent.replace(
+        /<li>([\s\S]*?)<\/li>/gi,
+        (_: any, item: string) => `${index++}. ${item.trim()}\n`,
+      ) + "\n"
+    );
+  });
+
+  // Process <br> and <p>
+  md = md.replace(/<br\s*\/?>/gi, "\n");
+  md = md.replace(/<p>([\s\S]*?)<\/p>/gi, "$1\n");
+
+  // Strip any remaining html tags
+  md = md.replace(/<[^>]+>/g, "");
+
+  // Decode common HTML entities
+  md = md
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"');
+
+  return md.trim();
+}

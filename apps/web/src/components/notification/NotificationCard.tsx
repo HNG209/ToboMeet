@@ -187,7 +187,11 @@ export default function NotificationCard({
   const handleActionClick = async () => {
     if (meetingCode) {
       onCloseDrawer();
-      router.push(`/meeting/${meetingCode}`);
+      if (typeof window !== "undefined" && (window as any).electronAPI?.isDesktop) {
+        window.open(`/meeting/${meetingCode}`, "_blank");
+      } else {
+        router.push(`/meeting/${meetingCode}`);
+      }
       return;
     }
 
@@ -199,7 +203,11 @@ export default function NotificationCard({
 
       if (response && response.meetingCode) {
         onCloseDrawer();
-        router.push(`/meeting/${response.meetingCode}`);
+        if (typeof window !== "undefined" && (window as any).electronAPI?.isDesktop) {
+          window.open(`/meeting/${response.meetingCode}`, "_blank");
+        } else {
+          router.push(`/meeting/${response.meetingCode}`);
+        }
       }
     } catch (error: any) {
       toast.error(error?.message || t("errors.session_ended"));

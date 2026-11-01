@@ -5,6 +5,7 @@ import { X, Search, MoreVertical } from "lucide-react";
 import { useTranslations } from "next-intl";
 import RoleBadge from "./RoleBadge";
 import MemberActionMenu from "./MemberActionMenu";
+import UserProfileModal from "./UserProfileModal";
 import UserAvatar from "@/components/common/UserAvatar";
 
 interface RoomRightSidebarProps {
@@ -50,6 +51,7 @@ export default function RoomRightSidebar({
   const t = useTranslations("room");
   const [memberSearch, setMemberSearch] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [selectedProfileMember, setSelectedProfileMember] = useState<any | null>(null);
 
   return (
     <>
@@ -139,14 +141,15 @@ export default function RoomRightSidebar({
                       {t("empty")}
                     </div>
                   ) : (
-                    <div className="space-y-3">
+                    <div className="space-y-0.5">
                       {displayedMembers.map((member: any) => {
                         const isSelf = member.userId === userId;
 
                         return (
                           <div
                             key={member.userId}
-                            className="group relative flex items-center gap-3 hover:bg-slate-50 p-2 rounded-lg transition-colors cursor-pointer"
+                            onClick={() => setSelectedProfileMember(member)}
+                            className="group relative flex items-center gap-2.5 hover:bg-slate-50 py-1.5 px-2 rounded-lg transition-colors cursor-pointer"
                           >
                             {/* Avatar */}
                             <div className="relative shrink-0">
@@ -155,7 +158,6 @@ export default function RoomRightSidebar({
                                 displayName={member.displayName}
                                 size="w-8 h-8"
                               />
-                              <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full"></div>
                             </div>
 
                             {/* Text Info */}
@@ -178,20 +180,14 @@ export default function RoomRightSidebar({
                                     member.userId === room?.ownerId
                                   )
                                     return (
-                                      <RoleBadge
-                                        role={member.role}
-                                      />
+                                      <RoleBadge role={member.role} size="sm" />
                                     );
                                   if (tRole === "admin")
                                     return (
-                                      <RoleBadge
-                                        role={tRole}
-                                      />
+                                      <RoleBadge role={tRole} size="sm" />
                                     );
                                   return (
-                                    <RoleBadge
-                                      role="member"
-                                    />
+                                    <RoleBadge role="member" size="sm" />
                                   );
                                 })()}
                               </div>
@@ -227,6 +223,7 @@ export default function RoomRightSidebar({
                                     }
                                     canUserManageChannel={canUserManageChannel}
                                     onClose={() => setOpenMenuId(null)}
+                                    onViewProfile={() => setSelectedProfileMember(member)}
                                     onReportUser={onReportUser}
                                     onTransferOwnership={onTransferOwnership}
                                     onRemoveMember={onRemoveMember}
@@ -250,6 +247,15 @@ export default function RoomRightSidebar({
           </div>
         </div>
       </aside>
+
+      {/* Modal xem thông tin cá nhân */}
+      <UserProfileModal
+        isOpen={!!selectedProfileMember}
+        onClose={() => setSelectedProfileMember(null)}
+        member={selectedProfileMember}
+        currentUserId={userId}
+        room={room}
+      />
     </>
   );
 }
