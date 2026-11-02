@@ -4,17 +4,17 @@ import { useState, useEffect } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import { useGetSessionsQuery } from "@/lib/redux/api/usersApi";
-import { X, Globe, Check, Monitor, Video, Lock } from "lucide-react";
+import { X, Globe, Check, Monitor, Video, Radio } from "lucide-react";
 import { DeviceSettings } from "./DeviceSettings";
 import { RecordingSettings } from "./RecordingSettings";
-import { PasswordSettings } from "./PasswordSettings";
+import { PersonalMeetingSettings } from "./PersonalMeetingSettings";
 import { useIsElectron } from "@/hooks/useIsElectron";
 
 interface SettingsDialogProps {
   onClose: () => void;
 }
 
-type Tab = "language" | "devices" | "recording" | "password";
+type Tab = "language" | "devices" | "recording" | "personal_meeting";
 
 export default function SettingsDialog({ onClose }: SettingsDialogProps) {
   const t = useTranslations("settings");
@@ -115,14 +115,14 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
               </button>
             )}
 
-            {/* TAB MAT KHAU */}
+            {/* TAB CUOC HOP CA NHAN */}
             <button
-              onClick={() => setActiveTab("password")}
+              onClick={() => setActiveTab("personal_meeting")}
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-250 w-full text-left
-                ${activeTab === "password" ? "bg-linear-to-r from-brand-500 to-indigo-600 text-white shadow-lg shadow-brand-500/25 scale-[1.02]" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}
+                ${activeTab === "personal_meeting" ? "bg-linear-to-r from-brand-500 to-indigo-600 text-white shadow-lg shadow-brand-500/25 scale-[1.02]" : "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900"}`}
             >
-              <Lock className="w-4 h-4" />
-              <span>{t("tabs.password")}</span>
+              <Video className="w-4 h-4" />
+              <span>{t("tabs.personal_meeting", { defaultValue: "Cuộc họp cá nhân" })}</span>
             </button>
           </nav>
         </aside>
@@ -257,8 +257,10 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
           {/* Tab Ghi hinh */}
           {activeTab === "recording" && <RecordingSettings />}
 
-          {/* Tab Mat khau */}
-          {activeTab === "password" && <PasswordSettings />}
+          {/* Tab Cuộc họp cá nhân */}
+          {activeTab === "personal_meeting" && (
+            <PersonalMeetingSettings onClose={onClose} />
+          )}
         </main>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Request,
   UseGuards,
   Delete,
@@ -240,5 +241,38 @@ export class UsersController {
       currentPassword.trim(),
       newPassword.trim(),
     );
+  }
+
+  /**
+   * POST /api/users/me/avatar/presigned-url
+   * Lấy presigned URL để upload avatar trực tiếp lên Cloudflare R2
+   */
+  @UseGuards(SupabaseGuard)
+  @Post("me/avatar/presigned-url")
+  async getAvatarUploadPresignedUrl(
+    @Request() req,
+    @Body() body: { fileName?: string; contentType?: string },
+  ) {
+    if (!body?.contentType) {
+      throw new BadRequestException("contentType là bắt buộc.");
+    }
+    return this.usersService.getAvatarUploadPresignedUrl(
+      req.user.id,
+      body.fileName || "avatar.jpg",
+      body.contentType,
+    );
+  }
+
+  /**
+   * PUT /api/users/me/profile
+   * Cập nhật thông tin profile (displayName, avatarUrl)
+   */
+  @UseGuards(SupabaseGuard)
+  @Put("me/profile")
+  async updateProfile(
+    @Request() req,
+    @Body() body: { displayName?: string; avatarUrl?: string },
+  ) {
+    return this.usersService.updateProfile(req.user.id, body);
   }
 }

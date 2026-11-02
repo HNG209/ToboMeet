@@ -174,6 +174,29 @@ export const usersApi = baseApi.injectEndpoints({
         data,
       }),
     }),
+
+    getAvatarUploadPresignedUrl: builder.mutation<
+      { signedUrl: string; publicUrl: string; key: string },
+      { fileName: string; contentType: string }
+    >({
+      query: (data) => ({
+        url: "/users/me/avatar/presigned-url",
+        method: "POST",
+        data,
+      }),
+    }),
+
+    updateProfile: builder.mutation<
+      UserResponse,
+      { displayName?: string; avatarUrl?: string }
+    >({
+      query: (data) => ({
+        url: "/users/me/profile",
+        method: "PUT",
+        data,
+      }),
+      invalidatesTags: ["User"],
+    }),
   }),
   overrideExisting: true,
 });
@@ -189,4 +212,6 @@ export const {
   useSearchUsersQuery,
   useLazyReverseGeocodeQuery,
   useChangePasswordMutation,
+  useGetAvatarUploadPresignedUrlMutation,
+  useUpdateProfileMutation,
 } = usersApi;

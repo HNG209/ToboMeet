@@ -16,7 +16,10 @@ import { Model, Types } from "mongoose";
 import { ConfigService } from "@nestjs/config";
 import { createClient } from "@supabase/supabase-js";
 import { AppGateway } from "../core/gateways/app.gateway";
-import { createHash } from "crypto";
+import { createHash, randomUUID } from "crypto";
+import * as path from "path";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PageResponse, UserResponse } from "@tobomeet/shared/types";
 
 export interface MappedSession {
@@ -188,12 +191,14 @@ export class UsersService {
         user.supabaseId = userId;
         hasChanges = true;
       }
-      if (
-        user.displayName !== metadata.full_name ||
-        user.avatarUrl !== metadata.avatar_url
-      ) {
-        user.displayName = metadata.full_name || user.displayName;
-        user.avatarUrl = metadata.avatar_url || user.avatarUrl;
+      // Giữ nguyên displayName và avatarUrl nếu user đã có trong DB
+      // Không ghi đè khi người dùng đăng nhập bằng phương thức khác cho cùng email
+      if (!user.displayName && metadata.full_name) {
+        user.displayName = metadata.full_name;
+        hasChanges = true;
+      }
+      if (!user.avatarUrl && metadata.avatar_url) {
+        user.avatarUrl = metadata.avatar_url;
         hasChanges = true;
       }
       if (hasChanges) {
@@ -204,8 +209,8 @@ export class UsersService {
       user = await this.userModel.create({
         supabaseId: userId,
         email: email,
-        displayName: metadata.full_name,
-        avatarUrl: metadata.avatar_url,
+        displayName: metadata.full_name || (email ? email.split("@")[0] : "User"),
+        avatarUrl: metadata.avatar_url || "",
       });
       console.log(`Đã tạo mới user: ${email}`);
     }
@@ -1307,5 +1312,112 @@ export class UsersService {
     await supabasePublic.auth.signOut({ scope: "local" });
 
     return { success: true, message: "Doi mat khau thanh cong." };
+  }
+
+  private getR2Client(): S3Client {
+    return new S3Client({
+      region: "auto",
+      endpoint: process.env.R2_ENDPOINT_URL,
+      credentials: {
+        accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
+        secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
+      },
+    });
+  }
+
+  /**
+   * Tạo presigned URL tải ảnh avatar lên Cloudflare R2
+   */
+  async getAvatarUploadPresignedUrl(
+    userId: string,
+    fileName: string,
+    contentType: string,
+  ): Promise<{ signedUrl: string; publicUrl: string; key: string }> {
+    const bucketName = process.env.R2_BUCKET_NAME || "tobomeet-recordings";
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowedTypes.includes(contentType)) {
+      throw new BadRequestException(
+        "Định dạng ảnh không được hỗ trợ. Vui lòng tải lên ảnh JPEG, PNG, WEBP hoặc GIF.",
+      );
+    }
+
+    const ext = fileName ? path.extname(fileName).toLowerCase() || ".jpg" : ".jpg";
+    const uniqueKey = `avatars/${userId}/${randomUUID()}-${Date.now()}${ext}`;
+
+    const s3 = this.getR2Client();
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: uniqueKey,
+      ContentType: contentType,
+    });
+
+    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    const r2PublicUrl = (process.env.R2_PUBLIC_URL || "").replace(/\/$/, "");
+    const publicUrl = r2PublicUrl
+      ? `${r2PublicUrl}/${uniqueKey}`
+      : `${process.env.R2_ENDPOINT_URL}/${bucketName}/${uniqueKey}`;
+
+    return {
+      signedUrl,
+      publicUrl,
+      key: uniqueKey,
+    };
+  }
+
+  /**
+   * Cập nhật thông tin trang cá nhân (displayName, avatarUrl)
+   */
+  async updateProfile(
+    userId: string,
+    data: { displayName?: string; avatarUrl?: string },
+  ): Promise<UserResponse> {
+    const user = await this.userModel.findOne({
+      $or: [
+        { supabaseId: userId },
+        ...(Types.ObjectId.isValid(userId) ? [{ _id: new Types.ObjectId(userId) }] : []),
+      ],
+    });
+
+    if (!user) {
+      throw new BadRequestException("Người dùng không tồn tại.");
+    }
+
+    if (data.displayName !== undefined) {
+      const cleanName = data.displayName.trim();
+      if (!cleanName) {
+        throw new BadRequestException("Tên hiển thị không được để trống.");
+      }
+      user.displayName = cleanName;
+    }
+
+    if (data.avatarUrl !== undefined) {
+      user.avatarUrl = data.avatarUrl;
+    }
+
+    await user.save();
+
+    // Đồng bộ user_metadata sang Supabase
+    try {
+      const metadataUpdates: Record<string, string> = {};
+      if (user.displayName) metadataUpdates.full_name = user.displayName;
+      if (user.avatarUrl) metadataUpdates.avatar_url = user.avatarUrl;
+
+      if (Object.keys(metadataUpdates).length > 0 && user.supabaseId) {
+        await this.supabaseAdmin.auth.admin.updateUserById(user.supabaseId, {
+          user_metadata: metadataUpdates,
+        });
+      }
+    } catch (err) {
+      this.logger.warn("Lỗi khi đồng bộ metadata sang Supabase: " + String(err));
+    }
+
+    return {
+      _id: user._id.toString(),
+      supabaseId: user.supabaseId,
+      displayName: user.displayName,
+      avatarUrl: user.avatarUrl,
+      email: user.email,
+      hasUnreadNotifications: user.hasUnreadNotifications,
+    };
   }
 }
