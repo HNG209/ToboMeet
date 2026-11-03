@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
-import { useTranslations } from "next-intl";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useTranslations, useLocale } from "next-intl";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   X,
@@ -15,15 +16,23 @@ import {
   Loader2,
   Check,
   CheckCircle2,
+  ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 import { UserResponse } from "@tobomeet/shared/types";
 import { validatePasswordPolicy } from "@tobomeet/shared/utils";
 import {
   useGetAvatarUploadPresignedUrlMutation,
   useUpdateProfileMutation,
+  useChangePasswordMutation,
 } from "@/lib/redux/api/usersApi";
-import { createClient } from "@/lib/supabase/client";
+import { getUserAuthInfo } from "@/app/[locale]/auth/profile-actions";
+import { refreshWebSession } from "@/lib/auth/session";
 import UserAvatar from "./UserAvatar";
+
+
+// In-memory cache for user auth provider info to avoid re-fetching on every modal open
+const authInfoCache = new Map<string, { providers: string[]; hasPassword: boolean }>();
 
 interface EditProfileModalProps {
   isOpen: boolean;
@@ -38,24 +47,36 @@ export default function EditProfileModal({
 }: EditProfileModalProps) {
   const t = useTranslations("profile");
   const tPolicy = useTranslations("forgot_password");
+  const locale = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // View state: "profile" (main tab) or "password" (dedicated password setup tab)
+  const [view, setView] = useState<"profile" | "password">("profile");
 
   // Profile editing state
   const [displayName, setDisplayName] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
-  // Auth identities / providers state
+  const userKey = user?._id || user?.email || "";
+  const cachedAuth = userKey ? authInfoCache.get(userKey) : undefined;
+
+  // Auth identities / providers state (cached across modal opens)
   const [connectedProviders, setConnectedProviders] = useState<Set<string>>(
-    new Set()
+    () => (cachedAuth ? new Set(cachedAuth.providers) : new Set())
   );
-  const [hasPassword, setHasPassword] = useState<boolean>(false);
-  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(true);
+  const [hasPassword, setHasPassword] = useState<boolean>(
+    () => (cachedAuth ? cachedAuth.hasPassword : false)
+  );
+  const [isLoadingAuth, setIsLoadingAuth] = useState<boolean>(
+    () => !cachedAuth
+  );
 
   // Password setup / change state
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
@@ -64,6 +85,7 @@ export default function EditProfileModal({
   const [getAvatarUploadPresignedUrl] =
     useGetAvatarUploadPresignedUrlMutation();
   const [updateProfile] = useUpdateProfileMutation();
+  const [changePasswordMutation] = useChangePasswordMutation();
 
   // Validate password using shared policy (matches signup)
   const {
@@ -76,15 +98,34 @@ export default function EditProfileModal({
     isValid: isPasswordPolicyValid,
   } = validatePasswordPolicy(newPassword);
 
+  // Reset view on modal close/open
+  useEffect(() => {
+    if (!isOpen) {
+      setView("profile");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+    }
+  }, [isOpen]);
+
   // ESC key listener
   useEffect(() => {
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (view === "password") {
+          setView("profile");
+        } else {
+          onClose();
+        }
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, view, onClose]);
 
   // Sync displayName when user changes
   useEffect(() => {
@@ -95,73 +136,71 @@ export default function EditProfileModal({
     }
   }, [user]);
 
-  // Fetch Supabase user identities & providers using official client APIs
-  const fetchAuthProviders = async () => {
+  // Fetch authentication identities & providers via Server Action (reads HTTP-only cookies)
+  const fetchAuthProviders = useCallback(async (force = false) => {
+    const key = user?._id || user?.email;
+    if (!key) return;
+
+    if (!force && authInfoCache.has(key)) {
+      const cached = authInfoCache.get(key)!;
+      setConnectedProviders(new Set(cached.providers));
+      setHasPassword(cached.hasPassword);
+      setIsLoadingAuth(false);
+      return;
+    }
+
     try {
       setIsLoadingAuth(true);
-      const supabase = createClient();
+      const res = await getUserAuthInfo();
 
-      const [userRes, identitiesRes, sessionRes] = await Promise.all([
-        supabase.auth.getUser(),
-        supabase.auth.getUserIdentities(),
-        supabase.auth.getSession(),
-      ]);
-
-      const sbUser = userRes.data?.user;
-      const identities = identitiesRes.data?.identities || sbUser?.identities || [];
-      const session = sessionRes.data?.session;
-
-      const detected = new Set<string>();
-
-      // 1. From identities
-      identities.forEach((id) => {
-        if (id.provider) detected.add(id.provider.toLowerCase());
-      });
-
-      // 2. From user app_metadata
-      const appProviders = sbUser?.app_metadata?.providers;
-      if (Array.isArray(appProviders)) {
-        appProviders.forEach((p) => p && detected.add(p.toLowerCase()));
+      if (res.success && Array.isArray(res.providers)) {
+        const detected = new Set(res.providers.map((p) => p.toLowerCase()));
+        setConnectedProviders(detected);
+        setHasPassword(res.hasPassword);
+        authInfoCache.set(key, {
+          providers: res.providers.map((p) => p.toLowerCase()),
+          hasPassword: res.hasPassword,
+        });
+      } else {
+        // Fallback if user has email
+        if (user?.email) {
+          const fallback = ["email"];
+          setConnectedProviders(new Set(fallback));
+          setHasPassword(true);
+          authInfoCache.set(key, {
+            providers: fallback,
+            hasPassword: true,
+          });
+        }
       }
-      if (sbUser?.app_metadata?.provider) {
-        detected.add(sbUser.app_metadata.provider.toLowerCase());
-      }
-
-      // 3. From session user app_metadata
-      const sessionProviders = session?.user?.app_metadata?.providers;
-      if (Array.isArray(sessionProviders)) {
-        sessionProviders.forEach((p) => p && detected.add(p.toLowerCase()));
-      }
-      if (session?.user?.app_metadata?.provider) {
-        detected.add(session.user.app_metadata.provider.toLowerCase());
-      }
-
-      // 4. Fallback if user has email and no oauth provider detected
-      if (detected.size === 0 && (user?.email || sbUser?.email)) {
-        detected.add("email");
-      }
-
-      setConnectedProviders(detected);
-
-      // Check if user has email/password login capability
-      const hasEmailProvider = detected.has("email");
-      setHasPassword(hasEmailProvider);
     } catch {
-      // fallback
       if (user?.email) {
-        setConnectedProviders(new Set(["email"]));
+        const fallback = ["email"];
+        setConnectedProviders(new Set(fallback));
         setHasPassword(true);
+        authInfoCache.set(key, {
+          providers: fallback,
+          hasPassword: true,
+        });
       }
     } finally {
       setIsLoadingAuth(false);
     }
-  };
+  }, [user?._id, user?.email]);
 
   useEffect(() => {
     if (isOpen) {
-      fetchAuthProviders();
+      const key = user?._id || user?.email;
+      if (key && authInfoCache.has(key)) {
+        const cached = authInfoCache.get(key)!;
+        setConnectedProviders(new Set(cached.providers));
+        setHasPassword(cached.hasPassword);
+        setIsLoadingAuth(false);
+      } else if (key) {
+        fetchAuthProviders();
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, user?._id, user?.email, fetchAuthProviders]);
 
   if (!isOpen) return null;
 
@@ -190,10 +229,10 @@ export default function EditProfileModal({
     } catch (err: any) {
       toast.error(
         err?.data?.message ||
-          err?.message ||
-          t("error_update_name", {
-            defaultValue: "Không thể cập nhật tên hiển thị",
-          })
+        err?.message ||
+        t("error_update_name", {
+          defaultValue: "Không thể cập nhật tên hiển thị",
+        })
       );
     } finally {
       setIsSavingName(false);
@@ -261,10 +300,10 @@ export default function EditProfileModal({
     } catch (err: any) {
       toast.error(
         err?.data?.message ||
-          err?.message ||
-          t("error_upload_avatar", {
-            defaultValue: "Không thể tải lên ảnh đại diện",
-          })
+        err?.message ||
+        t("error_upload_avatar", {
+          defaultValue: "Không thể tải lên ảnh đại diện",
+        })
       );
     } finally {
       setIsUploadingAvatar(false);
@@ -272,14 +311,32 @@ export default function EditProfileModal({
     }
   };
 
-  // Handle password setup / change via Supabase
+  // Handle password setup / change via NestJS backend (enforces current password validation)
   const handleSavePassword = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (hasPassword && !currentPassword.trim()) {
+      toast.error(
+        t("error_current_password_empty", {
+          defaultValue: "Vui lòng nhập mật khẩu hiện tại",
+        })
+      );
+      return;
+    }
 
     if (!newPassword.trim()) {
       toast.error(
         t("error_password_empty", {
           defaultValue: "Vui lòng nhập mật khẩu mới",
+        })
+      );
+      return;
+    }
+
+    if (hasPassword && currentPassword.trim() === newPassword.trim()) {
+      toast.error(
+        t("error_new_same", {
+          defaultValue: "Mật khẩu mới không được trùng với mật khẩu hiện tại",
         })
       );
       return;
@@ -305,44 +362,61 @@ export default function EditProfileModal({
 
     try {
       setIsSubmittingPassword(true);
-      const supabase = createClient();
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      const res = await changePasswordMutation({
+        currentPassword: hasPassword ? currentPassword.trim() : undefined,
+        newPassword: newPassword.trim(),
+      }).unwrap();
 
-      if (error) {
-        throw error;
+      if (res?.session) {
+        await refreshWebSession(res.session);
       }
 
       toast.success(
         hasPassword
           ? t("success_password_updated", {
-              defaultValue: "Đã đổi mật khẩu thành công!",
-            })
+            defaultValue: "Đã đổi mật khẩu thành công!",
+          })
           : t("success_password_set", {
-              defaultValue:
-                "Đã thiết lập mật khẩu thành công! Giờ đây bạn có thể đăng nhập bằng email và mật khẩu này.",
-            })
-      );
-
-      setNewPassword("");
-      setConfirmPassword("");
-      setShowPasswordForm(false);
-      setHasPassword(true);
-      await fetchAuthProviders();
-    } catch (err: any) {
-      toast.error(
-        err?.message ||
-          t("error_set_password", {
-            defaultValue: "Không thể thiết lập mật khẩu",
+            defaultValue:
+              "Đã thiết lập mật khẩu thành công! Giờ đây bạn có thể đăng nhập bằng email và mật khẩu này.",
           })
       );
+
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setHasPassword(true);
+      setView("profile");
+
+      // Cập nhật cache ngay lập tức và làm mới thông tin auth
+      const key = user?._id || user?.email;
+      if (key) {
+        const existing = authInfoCache.get(key);
+        const updatedProviders = Array.from(
+          new Set([...(existing?.providers || []), "email"])
+        );
+        authInfoCache.set(key, {
+          providers: updatedProviders,
+          hasPassword: true,
+        });
+        setConnectedProviders(new Set(updatedProviders));
+      }
+      await fetchAuthProviders(true);
+    } catch (err: any) {
+      console.error("[EditProfileModal] Error changing password:", err);
+      const errMsg =
+        err?.data?.message ||
+        err?.message ||
+        t("error_set_password", {
+          defaultValue: "Không thể thiết lập mật khẩu",
+        });
+      toast.error(errMsg);
     } finally {
       setIsSubmittingPassword(false);
     }
   };
 
-  // List of primary authentication methods to display
+  // Primary authentication methods to display
   const primaryProviders = [
     {
       id: "google",
@@ -392,8 +466,8 @@ export default function EditProfileModal({
         onClick={onClose}
       />
 
-      {/* Modal Card */}
-      <div className="relative bg-white border border-slate-200/80 rounded-3xl shadow-[0_32px_64px_rgba(15,23,42,0.18)] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col animate-scale-in transition-all duration-300">
+      {/* Modal Card with Dynamic View Transition */}
+      <div className="relative bg-white border border-slate-200/80 rounded-3xl shadow-[0_32px_64px_rgba(15,23,42,0.18)] w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col transition-all duration-300 ease-in-out">
         {/* Close Button */}
         <button
           onClick={onClose}
@@ -402,473 +476,544 @@ export default function EditProfileModal({
           <X className="w-4 h-4 text-slate-600" />
         </button>
 
-        {/* Modal Header */}
-        <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-          <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
-            <User className="w-5 h-5" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-800 tracking-tight">
-              {t("title", { defaultValue: "Thông tin cá nhân" })}
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              {t("subtitle", {
-                defaultValue:
-                  "Xem và cập nhật thông tin hiển thị, tài khoản và phương thức bảo mật",
-              })}
-            </p>
-          </div>
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
-          {/* ── Section 1: Avatar & Display Name ──────────────────────── */}
-          <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
-            {/* Avatar with Upload Hover */}
-            <div className="relative group shrink-0">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
-                onChange={handleAvatarFileChange}
-                className="hidden"
-              />
-              <div
-                onClick={() =>
-                  !isUploadingAvatar && fileInputRef.current?.click()
-                }
-                className="relative cursor-pointer rounded-full overflow-hidden border-2 border-white shadow-md ring-2 ring-brand-500/20 transition-transform active:scale-95"
-              >
-                <UserAvatar
-                  avatarUrl={user?.avatarUrl}
-                  displayName={user?.displayName || user?.email}
-                  size="w-20 h-20"
-                />
-                {/* Overlay on hover or loading */}
-                <div
-                  className={`absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center text-white transition-opacity ${
-                    isUploadingAvatar
-                      ? "opacity-100"
-                      : "opacity-0 group-hover:opacity-100"
-                  }`}
-                >
-                  {isUploadingAvatar ? (
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                  ) : (
-                    <>
-                      <Camera className="w-5 h-5 mb-1" />
-                      <span className="text-[10px] font-semibold">
-                        {t("change_avatar", { defaultValue: "Đổi ảnh" })}
-                      </span>
-                    </>
-                  )}
-                </div>
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* VIEW 1: MAIN PROFILE VIEW                                       */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {view === "profile" && (
+          <div className="flex flex-col h-full overflow-hidden animate-in fade-in duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
+              <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
+                <User className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+                  {t("title", { defaultValue: "Thông tin cá nhân" })}
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {t("subtitle", {
+                    defaultValue:
+                      "Xem và cập nhật thông tin hiển thị, tài khoản và phương thức bảo mật",
+                  })}
+                </p>
               </div>
             </div>
 
-            {/* User Basic Info */}
-            <div className="flex-1 min-w-0 text-center sm:text-left">
-              <h4 className="text-base font-bold text-slate-800 truncate">
-                {user?.displayName || "Người dùng"}
-              </h4>
-              <p className="text-xs text-slate-400 mt-1 truncate">
-                {user?.email}
-              </p>
-              <button
-                type="button"
-                onClick={() =>
-                  !isUploadingAvatar && fileInputRef.current?.click()
-                }
-                disabled={isUploadingAvatar}
-                className="mt-2 text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline flex items-center justify-center sm:justify-start gap-1 cursor-pointer disabled:opacity-50"
-              >
-                <Camera className="w-3.5 h-3.5" />
-                <span>
-                  {isUploadingAvatar
-                    ? t("uploading", { defaultValue: "Đang tải ảnh lên..." })
-                    : t("upload_new_photo", {
-                        defaultValue: "Tải lên ảnh mới",
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+              {/* ── Section 1: Avatar & Display Name ──────────────────── */}
+              <div className="flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl bg-slate-50/70 border border-slate-100">
+                {/* Avatar with Upload Hover */}
+                <div className="relative group shrink-0">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={handleAvatarFileChange}
+                    className="hidden"
+                  />
+                  <div
+                    onClick={() =>
+                      !isUploadingAvatar && fileInputRef.current?.click()
+                    }
+                    className="relative cursor-pointer rounded-full overflow-hidden border-2 border-white shadow-md ring-2 ring-brand-500/20 transition-transform active:scale-95"
+                  >
+                    <UserAvatar
+                      avatarUrl={user?.avatarUrl}
+                      displayName={user?.displayName || user?.email}
+                      size="w-20 h-20"
+                    />
+                    {/* Overlay on hover or loading */}
+                    <div
+                      className={`absolute inset-0 bg-slate-900/60 flex flex-col items-center justify-center text-white transition-opacity ${isUploadingAvatar
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100"
+                        }`}
+                    >
+                      {isUploadingAvatar ? (
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                      ) : (
+                        <>
+                          <Camera className="w-5 h-5 mb-1" />
+                          <span className="text-[10px] font-semibold">
+                            {t("change_avatar", { defaultValue: "Đổi ảnh" })}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* User Basic Info */}
+                <div className="flex-1 min-w-0 text-center sm:text-left">
+                  <h4 className="text-base font-bold text-slate-800 truncate">
+                    {user?.displayName || "Người dùng"}
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-1 truncate">
+                    {user?.email}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      !isUploadingAvatar && fileInputRef.current?.click()
+                    }
+                    disabled={isUploadingAvatar}
+                    className="mt-2 text-xs font-semibold text-brand-600 hover:text-brand-700 hover:underline flex items-center justify-center sm:justify-start gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>
+                      {isUploadingAvatar
+                        ? t("uploading", { defaultValue: "Đang tải ảnh lên..." })
+                        : t("upload_new_photo", {
+                          defaultValue: "Tải lên ảnh mới",
+                        })}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* ── Section 2: Form Chỉnh sửa Tên hiển thị & Email ────── */}
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-brand-600" />
+                  <span>
+                    {t("section_info", { defaultValue: "Thông tin hiển thị" })}
+                  </span>
+                </h4>
+
+                {/* Display Name Input */}
+                <form onSubmit={handleSaveDisplayName} className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-600 block">
+                    {t("display_name_label", { defaultValue: "Tên hiển thị" })}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      placeholder={t("display_name_placeholder", {
+                        defaultValue: "Nhập tên hiển thị của bạn",
                       })}
-                </span>
-              </button>
+                      className="flex-1 px-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
+                    />
+                    <button
+                      type="submit"
+                      disabled={
+                        isSavingName ||
+                        !displayName.trim() ||
+                        displayName.trim() === user?.displayName
+                      }
+                      className="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed shrink-0"
+                    >
+                      {isSavingName ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      <span>{t("save_name", { defaultValue: "Lưu tên" })}</span>
+                    </button>
+                  </div>
+                </form>
+
+                {/* Email (Disabled, No Extra Badges) */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-600 block">
+                    {t("email_label", { defaultValue: "Địa chỉ Email" })}
+                  </label>
+                  <div className="relative flex items-center">
+                    <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
+                    <input
+                      type="email"
+                      disabled
+                      value={user?.email || ""}
+                      className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed select-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Section 3: Phương thức đăng nhập đã liên kết ───────── */}
+              <div className="space-y-3">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-brand-600" />
+                  <span>
+                    {t("section_auth_methods", {
+                      defaultValue: "Phương thức đăng nhập",
+                    })}
+                  </span>
+                </h4>
+
+                {isLoadingAuth ? (
+                  <div className="py-4 flex items-center gap-2 text-slate-400 text-xs">
+                    <Loader2 className="w-4 h-4 animate-spin text-brand-500" />
+                    <span>
+                      {t("loading_auth", {
+                        defaultValue: "Đang tải danh sách phương thức...",
+                      })}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    {primaryProviders.map((prov) => {
+                      const isLinked =
+                        prov.id === "email"
+                          ? connectedProviders.has("email") || hasPassword
+                          : connectedProviders.has(prov.id);
+
+                      return (
+                        <div
+                          key={prov.id}
+                          className={`flex flex-col justify-between p-3 rounded-2xl border transition-all ${isLinked
+                            ? "bg-slate-50/90 border-slate-200 text-slate-800 shadow-2xs"
+                            : "bg-white border-slate-100 text-slate-400 opacity-70"
+                            }`}
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="p-1.5 rounded-lg bg-white shadow-2xs border border-slate-100">
+                              {prov.icon}
+                            </div>
+                            <span className="text-xs font-bold truncate">
+                              {prov.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center">
+                            {isLinked ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                                {t("connected", { defaultValue: "Đã liên kết" })}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                                {t("not_connected", {
+                                  defaultValue: "Chưa liên kết",
+                                })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Section 4: Mật khẩu (Chuyển sang Tab mới qua Mũi tên phải) ── */}
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewPassword("");
+                    setConfirmPassword("");
+                    setView("password");
+                  }}
+                  className="w-full flex items-center justify-between p-3.5 rounded-2xl border border-slate-200/80 bg-slate-50/70 hover:bg-slate-100/80 hover:border-slate-300 transition-all text-left cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-white border border-slate-200/80 flex items-center justify-center text-brand-600 shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                      <KeyRound className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 tracking-tight">
+                        {hasPassword
+                          ? t("password_section_title", {
+                            defaultValue: "Mật khẩu tài khoản",
+                          })
+                          : t("set_password_title", {
+                            defaultValue: "Thiết lập mật khẩu",
+                          })}
+                      </p>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {hasPassword
+                          ? t("password_row_desc_has", {
+                            defaultValue: "Đổi mật khẩu đăng nhập của bạn",
+                          })
+                          : t("password_row_desc_no", {
+                            defaultValue:
+                              "Tạo mật khẩu để có thể đăng nhập bằng email",
+                          })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0 text-slate-400 group-hover:text-brand-600 transition-colors">
+                    <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                </button>
+              </div>
             </div>
           </div>
+        )}
 
-          {/* ── Section 2: Form Chỉnh sửa Tên hiển thị & Email ────────── */}
-          <div className="space-y-4">
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-brand-600" />
-              <span>
-                {t("section_info", { defaultValue: "Thông tin hiển thị" })}
-              </span>
-            </h4>
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* VIEW 2: PASSWORD TAB (THIẾT LẬP HOẶC ĐỔI MẬT KHẨU)            */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {view === "password" && (
+          <div className="flex flex-col h-full overflow-hidden animate-in fade-in duration-200">
+            {/* Password Tab Header with Back Button */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => setView("profile")}
+                className="w-8 h-8 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
+                title={t("back", { defaultValue: "Quay lại" })}
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base font-bold text-slate-800 tracking-tight">
+                  {hasPassword
+                    ? t("btn_change_password", { defaultValue: "Đổi mật khẩu" })
+                    : t("set_password_title", {
+                      defaultValue: "Thiết lập mật khẩu",
+                    })}
+                </h3>
+                <p className="text-xs text-slate-400 truncate mt-0.5">
+                  {hasPassword
+                    ? t("change_pw_header", {
+                      defaultValue: "Cập nhật mật khẩu bảo vệ tài khoản của bạn",
+                    })
+                    : t("set_pw_header", {
+                      defaultValue:
+                        "Tạo mật khẩu mới để có thể đăng nhập bằng email",
+                    })}
+                </p>
+              </div>
+            </div>
 
-            {/* Display Name Input */}
-            <form onSubmit={handleSaveDisplayName} className="space-y-2">
-              <label className="text-xs font-semibold text-slate-600 block">
-                {t("display_name_label", { defaultValue: "Tên hiển thị" })}
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                  placeholder={t("display_name_placeholder", {
-                    defaultValue: "Nhập tên hiển thị của bạn",
+            {/* Password Form Content */}
+            <form
+              onSubmit={handleSavePassword}
+              className="flex-1 overflow-y-auto p-6 flex flex-col gap-5"
+            >
+              {/* Current Password (only when user already has a password) */}
+              {hasPassword && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      {t("current_password_label", {
+                        defaultValue: "Mật khẩu hiện tại",
+                      })}
+                    </label>
+                    <Link
+                      href={`/${locale}/forgot-password`}
+                      target="_blank"
+                      className="text-[11px] font-medium text-brand-600 hover:text-brand-700 hover:underline"
+                    >
+                      {t("forgot_password_link", {
+                        defaultValue: "Quên mật khẩu?",
+                      })}
+                    </Link>
+                  </div>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassword ? "text" : "password"}
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder={t("current_password_placeholder", {
+                        defaultValue: "Nhập mật khẩu hiện tại của bạn",
+                      })}
+                      className="w-full px-4 py-2.5 pr-10 text-sm rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      {showCurrentPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* New Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 block">
+                  {t("new_password_label", { defaultValue: "Mật khẩu mới" })}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder={t("new_password_placeholder", {
+                      defaultValue: "Tối thiểu 8 ký tự",
+                    })}
+                    className="w-full px-4 py-2.5 pr-10 text-sm rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showNewPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Password Policy Checklist (matches signup) */}
+              {newPassword && (
+                <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/80 space-y-2">
+                  <p className="text-[12px] font-bold text-slate-800">
+                    {tPolicy("reset_policy_title", {
+                      defaultValue: "Yêu cầu mật khẩu:",
+                    })}
+                  </p>
+                  <ul className="space-y-1.5">
+                    {[
+                      {
+                        id: 1,
+                        text: tPolicy("reset_policy_length", {
+                          defaultValue: "Tối thiểu 8 ký tự",
+                        }),
+                        valid: hasMinLength,
+                      },
+                      {
+                        id: 2,
+                        text: tPolicy("reset_policy_letter", {
+                          defaultValue: "Chứa ít nhất 1 chữ cái",
+                        }),
+                        valid: hasLetter,
+                      },
+                      {
+                        id: 3,
+                        text: tPolicy("reset_policy_upper", {
+                          defaultValue: "Chứa ít nhất 1 chữ hoa",
+                        }),
+                        valid: hasUpper,
+                      },
+                      {
+                        id: 4,
+                        text: tPolicy("reset_policy_lower", {
+                          defaultValue: "Chứa ít nhất 1 chữ thường",
+                        }),
+                        valid: hasLower,
+                      },
+                      {
+                        id: 5,
+                        text: tPolicy("reset_policy_number", {
+                          defaultValue: "Chứa ít nhất 1 chữ số",
+                        }),
+                        valid: hasNumber,
+                      },
+                    ].map((req) => (
+                      <li
+                        key={req.id}
+                        className="flex items-center gap-2 text-[12px]"
+                      >
+                        <div
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 ${req.valid ? "bg-[#0052FF]" : "bg-slate-300"
+                            }`}
+                        />
+                        <span
+                          className={
+                            req.valid
+                              ? "text-slate-800 font-medium"
+                              : "text-slate-500"
+                          }
+                        >
+                          {req.text}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="flex items-start gap-2 text-[12px] pt-1.5 border-t border-slate-100">
+                    <div
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${noConsecutive ? "bg-[#0052FF]" : "bg-slate-300"
+                        }`}
+                    />
+                    <span
+                      className={
+                        noConsecutive
+                          ? "text-slate-800 font-medium"
+                          : "text-slate-500 leading-relaxed"
+                      }
+                    >
+                      {tPolicy("reset_policy_no_consecutive_desc", {
+                        defaultValue:
+                          "Không chứa nhiều hơn 3 ký tự liên tiếp giống nhau",
+                      })}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Confirm Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700 block">
+                  {t("confirm_password_label", {
+                    defaultValue: "Xác nhận mật khẩu",
                   })}
-                  className="flex-1 px-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all"
-                />
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder={t("confirm_password_placeholder", {
+                      defaultValue: "Nhập lại mật khẩu mới",
+                    })}
+                    className="w-full px-4 py-2.5 pr-10 text-sm rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Bottom Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2.5 mt-auto border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setView("profile")}
+                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                >
+                  {t("cancel", { defaultValue: "Hủy" })}
+                </button>
                 <button
                   type="submit"
                   disabled={
-                    isSavingName ||
-                    !displayName.trim() ||
-                    displayName.trim() === user?.displayName
+                    isSubmittingPassword ||
+                    !newPassword ||
+                    (hasPassword && !currentPassword)
                   }
-                  className="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed shrink-0"
+                  className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                 >
-                  {isSavingName ? (
+                  {isSubmittingPassword ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   ) : (
                     <Check className="w-3.5 h-3.5" />
                   )}
-                  <span>{t("save_name", { defaultValue: "Lưu tên" })}</span>
+                  <span>
+                    {hasPassword
+                      ? t("btn_save_password", {
+                        defaultValue: "Cập nhật mật khẩu",
+                      })
+                      : t("btn_confirm_set_password", {
+                        defaultValue: "Lưu mật khẩu",
+                      })}
+                  </span>
                 </button>
               </div>
             </form>
-
-            {/* Email (Disabled, No Extra Badges) */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-slate-600 block">
-                {t("email_label", { defaultValue: "Địa chỉ Email" })}
-              </label>
-              <div className="relative flex items-center">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 pointer-events-none" />
-                <input
-                  type="email"
-                  disabled
-                  value={user?.email || ""}
-                  className="w-full pl-10 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed select-all"
-                />
-              </div>
-            </div>
           </div>
-
-          {/* ── Section 3: Phương thức đăng nhập đã liên kết ───────────── */}
-          <div className="space-y-3">
-            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-brand-600" />
-              <span>
-                {t("section_auth_methods", {
-                  defaultValue: "Phương thức đăng nhập",
-                })}
-              </span>
-            </h4>
-
-            {isLoadingAuth ? (
-              <div className="py-4 flex items-center gap-2 text-slate-400 text-xs">
-                <Loader2 className="w-4 h-4 animate-spin text-brand-500" />
-                <span>
-                  {t("loading_auth", {
-                    defaultValue: "Đang tải danh sách phương thức...",
-                  })}
-                </span>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                {primaryProviders.map((prov) => {
-                  const isLinked =
-                    prov.id === "email"
-                      ? connectedProviders.has("email") || hasPassword
-                      : connectedProviders.has(prov.id);
-
-                  return (
-                    <div
-                      key={prov.id}
-                      className={`flex flex-col justify-between p-3 rounded-2xl border transition-all ${
-                        isLinked
-                          ? "bg-slate-50/90 border-slate-200 text-slate-800 shadow-2xs"
-                          : "bg-white border-slate-100 text-slate-400 opacity-70"
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="p-1.5 rounded-lg bg-white shadow-2xs border border-slate-100">
-                          {prov.icon}
-                        </div>
-                        <span className="text-xs font-bold truncate">
-                          {prov.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center">
-                        {isLinked ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                            <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                            {t("connected", { defaultValue: "Đã liên kết" })}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                            {t("not_connected", {
-                              defaultValue: "Chưa liên kết",
-                            })}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* ── Section 4: Mật khẩu & Thiết lập mật khẩu ────────────────── */}
-          <div className="space-y-3 pt-2 border-t border-slate-100">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <KeyRound className="w-3.5 h-3.5 text-brand-600" />
-                  <span>
-                    {hasPassword
-                      ? t("password_section_title", {
-                          defaultValue: "Mật khẩu tài khoản",
-                        })
-                      : t("set_password_title", {
-                          defaultValue: "Thiết lập mật khẩu",
-                        })}
-                  </span>
-                </h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  {hasPassword
-                    ? t("password_desc_has", {
-                        defaultValue:
-                          "Bạn đã có mật khẩu và có thể đăng nhập bằng email.",
-                      })
-                    : t("password_desc_oauth", {
-                        defaultValue:
-                          "Tài khoản của bạn chưa có mật khẩu riêng. Bạn có thể thiết lập mật khẩu để đăng nhập bằng email khi cần.",
-                      })}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowPasswordForm(!showPasswordForm)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  showPasswordForm
-                    ? "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    : "bg-brand-50 text-brand-600 hover:bg-brand-100 border border-brand-200/50"
-                }`}
-              >
-                {showPasswordForm
-                  ? t("cancel", { defaultValue: "Đóng" })
-                  : hasPassword
-                    ? t("btn_change_password", { defaultValue: "Đổi mật khẩu" })
-                    : t("btn_set_password", {
-                        defaultValue: "Thiết lập mật khẩu",
-                      })}
-              </button>
-            </div>
-
-            {/* Password Form (Shown on toggle) */}
-            {showPasswordForm && (
-              <form
-                onSubmit={handleSavePassword}
-                className="mt-3 p-4 rounded-2xl bg-slate-50/70 border border-slate-200/80 space-y-3 animate-fade-in"
-              >
-                <div className="text-xs font-semibold text-slate-700">
-                  {hasPassword
-                    ? t("change_pw_header", {
-                        defaultValue: "Nhập mật khẩu mới",
-                      })
-                    : t("set_pw_header", {
-                        defaultValue: "Tạo mật khẩu cho tài khoản",
-                      })}
-                </div>
-
-                {/* New Password */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">
-                    {t("new_password_label", { defaultValue: "Mật khẩu mới" })}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showNewPassword ? "text" : "password"}
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder={t("new_password_placeholder", {
-                        defaultValue: "Tối thiểu 8 ký tự",
-                      })}
-                      className="w-full px-3.5 py-2 pr-10 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword(!showNewPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      {showNewPassword ? (
-                        <EyeOff className="w-3.5 h-3.5" />
-                      ) : (
-                        <Eye className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Password Policy Checklist (matches signup) */}
-                {newPassword && (
-                  <div className="bg-white rounded-xl p-3 border border-slate-200/80 space-y-2">
-                    <p className="text-[11px] font-bold text-slate-800">
-                      {tPolicy("reset_policy_title", {
-                        defaultValue: "Yêu cầu mật khẩu:",
-                      })}
-                    </p>
-                    <ul className="space-y-1">
-                      {[
-                        {
-                          id: 1,
-                          text: tPolicy("reset_policy_length", {
-                            defaultValue: "Tối thiểu 8 ký tự",
-                          }),
-                          valid: hasMinLength,
-                        },
-                        {
-                          id: 2,
-                          text: tPolicy("reset_policy_letter", {
-                            defaultValue: "Chứa ít nhất 1 chữ cái",
-                          }),
-                          valid: hasLetter,
-                        },
-                        {
-                          id: 3,
-                          text: tPolicy("reset_policy_upper", {
-                            defaultValue: "Chứa ít nhất 1 chữ hoa",
-                          }),
-                          valid: hasUpper,
-                        },
-                        {
-                          id: 4,
-                          text: tPolicy("reset_policy_lower", {
-                            defaultValue: "Chứa ít nhất 1 chữ thường",
-                          }),
-                          valid: hasLower,
-                        },
-                        {
-                          id: 5,
-                          text: tPolicy("reset_policy_number", {
-                            defaultValue: "Chứa ít nhất 1 chữ số",
-                          }),
-                          valid: hasNumber,
-                        },
-                      ].map((req) => (
-                        <li
-                          key={req.id}
-                          className="flex items-center gap-2 text-[11px]"
-                        >
-                          <div
-                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                              req.valid ? "bg-[#0052FF]" : "bg-slate-300"
-                            }`}
-                          />
-                          <span
-                            className={
-                              req.valid
-                                ? "text-slate-800 font-medium"
-                                : "text-slate-500"
-                            }
-                          >
-                            {req.text}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                    <div className="flex items-start gap-2 text-[11px] pt-1 border-t border-slate-100">
-                      <div
-                        className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${
-                          noConsecutive ? "bg-[#0052FF]" : "bg-slate-300"
-                        }`}
-                      />
-                      <span
-                        className={
-                          noConsecutive
-                            ? "text-slate-800 font-medium"
-                            : "text-slate-500 leading-relaxed"
-                        }
-                      >
-                        {tPolicy("reset_policy_no_consecutive_desc", {
-                          defaultValue:
-                            "Không chứa nhiều hơn 3 ký tự liên tiếp giống nhau",
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Confirm Password */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-600 uppercase">
-                    {t("confirm_password_label", {
-                      defaultValue: "Xác nhận mật khẩu",
-                    })}
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showConfirmPassword ? "text" : "password"}
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder={t("confirm_password_placeholder", {
-                        defaultValue: "Nhập lại mật khẩu mới",
-                      })}
-                      className="w-full px-3.5 py-2 pr-10 text-xs rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setShowConfirmPassword(!showConfirmPassword)
-                      }
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      {showConfirmPassword ? (
-                        <EyeOff className="w-3.5 h-3.5" />
-                      ) : (
-                        <Eye className="w-3.5 h-3.5" />
-                      )}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Submit button — solid single brand color, no gradient */}
-                <div className="pt-1 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowPasswordForm(false)}
-                    className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
-                  >
-                    {t("cancel", { defaultValue: "Hủy" })}
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSubmittingPassword || !newPassword}
-                    className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
-                  >
-                    {isSubmittingPassword ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Check className="w-3.5 h-3.5" />
-                    )}
-                    <span>
-                      {hasPassword
-                        ? t("btn_save_password", {
-                            defaultValue: "Cập nhật mật khẩu",
-                          })
-                        : t("btn_confirm_set_password", {
-                            defaultValue: "Lưu mật khẩu",
-                          })}
-                    </span>
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );

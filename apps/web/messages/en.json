@@ -2574,6 +2574,9 @@
     "btn_set_password": "Set Password",
     "change_pw_header": "Enter new password",
     "set_pw_header": "Create a password for your account",
+    "current_password_label": "Current Password",
+    "current_password_placeholder": "Enter your current password",
+    "forgot_password_link": "Forgot password?",
     "new_password_label": "New Password",
     "new_password_placeholder": "Minimum 8 characters",
     "confirm_password_label": "Confirm Password",
@@ -2587,6 +2590,9 @@
     "error_avatar_format": "Unsupported image format (JPEG, PNG, WEBP, GIF)",
     "success_avatar_updated": "Profile picture updated successfully!",
     "error_upload_avatar": "Unable to upload profile picture",
+    "error_current_password_empty": "Please enter your current password",
+    "error_wrong_current": "Current password is incorrect",
+    "error_new_same": "New password cannot be the same as current password",
     "error_password_empty": "Please enter a new password",
     "error_password_min": "Password must be at least 8 characters",
     "error_password_strength": "Password must include uppercase, lowercase, numbers and special characters",
@@ -2596,6 +2602,9 @@
     "error_set_password": "Unable to set password",
     "method_email_password": "Email & Password",
     "not_connected": "Not connected",
-    "error_password_policy": "Password does not meet all security requirements"
+    "error_password_policy": "Password does not meet all security requirements",
+    "back": "Back",
+    "password_row_desc_has": "Change your login password",
+    "password_row_desc_no": "Create a password to sign in with email"
   }
 }

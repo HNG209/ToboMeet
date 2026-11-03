@@ -143,7 +143,6 @@ export default function MobileConversationDetailsModal({
   if (!mounted || !conversation) return null;
 
   const recipient = conversation.recipient;
-  const isOnline = recipient?.status === "ACTIVE";
 
   const numColumns = 3;
   const totalHorizontalPadding = 32; // px-4 = 16 each side
@@ -195,16 +194,11 @@ export default function MobileConversationDetailsModal({
         >
           {/* 2. Recipient Profile Section */}
           <View className="items-center px-6 pt-6 pb-5 border-b border-slate-100 bg-white">
-            <View className="relative mb-3">
+            <View className="mb-3">
               <MobileUserAvatar
                 avatarUrl={recipient?.avatarUrl}
                 displayName={recipient?.displayName}
                 size={76}
-              />
-              <View
-                className={`absolute bottom-0 right-0 w-4 h-4 rounded-full border-2 border-white ${
-                  isOnline ? "bg-emerald-500" : "bg-slate-300"
-                }`}
               />
             </View>
 
@@ -213,27 +207,10 @@ export default function MobileConversationDetailsModal({
             </Text>
 
             {Boolean(recipient?.email) && (
-              <Text className="text-xs text-slate-400 text-center mb-2">
+              <Text className="text-xs text-slate-400 text-center">
                 {recipient?.email}
               </Text>
             )}
-
-            <View className="flex-row items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-100 mt-1">
-              <View
-                className={`w-2 h-2 rounded-full ${
-                  isOnline ? "bg-emerald-500" : "bg-slate-300"
-                }`}
-              />
-              <Text
-                className={`text-xs font-medium ${
-                  isOnline ? "text-emerald-600" : "text-slate-400"
-                }`}
-              >
-                {isOnline
-                  ? t("chat.online", "Đang hoạt động")
-                  : t("chat.offline", "Ngoại tuyến")}
-              </Text>
-            </View>
           </View>
 
           {/* 3. Horizontal Tabs */}

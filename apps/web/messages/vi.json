@@ -2559,6 +2559,9 @@
     "btn_set_password": "Thiết lập mật khẩu",
     "change_pw_header": "Nhập mật khẩu mới",
     "set_pw_header": "Tạo mật khẩu cho tài khoản",
+    "current_password_label": "Mật khẩu hiện tại",
+    "current_password_placeholder": "Nhập mật khẩu hiện tại của bạn",
+    "forgot_password_link": "Quên mật khẩu?",
     "new_password_label": "Mật khẩu mới",
     "new_password_placeholder": "Tối thiểu 8 ký tự",
     "confirm_password_label": "Xác nhận mật khẩu",
@@ -2572,6 +2575,9 @@
     "error_avatar_format": "Định dạng ảnh không được hỗ trợ (JPEG, PNG, WEBP, GIF)",
     "success_avatar_updated": "Đã cập nhật ảnh đại diện thành công!",
     "error_upload_avatar": "Không thể tải lên ảnh đại diện",
+    "error_current_password_empty": "Vui lòng nhập mật khẩu hiện tại",
+    "error_wrong_current": "Mật khẩu hiện tại không chính xác",
+    "error_new_same": "Mật khẩu mới không được trùng với mật khẩu hiện tại",
     "error_password_empty": "Vui lòng nhập mật khẩu mới",
     "error_password_min": "Mật khẩu phải có ít nhất 8 ký tự",
     "error_password_strength": "Mật khẩu cần gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt",
@@ -2581,6 +2587,9 @@
     "error_set_password": "Không thể thiết lập mật khẩu",
     "method_email_password": "Email & Mật khẩu",
     "not_connected": "Chưa liên kết",
-    "error_password_policy": "Mật khẩu chưa đáp ứng đầy đủ yêu cầu bảo mật"
+    "error_password_policy": "Mật khẩu chưa đáp ứng đầy đủ yêu cầu bảo mật",
+    "back": "Quay lại",
+    "password_row_desc_has": "Đổi mật khẩu đăng nhập của bạn",
+    "password_row_desc_no": "Tạo mật khẩu để có thể đăng nhập bằng email"
   }
 }

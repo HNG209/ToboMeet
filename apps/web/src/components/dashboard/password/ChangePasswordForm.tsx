@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { CheckCircle2, Circle } from "lucide-react";
 import { useChangePasswordMutation } from "@/lib/redux/api/usersApi";
-import { doClientLogout } from "@/lib/axios";
+import { refreshWebSession } from "@/lib/auth/session";
 import { PasswordField } from "./PasswordField";
 import { PasswordActions } from "./PasswordActions";
 
@@ -206,14 +206,21 @@ export function ChangePasswordForm() {
     if (allErrors.currentPassword || allErrors.newPassword || allErrors.confirmPassword) return;
 
     try {
-      await changePassword({
+      const res = await changePassword({
         currentPassword: values.currentPassword,
         newPassword: values.newPassword,
       }).unwrap();
 
+      console.log("[ChangePasswordForm] Result:", res);
+
+      if (res?.session) {
+        await refreshWebSession(res.session);
+      }
+
       toast.success(t("success"));
       handleCancel();
     } catch (err: unknown) {
+      console.error('[ChangePasswordForm] Error:', err);
       const apiErr = err as { code?: number; message?: string };
       const code = apiErr?.code;
       const message = (apiErr?.message ?? "").toLowerCase();

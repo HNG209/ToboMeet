@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Provider } from "@supabase/supabase-js";
 import { getLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 export type FormState = {
   error: string | null;
@@ -161,7 +162,7 @@ export async function logout(): Promise<{ redirectUrl: string }> {
   return { redirectUrl: `/${locale}/login` };
 }
 
-// 1. Gửi mã OTP về email
+// Gửi mã OTP về email
 export async function sendPasswordResetOtp(email: string) {
   const supabase = await createClient();
 
@@ -178,7 +179,7 @@ export async function sendPasswordResetOtp(email: string) {
   return { success: true };
 }
 
-// 2. Xác thực mã OTP (Tạo phiên đăng nhập tạm thời)
+// Xác thực mã OTP (Tạo phiên đăng nhập tạm thời)
 export async function verifyPasswordResetOtp(email: string, token: string) {
   const supabase = await createClient();
 
@@ -196,12 +197,47 @@ export async function verifyPasswordResetOtp(email: string, token: string) {
     };
   }
 
+  // Đặt cookie đánh dấu phiên phục hồi mật khẩu hợp lệ (tồn tại tối đa 10 phút)
+  try {
+    const cookieStore = await cookies();
+    cookieStore.set("pwd_recovery_verified", email.trim().toLowerCase(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 10 * 60, // 10 phút
+      path: "/",
+    });
+  } catch (cookieErr) {
+    console.error("Lỗi đặt recovery cookie:", cookieErr);
+  }
+
   return { success: true };
 }
 
-// 3. Cập nhật mật khẩu mới (Khi đã có phiên đăng nhập từ bước 2)
+// Cập nhật mật khẩu mới (Chỉ cho phép khi phiên đã xác thực OTP recovery)
 export async function updatePassword(password: string) {
+  const cookieStore = await cookies();
+  const recoveryEmail = cookieStore.get("pwd_recovery_verified")?.value;
+
+  // Không cho phép đổi mật khẩu nếu không có cờ xác thực OTP recovery
+  if (!recoveryEmail) {
+    return {
+      success: false,
+      error: "unauthorized_recovery_attempt",
+    };
+  }
+
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || user.email?.toLowerCase() !== recoveryEmail.toLowerCase()) {
+    return {
+      success: false,
+      error: "unauthorized_recovery_attempt",
+    };
+  }
 
   const { error } = await supabase.auth.updateUser({
     password: password,
@@ -219,6 +255,11 @@ export async function updatePassword(password: string) {
     }
     return { success: false, error: errorMessage };
   }
+
+  // Dọn dẹp cookie phục hồi và đăng xuất session tạm thời
+  try {
+    cookieStore.delete("pwd_recovery_verified");
+  } catch { }
 
   await supabase.auth.signOut({ scope: "local" });
 

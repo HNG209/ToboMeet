@@ -27,8 +27,18 @@ export interface SessionsResponse {
   totalLoggedOut: number;
 }
 
+export interface ChangePasswordResponse {
+  success: boolean;
+  message: string;
+  session?: {
+    access_token: string;
+    refresh_token: string;
+    expires_in?: number;
+    expires_at?: number;
+  };
+}
 export interface ChangePasswordPayload {
-  currentPassword: string;
+  currentPassword?: string;
   newPassword: string;
 }
 
@@ -129,7 +139,7 @@ export const usersApi = baseApi.injectEndpoints({
     }),
 
     changePassword: builder.mutation<
-      { success: boolean; message: string },
+      ChangePasswordResponse,
       ChangePasswordPayload
     >({
       query: (data) => ({
@@ -137,6 +147,29 @@ export const usersApi = baseApi.injectEndpoints({
         method: "PUT",
         data,
       }),
+    }),
+
+    getAvatarUploadPresignedUrl: builder.mutation<
+      { signedUrl: string; publicUrl: string; key: string },
+      { fileName: string; contentType: string }
+    >({
+      query: (data) => ({
+        url: "/users/me/avatar/presigned-url",
+        method: "POST",
+        data,
+      }),
+    }),
+
+    updateProfile: builder.mutation<
+      UserResponse,
+      { displayName?: string; avatarUrl?: string }
+    >({
+      query: (data) => ({
+        url: "/users/me/profile",
+        method: "PUT",
+        data,
+      }),
+      invalidatesTags: ["User"],
     }),
   }),
   overrideExisting: false,
@@ -151,4 +184,6 @@ export const {
   useRevokeOtherSessionsMutation,
   useSearchUsersQuery,
   useChangePasswordMutation,
+  useGetAvatarUploadPresignedUrlMutation,
+  useUpdateProfileMutation,
 } = usersApi;

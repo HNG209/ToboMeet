@@ -47,24 +47,20 @@ export default function MobileConversationItem({
   const { t } = useTranslation();
   const { recipient, lastMessagePreview, lastMessageAt, unreadCount } = conversation;
   const timeFormatted = formatRelativeTime(lastMessageAt, t("chat.yesterday", "Hôm qua"));
-  const isOnline = recipient?.status === "ACTIVE";
-
+  
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onPress}
       className="flex-row items-center px-4 py-3 bg-white border-b border-slate-100"
     >
-      {/* Avatar with online badge */}
-      <View className="relative mr-3">
+      {/* Avatar */}
+      <View className="mr-3">
         <MobileUserAvatar
           avatarUrl={recipient?.avatarUrl}
           displayName={recipient?.displayName}
           size={50}
         />
-        {isOnline && (
-          <View className="absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white" />
-        )}
       </View>
 
       {/* Info */}

@@ -189,7 +189,11 @@ export default function MemberActionMenu({
       (currentChannel?.isPrivate === true || targetChannelRole !== "admin"));
 
   return (
-    <div ref={menuRef} className="absolute right-4 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl py-1 mt-1 text-xs">
+    <div
+      ref={menuRef}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute right-4 z-50 w-56 bg-white border border-slate-200 rounded-xl shadow-xl py-1 mt-1 text-xs"
+    >
         {/* Xem hồ sơ & Report */}
         <button
           onClick={() => {
@@ -202,8 +206,9 @@ export default function MemberActionMenu({
         </button>
 
         <button
-          onClick={() => {
-            onReportUser({
+          onClick={(e) => {
+          e.stopPropagation();
+          onReportUser({
               userId: member.userId,
               displayName: member.displayName || "Người dùng",
             });
@@ -219,7 +224,7 @@ export default function MemberActionMenu({
           <>
             {isAdmin ? (
               <button
-                onClick={() => handleUpdateRole("member")}
+                onClick={(e) => { e.stopPropagation(); handleUpdateRole("member"); }}
                 className="w-full text-left px-4 py-2 font-semibold text-amber-600 hover:bg-amber-50 flex items-center gap-2"
               >
                 <UserCheck className="w-3.5 h-3.5" />
@@ -229,7 +234,7 @@ export default function MemberActionMenu({
               </button>
             ) : (
               <button
-                onClick={() => handleUpdateRole("admin")}
+                onClick={(e) => { e.stopPropagation(); handleUpdateRole("admin"); }}
                 className="w-full text-left px-4 py-2 font-semibold text-blue-600 hover:bg-blue-50 flex items-center gap-2"
               >
                 <UserCheck className="w-3.5 h-3.5" />
@@ -240,8 +245,9 @@ export default function MemberActionMenu({
             )}
 
             <button
-              onClick={() => {
-                onTransferOwnership({
+              onClick={(e) => {
+          e.stopPropagation();
+          onTransferOwnership({
                   userId: member.userId,
                   displayName: member.displayName || "Thành viên",
                 });
@@ -263,7 +269,7 @@ export default function MemberActionMenu({
               {isTargetInPrivateChannel ? (
                 !isCurrentUserOwner && (isAdmin || isTargetRoomOwner) ? null : (
                   <button
-                    onClick={() => handleTogglePrivateChannelAccess("remove")}
+                    onClick={(e) => { e.stopPropagation(); handleTogglePrivateChannelAccess("remove"); }}
                     className="w-full text-left px-4 py-2 font-semibold text-red-600 hover:bg-red-50 flex items-center gap-2"
                   >
                     <UserMinus className="w-3.5 h-3.5" />
@@ -274,7 +280,7 @@ export default function MemberActionMenu({
                 )
               ) : (
                 <button
-                  onClick={() => handleTogglePrivateChannelAccess("add")}
+                  onClick={(e) => { e.stopPropagation(); handleTogglePrivateChannelAccess("add"); }}
                   className="w-full text-left px-4 py-2 font-semibold text-brand-600 hover:bg-brand-50 flex items-center gap-2"
                 >
                   <UserPlus className="w-3.5 h-3.5" />
@@ -289,8 +295,9 @@ export default function MemberActionMenu({
         {/* XÓA KHỎI PHÒNG */}
         {canRemoveFromRoom && (
           <button
-            onClick={() => {
-              onRemoveMember({
+            onClick={(e) => {
+          e.stopPropagation();
+          onRemoveMember({
                 userId: member.userId,
                 displayName: member.displayName || "Người dùng",
               });

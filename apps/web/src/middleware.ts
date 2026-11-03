@@ -65,7 +65,8 @@ export async function middleware(request: NextRequest) {
   }
 
   // Nếu người dùng đã có token (user tồn tại) và đang vào các trang cấm
-  if (user && (isAuthPage || isHomePage) && !isResetting) {
+  const isLoginOrSignup = pathWithoutLocale === "/login" || pathWithoutLocale === "/signup";
+  if (user && (isLoginOrSignup || isHomePage) && !isResetting) {
     // Nếu là admin -> Bẻ lái vào /admin
     if (role === "admin") {
       return NextResponse.redirect(
@@ -77,6 +78,11 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(
       new URL(`/${currentLocale}/dashboard`, request.url),
     );
+  }
+
+  // Nếu là Next-Action (Server Action), không redirect để tránh lỗi "unexpected response from server"
+  if (request.headers.has("next-action")) {
+    return response;
   }
 
   // Nếu người dùng chưa có token (user không tồn tại) và đang vào các trang cần auth

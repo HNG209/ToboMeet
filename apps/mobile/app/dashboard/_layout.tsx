@@ -10,29 +10,15 @@ import {
   useDashboardDrawer,
 } from "../../components/dashboard/DashboardDrawerContext";
 import UserDrawerModal from "../../components/dashboard/UserDrawerModal";
-import SettingsDrawerModal from "../../components/dashboard/SettingsDrawerModal";
 
 function DrawerModals() {
-  const {
-    isUserDrawerOpen,
-    closeUserDrawer,
-    isSettingsDrawerOpen,
-    closeSettingsDrawer,
-    openSettingsFromUserDrawer,
-  } = useDashboardDrawer();
+  const { isUserDrawerOpen, closeUserDrawer } = useDashboardDrawer();
 
   return (
-    <>
-      <UserDrawerModal
-        isOpen={isUserDrawerOpen}
-        onClose={closeUserDrawer}
-        onOpenSettings={openSettingsFromUserDrawer}
-      />
-      <SettingsDrawerModal
-        isOpen={isSettingsDrawerOpen}
-        onClose={closeSettingsDrawer}
-      />
-    </>
+    <UserDrawerModal
+      isOpen={isUserDrawerOpen}
+      onClose={closeUserDrawer}
+    />
   );
 }
 

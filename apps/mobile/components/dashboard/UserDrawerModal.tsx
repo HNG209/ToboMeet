@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,11 @@ import {
   Animated,
   Dimensions,
   Image,
-  SafeAreaView,
-  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { supabase } from "../../lib/supabase";
 import { toast } from "../../lib/toast";
 import { useGetMeQuery } from "../../lib/redux/features/users/usersApi";
@@ -21,26 +20,29 @@ import { useGetMeQuery } from "../../lib/redux/features/users/usersApi";
 interface UserDrawerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onOpenSettings: () => void;
 }
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
-const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.82, 330);
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const DRAWER_WIDTH = Math.min(SCREEN_WIDTH * 0.85, 330);
 
 export default function UserDrawerModal({
   isOpen,
   onClose,
-  onOpenSettings,
 }: UserDrawerModalProps) {
   const { t } = useTranslation();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { data: profile } = useGetMeQuery();
 
+  const [modalVisible, setModalVisible] = useState(isOpen);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (isOpen) {
+      setModalVisible(true);
+      slideAnim.setValue(0);
+      fadeAnim.setValue(0);
       Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 1,
@@ -54,7 +56,7 @@ export default function UserDrawerModal({
           useNativeDriver: true,
         }),
       ]).start();
-    } else {
+    } else if (modalVisible) {
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: 0,
@@ -66,19 +68,39 @@ export default function UserDrawerModal({
           duration: 200,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]).start(() => {
+        setModalVisible(false);
+      });
     }
-  }, [isOpen, slideAnim, fadeAnim]);
+  }, [isOpen]);
+
+  const handleClose = () => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setModalVisible(false);
+      onClose();
+    });
+  };
 
   const handleLogout = async () => {
     try {
-      onClose();
+      handleClose();
       const { error } = await supabase.auth.signOut({ scope: "local" });
       if (error) throw error;
       router.replace("/(auth)/login");
     } catch (error) {
       console.error("Lỗi đăng xuất", error);
-      toast.error("Lỗi đăng xuất, vui lòng thử lại sau.");
+      toast.error(t("dashboard.logout_error", "Lỗi đăng xuất, vui lòng thử lại sau."));
     }
   };
 
@@ -89,15 +111,15 @@ export default function UserDrawerModal({
 
   return (
     <Modal
-      visible={isOpen}
+      visible={modalVisible}
       transparent
       animationType="none"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
       statusBarTranslucent
     >
       <View style={{ flex: 1, flexDirection: "row" }}>
-        {/* Backdrop overlay */}
-        <TouchableWithoutFeedback onPress={onClose}>
+        {/* Backdrop overlay: click ra ngoài để đóng */}
+        <TouchableWithoutFeedback onPress={handleClose}>
           <Animated.View
             style={{
               position: "absolute",
@@ -111,7 +133,7 @@ export default function UserDrawerModal({
           />
         </TouchableWithoutFeedback>
 
-        {/* Drawer Content (Trượt từ trái sang phải) */}
+        {/* Drawer Content */}
         <Animated.View
           style={{
             width: DRAWER_WIDTH,
@@ -125,92 +147,82 @@ export default function UserDrawerModal({
             elevation: 20,
           }}
         >
-          <SafeAreaView style={{ flex: 1 }}>
-            <View style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-              {/* ── HEADER CỦA DRAWER: Hiện đầy đủ thông tin người dùng ── */}
-              <View
+          <View
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              paddingTop: Math.max(insets.top, 24),
+              paddingBottom: Math.max(insets.bottom, 16),
+            }}
+          >
+            {/* ── HEADER CỦA DRAWER: Avatar, Tên & Email chung dòng/khối ngang ── */}
+            <View
+              style={{
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                backgroundColor: "#F8FAFC",
+                borderBottomWidth: 1,
+                borderBottomColor: "#E2E8F0",
+              }}
+            >
+              {/* Khối bấm chuyển hướng sang trang profile */}
+              <TouchableOpacity
+                onPress={() => {
+                  handleClose();
+                  router.push("/profile");
+                }}
+                activeOpacity={0.7}
                 style={{
-                  paddingHorizontal: 20,
-                  paddingTop: Platform.OS === "android" ? 36 : 16,
-                  paddingBottom: 20,
-                  backgroundColor: "#F8FAFC",
-                  borderBottomWidth: 1,
-                  borderBottomColor: "#E2E8F0",
+                  flexDirection: "row",
+                  alignItems: "center",
                 }}
               >
+                {/* Avatar */}
                 <View
                   style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    backgroundColor: "#DBEAFE",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    overflow: "hidden",
+                    borderWidth: 2,
+                    borderColor: "#ffffff",
                   }}
                 >
-                  {/* Avatar lớn kèm chấm trạng thái online */}
-                  <View style={{ position: "relative" }}>
-                    <View
+                  {profile?.avatarUrl ? (
+                    <Image
+                      source={{ uri: profile.avatarUrl }}
+                      style={{ width: "100%", height: "100%" }}
+                    />
+                  ) : (
+                    <Text
                       style={{
-                        width: 58,
-                        height: 58,
-                        borderRadius: 29,
-                        backgroundColor: "#DBEAFE",
-                        justifyContent: "center",
-                        alignItems: "center",
-                        overflow: "hidden",
-                        borderWidth: 2,
-                        borderColor: "#ffffff",
+                        fontWeight: "bold",
+                        color: "#0052FF",
+                        fontSize: 18,
                       }}
                     >
-                      {profile?.avatarUrl ? (
-                        <Image
-                          source={{ uri: profile.avatarUrl }}
-                          style={{ width: "100%", height: "100%" }}
-                        />
-                      ) : (
-                        <Text
-                          style={{
-                            fontWeight: "bold",
-                            color: "#0052FF",
-                            fontSize: 22,
-                          }}
-                        >
-                          {(profile?.displayName || "U")
-                            .charAt(0)
-                            .toUpperCase()}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Nút đóng drawer */}
-                  <TouchableOpacity
-                    onPress={onClose}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 16,
-                      backgroundColor: "#ffffff",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      borderWidth: 1,
-                      borderColor: "#E2E8F0",
-                    }}
-                  >
-                    <Feather name="x" size={16} color="#64748B" />
-                  </TouchableOpacity>
+                      {(profile?.displayName || "U")
+                        .charAt(0)
+                        .toUpperCase()}
+                    </Text>
+                  )}
                 </View>
 
-                {/* Thông tin tên & email người dùng */}
-                <View style={{ marginTop: 12 }}>
+                {/* Tên & Email hiển thị chung hàng/khối */}
+                <View style={{ marginLeft: 12, flex: 1 }}>
                   <Text
                     style={{
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: "bold",
                       color: "#0F172A",
                     }}
                     numberOfLines={1}
                   >
-                    {profile?.displayName || "Người dùng"}
+                    {profile?.displayName || t("common.user", "Người dùng")}
                   </Text>
                   <Text
                     style={{
@@ -219,204 +231,185 @@ export default function UserDrawerModal({
                       marginTop: 2,
                     }}
                     numberOfLines={1}
+                    ellipsizeMode="tail"
                   >
                     {profile?.email || ""}
                   </Text>
                 </View>
-              </View>
 
-              {/* ── DANH SÁCH MENU BÊN TRONG DRAWER ── */}
-              <View style={{ flex: 1, paddingVertical: 12, paddingHorizontal: 12 }}>
-                {/* Mục Cài đặt chính (Đã được chuyển từ bottom tab vào đây) */}
-                <TouchableOpacity
-                  onPress={onOpenSettings}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 13,
-                    paddingHorizontal: 14,
-                    borderRadius: 14,
-                    backgroundColor: "#EFF6FF",
-                    marginBottom: 8,
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 10,
-                      backgroundColor: "#0052FF",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      marginRight: 12,
-                    }}
-                  >
-                    <Feather name="settings" size={18} color="#ffffff" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "bold",
-                        color: "#0052FF",
-                      }}
-                    >
-                      {t("dashboard.tab_settings", "Cài đặt")}
-                    </Text>
-                    <Text style={{ fontSize: 11, color: "#60A5FA" }}>
-                      Thiết bị, ngôn ngữ, mật khẩu
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={16} color="#0052FF" />
-                </TouchableOpacity>
+                <Feather
+                  name="chevron-right"
+                  size={16}
+                  color="#94A3B8"
+                  style={{ marginLeft: 4 }}
+                />
+              </TouchableOpacity>
+            </View>
 
-                {/* Menu items phụ */}
-                <TouchableOpacity
-                  onPress={() => {
-                    onClose();
-                    router.push("/dashboard/settings/devices");
-                  }}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 12,
-                    paddingHorizontal: 14,
-                    borderRadius: 12,
-                  }}
-                >
-                  <Feather
-                    name="smartphone"
-                    size={18}
-                    color="#64748B"
-                    style={{ marginRight: 12 }}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "600",
-                      color: "#334155",
-                      flex: 1,
-                    }}
-                  >
-                    {t("settings.tabs.devices", "Quản lý thiết bị")}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    onClose();
-                    router.push("/dashboard/settings/language");
-                  }}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 12,
-                    paddingHorizontal: 14,
-                    borderRadius: 12,
-                  }}
-                >
-                  <Feather
-                    name="globe"
-                    size={18}
-                    color="#64748B"
-                    style={{ marginRight: 12 }}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "600",
-                      color: "#334155",
-                      flex: 1,
-                    }}
-                  >
-                    {t("settings.tabs.language", "Ngôn ngữ")}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    onClose();
-                    router.push("/dashboard/settings/password");
-                  }}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 12,
-                    paddingHorizontal: 14,
-                    borderRadius: 12,
-                  }}
-                >
-                  <Feather
-                    name="lock"
-                    size={18}
-                    color="#64748B"
-                    style={{ marginRight: 12 }}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "600",
-                      color: "#334155",
-                      flex: 1,
-                    }}
-                  >
-                    {t("settings.password.header", "Đổi mật khẩu")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* ── FOOTER CỦA DRAWER: Nút Đăng xuất ── */}
-              <View
+            {/* ── DANH SÁCH MENU BÊN TRONG DRAWER ── */}
+            <View
+              style={{
+                flex: 1,
+                paddingVertical: 12,
+                paddingHorizontal: 12,
+                gap: 4,
+              }}
+            >
+              {/* Tab 1: Cuộc họp cá nhân */}
+              <TouchableOpacity
+                onPress={() => {
+                  handleClose();
+                  router.push("/settings/personal-meeting");
+                }}
+                activeOpacity={0.7}
                 style={{
-                  padding: 16,
-                  borderTopWidth: 1,
-                  borderTopColor: "#F1F5F9",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
                 }}
               >
-                <TouchableOpacity
-                  onPress={handleLogout}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 12,
-                    paddingHorizontal: 16,
-                    borderRadius: 14,
-                    backgroundColor: "#FEF2F2",
-                    borderWidth: 1,
-                    borderColor: "#FEE2E2",
-                  }}
-                >
-                  <Feather
-                    name="log-out"
-                    size={16}
-                    color="#EF4444"
-                    style={{ marginRight: 8 }}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: "bold",
-                      color: "#EF4444",
-                    }}
-                  >
-                    {t("dashboard.logout", "Đăng xuất")}
-                  </Text>
-                </TouchableOpacity>
-
+                <Feather
+                  name="video"
+                  size={18}
+                  color="#0052FF"
+                  style={{ marginRight: 12 }}
+                />
                 <Text
                   style={{
-                    fontSize: 10,
-                    color: "#94A3B8",
-                    textAlign: "center",
-                    marginTop: 10,
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: "#334155",
+                    flex: 1,
                   }}
                 >
-                  ToboMeet v1.0.0
+                  {t("settings.tabs.personal_meeting", "Cuộc họp cá nhân")}
                 </Text>
-              </View>
+                <Feather name="chevron-right" size={16} color="#CBD5E1" />
+              </TouchableOpacity>
+
+              {/* Tab 2: Quản lý thiết bị */}
+              <TouchableOpacity
+                onPress={() => {
+                  handleClose();
+                  router.push("/settings/devices");
+                }}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                }}
+              >
+                <Feather
+                  name="smartphone"
+                  size={18}
+                  color="#64748B"
+                  style={{ marginRight: 12 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: "#334155",
+                    flex: 1,
+                  }}
+                >
+                  {t("settings.tabs.devices", "Quản lý thiết bị")}
+                </Text>
+                <Feather name="chevron-right" size={16} color="#CBD5E1" />
+              </TouchableOpacity>
+
+              {/* Tab 3: Ngôn ngữ */}
+              <TouchableOpacity
+                onPress={() => {
+                  handleClose();
+                  router.push("/settings/language");
+                }}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                }}
+              >
+                <Feather
+                  name="globe"
+                  size={18}
+                  color="#64748B"
+                  style={{ marginRight: 12 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "600",
+                    color: "#334155",
+                    flex: 1,
+                  }}
+                >
+                  {t("settings.tabs.language", "Ngôn ngữ")}
+                </Text>
+                <Feather name="chevron-right" size={16} color="#CBD5E1" />
+              </TouchableOpacity>
             </View>
-          </SafeAreaView>
+
+            {/* ── FOOTER CỦA DRAWER: Nút Đăng xuất ── */}
+            <View
+              style={{
+                padding: 16,
+                borderTopWidth: 1,
+                borderTopColor: "#F1F5F9",
+              }}
+            >
+              <TouchableOpacity
+                onPress={handleLogout}
+                activeOpacity={0.8}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 14,
+                  backgroundColor: "#FEF2F2",
+                  borderWidth: 1,
+                  borderColor: "#FEE2E2",
+                }}
+              >
+                <Feather
+                  name="log-out"
+                  size={16}
+                  color="#EF4444"
+                  style={{ marginRight: 8 }}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "bold",
+                    color: "#EF4444",
+                  }}
+                >
+                  {t("dashboard.logout", "Đăng xuất")}
+                </Text>
+              </TouchableOpacity>
+
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: "#94A3B8",
+                  textAlign: "center",
+                  marginTop: 10,
+                }}
+              >
+                ToboMeet v1.0.0
+              </Text>
+            </View>
+          </View>
         </Animated.View>
       </View>
     </Modal>

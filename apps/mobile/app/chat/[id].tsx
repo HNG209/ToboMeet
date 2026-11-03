@@ -497,11 +497,7 @@ export default function ConversationScreen() {
               <Text className="text-sm font-bold text-slate-900" numberOfLines={1}>
                 {recipient?.displayName || t("chat.user_fallback", "Người dùng")}
               </Text>
-              <Text className="text-[11px] text-emerald-600 font-medium">
-                {recipient?.status === "ACTIVE"
-                  ? t("chat.online", "Đang hoạt động")
-                  : t("chat.offline", "Ngoại tuyến")}
-              </Text>
+              
             </View>
           </TouchableOpacity>
         </View>

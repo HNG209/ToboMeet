@@ -16,7 +16,7 @@ export async function createClient() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, { ...options, httpOnly: true }),
+              cookieStore.set(name, value, { ...options, path: "/", sameSite: "lax", httpOnly: true }),
             );
           } catch {
             // Bỏ qua lỗi nếu gọi setAll từ Server Component

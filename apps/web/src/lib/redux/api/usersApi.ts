@@ -41,8 +41,19 @@ export type SearchUsersArgs = {
 };
 
 export interface ChangePasswordPayload {
-  currentPassword: string;
+  currentPassword?: string;
   newPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+  message: string;
+  session?: {
+    access_token: string;
+    refresh_token: string;
+    expires_in?: number;
+    expires_at?: number;
+  };
 }
 
 export const usersApi = baseApi.injectEndpoints({
@@ -165,7 +176,7 @@ export const usersApi = baseApi.injectEndpoints({
     }),
 
     changePassword: builder.mutation<
-      { success: boolean; message: string },
+      ChangePasswordResponse,
       ChangePasswordPayload
     >({
       query: (data) => ({
