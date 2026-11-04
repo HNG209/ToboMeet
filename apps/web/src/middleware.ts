@@ -64,9 +64,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL(`/${currentLocale}/404`, request.url));
   }
 
-  // Nếu người dùng đã có token (user tồn tại) và đang vào các trang cấm
-  const isLoginOrSignup = pathWithoutLocale === "/login" || pathWithoutLocale === "/signup";
-  if (user && (isLoginOrSignup || isHomePage) && !isResetting) {
+  // Nếu người dùng đã có token (user tồn tại) và đang vào các trang cấm (login, signup, forgot-password)
+  const isAuthRestricted =
+    pathWithoutLocale === "/login" ||
+    pathWithoutLocale === "/signup" ||
+    pathWithoutLocale === "/forgot-password";
+  if (user && (isAuthRestricted || isHomePage) && !isResetting) {
     // Nếu là admin -> Bẻ lái vào /admin
     if (role === "admin") {
       return NextResponse.redirect(

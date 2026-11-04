@@ -18,16 +18,24 @@ import {
   CheckCircle2,
   ChevronRight,
   ArrowLeft,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react";
 import { UserResponse } from "@tobomeet/shared/types";
 import { validatePasswordPolicy } from "@tobomeet/shared/utils";
 import {
   useGetAvatarUploadPresignedUrlMutation,
   useUpdateProfileMutation,
-  useChangePasswordMutation,
 } from "@/lib/redux/api/usersApi";
-import { getUserAuthInfo } from "@/app/[locale]/auth/profile-actions";
-import { refreshWebSession } from "@/lib/auth/session";
+import {
+  getUserAuthInfo,
+  updateUserPassword,
+  resetUserPasswordWithRecoverySession,
+} from "@/app/[locale]/auth/profile-actions";
+import {
+  sendPasswordResetOtp,
+  verifyPasswordResetOtp,
+} from "@/app/[locale]/auth/actions";
 import UserAvatar from "./UserAvatar";
 
 
@@ -47,11 +55,26 @@ export default function EditProfileModal({
 }: EditProfileModalProps) {
   const t = useTranslations("profile");
   const tPolicy = useTranslations("forgot_password");
+  const t1 = useTranslations("password_reset");
   const locale = useLocale();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // View state: "profile" (main tab) or "password" (dedicated password setup tab)
-  const [view, setView] = useState<"profile" | "password">("profile");
+  // View state: "profile" (main tab), "password" (change/set password tab), "forgot-password" (embedded forgot password flow)
+  const [view, setView] = useState<"profile" | "password" | "forgot-password">("profile");
+
+  // Forgot password sub-flow state (embedded inside modal)
+  const [forgotStep, setForgotStep] = useState<"email" | "otp" | "reset" | "success">("email");
+  const [forgotOtp, setForgotOtp] = useState<string[]>(Array(6).fill(""));
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
+  const [forgotCountdown, setForgotCountdown] = useState(0);
+  const [isSendingForgotOtp, setIsSendingForgotOtp] = useState(false);
+  const [isVerifyingForgotOtp, setIsVerifyingForgotOtp] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+  const [forgotErrorMsg, setForgotErrorMsg] = useState("");
+  const forgotOtpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Profile editing state
   const [displayName, setDisplayName] = useState("");
@@ -85,7 +108,6 @@ export default function EditProfileModal({
   const [getAvatarUploadPresignedUrl] =
     useGetAvatarUploadPresignedUrlMutation();
   const [updateProfile] = useUpdateProfileMutation();
-  const [changePasswordMutation] = useChangePasswordMutation();
 
   // Validate password using shared policy (matches signup)
   const {
@@ -98,7 +120,25 @@ export default function EditProfileModal({
     isValid: isPasswordPolicyValid,
   } = validatePasswordPolicy(newPassword);
 
-  // Reset view on modal close/open
+  // Validate forgot password policy
+  const {
+    hasMinLength: forgotHasMinLength,
+    hasLetter: forgotHasLetter,
+    hasUpper: forgotHasUpper,
+    hasLower: forgotHasLower,
+    hasNumber: forgotHasNumber,
+    noConsecutive: forgotNoConsecutive,
+    isValid: isForgotPolicyValid,
+  } = validatePasswordPolicy(forgotNewPassword);
+
+  // Forgot Password Countdown timer
+  useEffect(() => {
+    if (forgotCountdown <= 0) return;
+    const timer = setTimeout(() => setForgotCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [forgotCountdown]);
+
+  // Reset view & states on modal close/open
   useEffect(() => {
     if (!isOpen) {
       setView("profile");
@@ -108,6 +148,14 @@ export default function EditProfileModal({
       setShowCurrentPassword(false);
       setShowNewPassword(false);
       setShowConfirmPassword(false);
+      setForgotStep("email");
+      setForgotOtp(Array(6).fill(""));
+      setForgotNewPassword("");
+      setForgotConfirmPassword("");
+      setShowForgotNewPassword(false);
+      setShowForgotConfirmPassword(false);
+      setForgotErrorMsg("");
+      setForgotCountdown(0);
     }
   }, [isOpen]);
 
@@ -116,7 +164,9 @@ export default function EditProfileModal({
     if (!isOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        if (view === "password") {
+        if (view === "forgot-password") {
+          setView("password");
+        } else if (view === "password") {
           setView("profile");
         } else {
           onClose();
@@ -362,13 +412,27 @@ export default function EditProfileModal({
 
     try {
       setIsSubmittingPassword(true);
-      const res = await changePasswordMutation({
+      const res = await updateUserPassword({
         currentPassword: hasPassword ? currentPassword.trim() : undefined,
         newPassword: newPassword.trim(),
-      }).unwrap();
+      });
 
-      if (res?.session) {
-        await refreshWebSession(res.session);
+      if (!res.success) {
+        if (res.isWrongCurrent) {
+          toast.error(
+            t("error_wrong_current", {
+              defaultValue: "Mật khẩu hiện tại không chính xác",
+            })
+          );
+          return;
+        }
+        toast.error(
+          res.error ||
+            t("error_set_password", {
+              defaultValue: "Không thể thiết lập mật khẩu",
+            })
+        );
+        return;
       }
 
       toast.success(
@@ -404,15 +468,184 @@ export default function EditProfileModal({
       await fetchAuthProviders(true);
     } catch (err: any) {
       console.error("[EditProfileModal] Error changing password:", err);
-      const errMsg =
-        err?.data?.message ||
+      toast.error(
         err?.message ||
-        t("error_set_password", {
-          defaultValue: "Không thể thiết lập mật khẩu",
-        });
-      toast.error(errMsg);
+          t("error_set_password", {
+            defaultValue: "Không thể thiết lập mật khẩu",
+          })
+      );
     } finally {
       setIsSubmittingPassword(false);
+    }
+  };
+
+  // OTP input helpers for forgot password flow
+  const handleForgotOtpChange = (index: number, value: string) => {
+    const val = value.replace(/[^0-9]/g, "");
+    if (val.length > 1) {
+      const pasted = val.slice(0, 6).split("");
+      const newOtp = [...forgotOtp];
+      pasted.forEach((char, i) => {
+        if (index + i < 6) newOtp[index + i] = char;
+      });
+      setForgotOtp(newOtp);
+      const focusIndex = Math.min(index + pasted.length, 5);
+      forgotOtpRefs.current[focusIndex]?.focus();
+      return;
+    }
+
+    const newOtp = [...forgotOtp];
+    newOtp[index] = val;
+    setForgotOtp(newOtp);
+
+    if (val && index < 5) {
+      forgotOtpRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleForgotOtpKeyDown = (
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
+    if (e.key === "Backspace" && !forgotOtp[index] && index > 0) {
+      forgotOtpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // Step 1: Send OTP to user's registered email
+  const handleForgotSendOtp = async () => {
+    const targetEmail = user?.email;
+    if (!targetEmail) {
+      toast.error(
+        tPolicy("error_invalid_email", {
+          defaultValue: "Không tìm thấy email của tài khoản.",
+        }),
+      );
+      return;
+    }
+    try {
+      setIsSendingForgotOtp(true);
+      setForgotErrorMsg("");
+      const res = await sendPasswordResetOtp(targetEmail);
+      if (res.success) {
+        setForgotStep("otp");
+        setForgotCountdown(300);
+        setForgotOtp(Array(6).fill(""));
+        toast.success(
+          t1("otp_sent", {
+            defaultValue: "Đã gửi mã xác thực tới email của bạn.",
+          }),
+        );
+      } else {
+        setForgotErrorMsg(t1(res.error || "otp_send_failed"));
+      }
+    } catch {
+      setForgotErrorMsg(
+        t("error_network", {
+          defaultValue: "Lỗi kết nối, vui lòng thử lại.",
+        }),
+      );
+    } finally {
+      setIsSendingForgotOtp(false);
+    }
+  };
+
+  // Step 2: Verify OTP and establish recovery session
+  const handleForgotVerifyOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const code = forgotOtp.join("");
+    if (code.length < 6) {
+      setForgotErrorMsg(
+        tPolicy("error_invalid_otp", {
+          defaultValue: "Vui lòng nhập đầy đủ mã xác thực 6 số.",
+        }),
+      );
+      return;
+    }
+    const targetEmail = user?.email;
+    if (!targetEmail) return;
+
+    try {
+      setIsVerifyingForgotOtp(true);
+      setForgotErrorMsg("");
+      const res = await verifyPasswordResetOtp(targetEmail, code);
+      if (res.success) {
+        setForgotStep("reset");
+      } else {
+        setForgotErrorMsg(t1(res.error || "otp_invalid_or_expired"));
+      }
+    } catch {
+      setForgotErrorMsg(
+        t("error_network", {
+          defaultValue: "Lỗi kết nối, vui lòng thử lại.",
+        }),
+      );
+    } finally {
+      setIsVerifyingForgotOtp(false);
+    }
+  };
+
+  // Step 3: Reset password using recovery session (without logging out)
+  const handleForgotResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isForgotPolicyValid) {
+      setForgotErrorMsg(
+        t("error_password_policy", {
+          defaultValue: "Mật khẩu chưa đáp ứng đầy đủ yêu cầu bảo mật.",
+        }),
+      );
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotErrorMsg(
+        t("error_password_mismatch", {
+          defaultValue: "Xác nhận mật khẩu không khớp.",
+        }),
+      );
+      return;
+    }
+
+    try {
+      setIsResettingPassword(true);
+      setForgotErrorMsg("");
+      const res =
+        await resetUserPasswordWithRecoverySession(forgotNewPassword);
+      if (res.success) {
+        setForgotStep("success");
+        setHasPassword(true);
+        toast.success(
+          t("success_password_updated", {
+            defaultValue: "Đã đổi mật khẩu thành công!",
+          }),
+        );
+        const key = user?._id || user?.email;
+        if (key) {
+          const existing = authInfoCache.get(key);
+          const updatedProviders = Array.from(
+            new Set([...(existing?.providers || []), "email"]),
+          );
+          authInfoCache.set(key, {
+            providers: updatedProviders,
+            hasPassword: true,
+          });
+          setConnectedProviders(new Set(updatedProviders));
+        }
+      } else {
+        setForgotErrorMsg(
+          res.error ||
+            t("error_set_password", {
+              defaultValue: "Không thể đổi mật khẩu.",
+            }),
+        );
+      }
+    } catch {
+      setForgotErrorMsg(
+        t("error_network", {
+          defaultValue: "Lỗi kết nối, vui lòng thử lại.",
+        }),
+      );
+    } finally {
+      setIsResettingPassword(false);
     }
   };
 
@@ -793,15 +1026,19 @@ export default function EditProfileModal({
                         defaultValue: "Mật khẩu hiện tại",
                       })}
                     </label>
-                    <Link
-                      href={`/${locale}/forgot-password`}
-                      target="_blank"
-                      className="text-[11px] font-medium text-brand-600 hover:text-brand-700 hover:underline"
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setView("forgot-password");
+                        setForgotStep("email");
+                        setForgotErrorMsg("");
+                      }}
+                      className="text-[11px] font-medium text-brand-600 hover:text-brand-700 hover:underline cursor-pointer"
                     >
                       {t("forgot_password_link", {
                         defaultValue: "Quên mật khẩu?",
                       })}
-                    </Link>
+                    </button>
                   </div>
                   <div className="relative">
                     <input
@@ -1012,6 +1249,434 @@ export default function EditProfileModal({
                 </button>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* ─── VIEW 3: FORGOT PASSWORD FLOW (EMBEDDED INSIDE MODAL) ─── */}
+        {view === "forgot-password" && (
+          <div className="flex flex-col h-full overflow-hidden animate-in fade-in duration-200">
+            {/* Header with Back button */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setView("password")}
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
+                  title={t("back", { defaultValue: "Quay lại" })}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    {tPolicy("title", { defaultValue: "Quên mật khẩu" })}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {forgotStep === "email" &&
+                      t("forgot_password_confirm_subtitle", {
+                        defaultValue:
+                          "Hãy xác nhận đây là email của bạn và gửi mã OTP để đặt lại mật khẩu",
+                      })}
+                    {forgotStep === "otp" &&
+                      (tPolicy("otp_subtitle", {
+                        defaultValue: "Nhập mã xác thực 6 số gửi đến email",
+                      }))}
+                    {forgotStep === "reset" &&
+                      (tPolicy("reset_subtitle", {
+                        defaultValue: "Nhập mật khẩu mới của bạn",
+                      }))}
+                    {forgotStep === "success" &&
+                      t("reset_password_success_title", {
+                        defaultValue: "Đặt lại mật khẩu thành công",
+                      })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Body Content */}
+            <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-5">
+              {/* Error Alert */}
+              {forgotErrorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-600 flex items-start gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="flex-1">{forgotErrorMsg}</span>
+                </div>
+              )}
+
+              {/* STEP 1: EMAIL CONFIRMATION & SEND OTP */}
+              {forgotStep === "email" && (
+                <div
+                  key="forgot-step-email"
+                  className="flex flex-col items-center justify-center py-6 text-center space-y-5 my-auto animate-in fade-in slide-in-from-right-4 duration-300"
+                >
+                  <div className="w-14 h-14 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600 shadow-sm">
+                    <Mail className="w-7 h-7" />
+                  </div>
+                  <div className="max-w-xs space-y-1.5">
+                    <h4 className="text-sm font-bold text-slate-800">
+                      {t("confirm_email_title", { defaultValue: "Xác nhận địa chỉ email" })}
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      {t("forgot_password_confirm_desc", {
+                        defaultValue:
+                          "Hãy xác nhận đây là email của bạn và nhấn gửi mã OTP để đặt lại mật khẩu:",
+                      })}
+                    </p>
+                  </div>
+                  <div className="w-full max-w-sm px-4 py-3 bg-slate-50 border border-slate-200/80 rounded-xl text-sm font-semibold text-slate-800 break-all select-all">
+                    {user?.email}
+                  </div>
+                  <div className="w-full max-w-sm pt-2">
+                    <button
+                      type="button"
+                      onClick={handleForgotSendOtp}
+                      disabled={isSendingForgotOtp}
+                      className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                    >
+                      {isSendingForgotOtp ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Mail className="w-4 h-4" />
+                      )}
+                      <span>
+                        {t("send_otp_btn", { defaultValue: "Gửi mã OTP xác nhận" })}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 2: OTP INPUT */}
+              {forgotStep === "otp" && (
+                <form
+                  key="forgot-step-otp"
+                  onSubmit={handleForgotVerifyOtp}
+                  className="flex flex-col items-center justify-center py-4 space-y-5 my-auto animate-in fade-in slide-in-from-right-4 duration-300"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-brand-50 border border-brand-100 flex items-center justify-center text-brand-600">
+                    <KeyRound className="w-6 h-6" />
+                  </div>
+                  <div className="text-center space-y-1 max-w-xs">
+                    <h4 className="text-sm font-bold text-slate-800">
+                      Nhập mã xác thực
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Mã đã được gửi đến <span className="font-semibold text-slate-700">{user?.email}</span>
+                    </p>
+                  </div>
+
+                  {/* 6 Digit OTP Input Boxes */}
+                  <div className="flex items-center justify-center gap-2 sm:gap-2.5">
+                    {forgotOtp.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => {
+                          forgotOtpRefs.current[index] = el;
+                        }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleForgotOtpChange(index, e.target.value)}
+                        onKeyDown={(e) => handleForgotOtpKeyDown(index, e)}
+                        className="w-10 h-12 sm:w-11 sm:h-12 text-center text-lg font-bold rounded-xl border border-slate-200 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all shadow-sm"
+                      />
+                    ))}
+                  </div>
+
+                  {/* Resend OTP */}
+                  <div className="flex items-center justify-center gap-1.5 text-xs text-slate-500">
+                    {forgotCountdown > 0 ? (
+                      <span>
+                        Gửi lại mã sau{" "}
+                        <strong className="text-slate-700">
+                          {Math.floor(forgotCountdown / 60)}:
+                          {(forgotCountdown % 60).toString().padStart(2, "0")}
+                        </strong>
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleForgotSendOtp}
+                        disabled={isSendingForgotOtp}
+                        className="text-brand-600 hover:text-brand-700 font-semibold hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        <span>Gửi lại mã</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="w-full max-w-sm pt-2">
+                    <button
+                      type="submit"
+                      disabled={isVerifyingForgotOtp || forgotOtp.join("").length < 6}
+                      className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 shadow-sm"
+                    >
+                      {isVerifyingForgotOtp ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Check className="w-4 h-4" />
+                      )}
+                      <span>Xác nhận mã OTP</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* STEP 3: RESET PASSWORD */}
+              {forgotStep === "reset" && (
+                <form
+                  key="forgot-step-reset"
+                  onSubmit={handleForgotResetPassword}
+                  className="flex flex-col gap-4 py-2 animate-in fade-in slide-in-from-right-4 duration-300"
+                >
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-slate-800">
+                      Thiết lập mật khẩu mới
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      Phiên khôi phục đã được xác thực. Vui lòng nhập mật khẩu mới.
+                    </p>
+                  </div>
+
+                  {/* New Password */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      {t("new_password_label", { defaultValue: "Mật khẩu mới" })}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showForgotNewPassword ? "text" : "password"}
+                        value={forgotNewPassword}
+                        onChange={(e) => setForgotNewPassword(e.target.value)}
+                        placeholder={t("new_password_placeholder", {
+                          defaultValue: "Tối thiểu 8 ký tự",
+                        })}
+                        className="w-full px-4 py-2.5 pr-10 text-sm rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showForgotNewPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Password Policy Checklist */}
+                  {forgotNewPassword && (
+                    <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-200/80 space-y-2">
+                      <p className="text-[12px] font-bold text-slate-800">
+                        {tPolicy("reset_policy_title", {
+                          defaultValue: "Yêu cầu mật khẩu:",
+                        })}
+                      </p>
+                      <ul className="space-y-1.5">
+                        {[
+                          {
+                            id: 1,
+                            text: tPolicy("reset_policy_length", {
+                              defaultValue: "Tối thiểu 8 ký tự",
+                            }),
+                            valid: forgotHasMinLength,
+                          },
+                          {
+                            id: 2,
+                            text: tPolicy("reset_policy_letter", {
+                              defaultValue: "Chứa ít nhất 1 chữ cái",
+                            }),
+                            valid: forgotHasLetter,
+                          },
+                          {
+                            id: 3,
+                            text: tPolicy("reset_policy_upper", {
+                              defaultValue: "Chứa ít nhất 1 chữ hoa",
+                            }),
+                            valid: forgotHasUpper,
+                          },
+                          {
+                            id: 4,
+                            text: tPolicy("reset_policy_lower", {
+                              defaultValue: "Chứa ít nhất 1 chữ thường",
+                            }),
+                            valid: forgotHasLower,
+                          },
+                          {
+                            id: 5,
+                            text: tPolicy("reset_policy_number", {
+                              defaultValue: "Chứa ít nhất 1 chữ số",
+                            }),
+                            valid: forgotHasNumber,
+                          },
+                        ].map((req) => (
+                          <li
+                            key={req.id}
+                            className="flex items-center gap-2 text-[12px]"
+                          >
+                            <div
+                              className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                req.valid ? "bg-[#0052FF]" : "bg-slate-300"
+                              }`}
+                            />
+                            <span
+                              className={
+                                req.valid
+                                  ? "text-slate-800 font-medium"
+                                  : "text-slate-500"
+                              }
+                            >
+                              {req.text}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="flex items-start gap-2 text-[12px] pt-1.5 border-t border-slate-100">
+                        <div
+                          className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${
+                            forgotNoConsecutive ? "bg-[#0052FF]" : "bg-slate-300"
+                          }`}
+                        />
+                        <span
+                          className={
+                            forgotNoConsecutive
+                              ? "text-slate-800 font-medium"
+                              : "text-slate-500 leading-relaxed"
+                          }
+                        >
+                          {tPolicy("reset_policy_consecutive", {
+                            defaultValue: "Không lặp lại 4 ký tự liên tiếp",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Confirm Password */}
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-700 block">
+                      {t("confirm_password_label", {
+                        defaultValue: "Xác nhận mật khẩu",
+                      })}
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showForgotConfirmPassword ? "text" : "password"}
+                        value={forgotConfirmPassword}
+                        onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                        placeholder={t("confirm_password_placeholder", {
+                          defaultValue: "Nhập lại mật khẩu mới",
+                        })}
+                        className="w-full px-4 py-2.5 pr-10 text-sm rounded-xl border border-slate-200 bg-white text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowForgotConfirmPassword(!showForgotConfirmPassword)
+                        }
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        {showForgotConfirmPassword ? (
+                          <EyeOff className="w-4 h-4" />
+                        ) : (
+                          <Eye className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Bottom Buttons */}
+                  <div className="pt-2 flex items-center justify-end gap-2.5 mt-auto border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setView("password")}
+                      className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                    >
+                      {t("cancel", { defaultValue: "Hủy" })}
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        isResettingPassword ||
+                        !forgotNewPassword ||
+                        !isForgotPolicyValid ||
+                        forgotNewPassword !== forgotConfirmPassword
+                      }
+                      className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                    >
+                      {isResettingPassword ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Check className="w-3.5 h-3.5" />
+                      )}
+                      <span>Lưu mật khẩu mới</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* STEP 4: SUCCESS */}
+              {forgotStep === "success" && (
+                <div
+                  key="forgot-step-success"
+                  className="flex flex-col items-center justify-center py-8 text-center space-y-4 my-auto animate-in fade-in zoom-in-95 duration-300"
+                >
+                  <div className="w-16 h-16 rounded-3xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-500 shadow-sm">
+                    <CheckCircle2 className="w-9 h-9" />
+                  </div>
+                  <div className="space-y-1.5 max-w-xs">
+                    <h4 className="text-base font-bold text-slate-900">
+                      {t("reset_password_success_title", {
+                        defaultValue: "Đổi mật khẩu thành công!",
+                      })}
+                    </h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      {t("reset_password_success_desc", {
+                        defaultValue:
+                          "Mật khẩu của bạn đã được thay đổi. Phiên làm việc đã được cập nhật với mật khẩu mới.",
+                      })}
+                    </p>
+                  </div>
+                  <div className="pt-3 w-full max-w-xs">
+                    <button
+                      type="button"
+                      onClick={() => setView("profile")}
+                      className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-sm"
+                    >
+                      {t("back_to_profile_btn", {
+                        defaultValue: "Quay lại thông tin cá nhân",
+                      })}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Step indicator dots at bottom center */}
+            <div className="py-3.5 border-t border-slate-100 flex items-center justify-center gap-2 bg-slate-50/50 shrink-0">
+              {(["email", "otp", "reset"] as const).map((s, idx) => {
+                const stepOrder = { email: 0, otp: 1, reset: 2, success: 3 };
+                const active = stepOrder[forgotStep] >= idx;
+                const isCurrent = forgotStep === s;
+                return (
+                  <div
+                    key={s}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      isCurrent
+                        ? "w-6 bg-brand-600"
+                        : active
+                        ? "w-2 bg-brand-600/70"
+                        : "w-2 bg-slate-300"
+                    }`}
+                  />
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

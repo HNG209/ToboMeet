@@ -202,58 +202,6 @@ export class UsersController {
     return { success: true };
   }
 
-  /**
-   * PUT /api/users/me/password
-   * Đổi hoặc thiết lập mật khẩu của người dùng hiện tại.
-   * Body: { currentPassword?: string, newPassword: string }
-   */
-  @UseGuards(SupabaseGuard)
-  @Put("me/password")
-  async changePassword(
-    @Request() req,
-    @Body() body: { currentPassword?: string; newPassword?: string },
-  ) {
-    const userId = req.user.id as string;
-    const email = req.user.email as string;
-
-    const { currentPassword, newPassword } = body || {};
-
-    if (!newPassword || !newPassword.trim()) {
-      throw new BadRequestException("newPassword là bắt buộc.");
-    }
-    if (newPassword.trim().length < 8) {
-      throw new BadRequestException("newPassword phải có ít nhất 8 ký tự.");
-    }
-    if (currentPassword && newPassword.trim() === currentPassword.trim()) {
-      throw new BadRequestException(
-        "newPassword không được trùng với currentPassword.",
-      );
-    }
-
-    return this.usersService.changePassword(
-      userId,
-      email,
-      currentPassword ? currentPassword.trim() : "",
-      newPassword.trim(),
-    );
-  }
-
-  /**
-   * POST /api/users/password/reset-by-otp
-   * Đặt lại mật khẩu bằng mã OTP nhận từ email (quên mật khẩu - không cần đăng nhập).
-   * Body: { email, token, newPassword }
-   */
-  @Post("password/reset-by-otp")
-  async resetPasswordByOtp(
-    @Body() body: { email?: string; token?: string; newPassword?: string },
-  ) {
-    const { email, token, newPassword } = body || {};
-    return this.usersService.resetPasswordWithOtp(
-      email || "",
-      token || "",
-      newPassword || "",
-    );
-  }
 
   /**
    * POST /api/users/me/avatar/presigned-url

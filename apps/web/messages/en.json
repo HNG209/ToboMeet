@@ -374,7 +374,8 @@
     "copied_personal_meeting_link": "Personal meeting link copied!",
     "error_personal_meeting_link": "Unable to get personal meeting link",
     "view_edit_profile": "Click to view & edit profile",
-    "edit_profile_hint": "Edit Profile →"
+    "edit_profile_hint": "Edit Profile →",
+    "profile_menu_item": "Personal Profile"
   },
   "settings": {
     "title": "Settings",
@@ -2605,6 +2606,14 @@
     "error_password_policy": "Password does not meet all security requirements",
     "back": "Back",
     "password_row_desc_has": "Change your login password",
-    "password_row_desc_no": "Create a password to sign in with email"
+    "password_row_desc_no": "Create a password to sign in with email",
+    "forgot_password_confirm_subtitle": "Please confirm this is your email address and request an OTP to reset your password",
+    "forgot_password_confirm_desc": "Please confirm this is your email address and click send OTP to reset your password:",
+    "confirm_email_title": "Confirm email address",
+    "confirm_email_subtitle": "Please confirm this is your email address and request an OTP to reset your password",
+    "send_otp_btn": "Send verification OTP",
+    "reset_password_success_title": "Password changed successfully!",
+    "reset_password_success_desc": "Your password has been changed. Your session has been updated with the new password.",
+    "back_to_profile_btn": "Back to personal information"
   }
 }

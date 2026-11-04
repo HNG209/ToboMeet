@@ -62,7 +62,21 @@
     "reset_policy_number": "Có chứa chữ số (0-9)",
     "reset_policy_no_consecutive_title": "Quy tắc an toàn:",
     "reset_policy_no_consecutive_desc": "Không sử dụng 4 ký tự giống nhau liên tiếp (ví dụ: aaaa, 1111).",
-    "reset_submit_btn": "Cập nhật mật khẩu"
+    "reset_submit_btn": "Cập nhật mật khẩu",
+    "confirm_email_title": "Gửi mã xác thực",
+    "confirm_email_desc": "Mã xác thực gồm 6 chữ số sẽ được gửi về địa chỉ email tài khoản của bạn:",
+    "btn_send_otp": "Gửi mã OTP qua email",
+    "otp_title_screen": "Nhập mã xác thực",
+    "otp_desc_screen": "Mã 6 chữ số đã được gửi đến",
+    "resend_in": "Gửi lại mã sau",
+    "resend_btn": "Gửi lại mã OTP",
+    "btn_verify_otp": "Xác nhận mã OTP",
+    "reset_title_screen": "Thiết lập mật khẩu mới",
+    "reset_desc_screen": "Phiên khôi phục đã được xác thực thành công. Vui lòng nhập mật khẩu mới.",
+    "btn_save_new": "Lưu mật khẩu mới",
+    "success_title": "Đổi mật khẩu thành công!",
+    "success_desc": "Mật khẩu của bạn đã được cập nhật thành công. Phiên làm việc của bạn vẫn đang hoạt động với mật khẩu mới mà không bị gián đoạn.",
+    "btn_back_to_profile": "Quay lại thông tin cá nhân"
   },
   "password_reset": {
     "new_password": "Mật khẩu mới",
@@ -1388,6 +1402,10 @@
     "avatar_error": "Không thể tải ảnh lên máy chủ lưu trữ",
     "name_empty": "Tên hiển thị không được để trống",
     "name_updated": "Đã cập nhật tên hiển thị thành công!",
-    "name_error": "Không thể cập nhật tên"
+    "name_error": "Không thể cập nhật tên",
+    "forgot_password_link": "Quên mật khẩu?"
+  },
+  "screen": {
+    "loading": "Đang tải dữ liệu..."
   }
 }

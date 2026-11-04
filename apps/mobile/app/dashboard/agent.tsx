@@ -12,7 +12,7 @@ import {
   KeyboardEvent,
   LayoutAnimation,
 } from "react-native";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useDispatch } from "react-redux";
@@ -423,7 +423,7 @@ export default function AgentScreen() {
       >
         {!isUser && (
           <View className="w-8 h-8 rounded-full bg-indigo-600 items-center justify-center mr-2 mt-0.5 shadow-xs">
-            <MaterialCommunityIcons name="robot" size={18} color="#ffffff" />
+            <Ionicons name="sparkles" size={16} color="#ffffff" />
           </View>
         )}
 
@@ -450,7 +450,7 @@ export default function AgentScreen() {
   const renderEmptyState = () => (
     <View className="px-5 py-6 items-center">
       <View className="w-16 h-16 rounded-3xl bg-indigo-600 items-center justify-center shadow-lg shadow-indigo-200 mb-3.5">
-        <MaterialCommunityIcons name="robot" size={36} color="#ffffff" />
+        <Ionicons name="sparkles" size={32} color="#ffffff" />
       </View>
 
       <Text className="text-lg font-bold text-slate-800 text-center mb-1.5">

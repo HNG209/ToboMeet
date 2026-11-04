@@ -1,6 +1,6 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { View, Text, TouchableOpacity } from "react-native";
 import { useGetMeQuery } from "../../lib/redux/features/users/usersApi";
 import { useNotificationCacheManager } from "../../hooks/useNotificationCacheManager";
@@ -88,7 +88,7 @@ function DashboardTabs() {
                   {...props}
                   activeOpacity={0.85}
                   style={{
-                    top: -14,
+                    top: -6,
                     justifyContent: "center",
                     alignItems: "center",
                     flex: 1,
@@ -111,9 +111,9 @@ function DashboardTabs() {
                       borderColor: "#ffffff",
                     }}
                   >
-                    <MaterialCommunityIcons
-                      name="robot"
-                      size={26}
+                    <Ionicons
+                      name="sparkles"
+                      size={24}
                       color="#ffffff"
                     />
                   </View>

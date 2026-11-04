@@ -361,7 +361,8 @@
     "copied_personal_meeting_link": "Đã sao chép link cuộc họp cá nhân!",
     "error_personal_meeting_link": "Không thể lấy link cuộc họp cá nhân",
     "view_edit_profile": "Bấm để xem & chỉnh sửa thông tin cá nhân",
-    "edit_profile_hint": "Chỉnh sửa trang cá nhân →"
+    "edit_profile_hint": "Chỉnh sửa trang cá nhân →",
+    "profile_menu_item": "Hồ sơ cá nhân"
   },
   "settings": {
     "title": "Cài đặt",
@@ -2590,6 +2591,14 @@
     "error_password_policy": "Mật khẩu chưa đáp ứng đầy đủ yêu cầu bảo mật",
     "back": "Quay lại",
     "password_row_desc_has": "Đổi mật khẩu đăng nhập của bạn",
-    "password_row_desc_no": "Tạo mật khẩu để có thể đăng nhập bằng email"
+    "password_row_desc_no": "Tạo mật khẩu để có thể đăng nhập bằng email",
+    "forgot_password_confirm_subtitle": "Hãy xác nhận đây là email của bạn và gửi mã OTP để đặt lại mật khẩu",
+    "forgot_password_confirm_desc": "Hãy xác nhận đây là email của bạn và nhấn gửi mã OTP để đặt lại mật khẩu:",
+    "confirm_email_title": "Xác nhận địa chỉ email",
+    "confirm_email_subtitle": "Hãy xác nhận đây là email của bạn và gửi mã OTP để đặt lại mật khẩu",
+    "send_otp_btn": "Gửi mã OTP xác nhận",
+    "reset_password_success_title": "Đổi mật khẩu thành công!",
+    "reset_password_success_desc": "Mật khẩu của bạn đã được thay đổi. Phiên làm việc đã được cập nhật với mật khẩu mới.",
+    "back_to_profile_btn": "Quay lại thông tin cá nhân"
   }
 }

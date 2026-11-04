@@ -247,7 +247,12 @@ function MeetingWhiteboardCanvas({
 
       {/* Tldraw Canvas */}
       <div className="w-full h-full">
-        <Tldraw store={store.store} user={user} autoFocus />
+        <Tldraw
+          store={store.store}
+          user={user}
+          licenseKey={process.env.NEXT_PUBLIC_TLDRAW_LICENSE_KEY}
+          autoFocus
+        />
       </div>
 
       {/* Modal Cài đặt Whiteboard (Chỉ hiện với Admin / Owner) */}

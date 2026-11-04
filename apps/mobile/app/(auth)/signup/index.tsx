@@ -10,7 +10,7 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 import { supabaseAuth } from "../../../lib/supabase";
 import { validatePasswordPolicy } from "@tobomeet/shared/utils";
 import { renderConstraintRow } from "../forgot-password";
@@ -157,34 +157,38 @@ export default function SignupScreen() {
 
           <View className="gap-4">
             {/* Input Email */}
-            <View>
-              <Text className="block mb-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <View className="gap-1.5">
+              <Text className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 {t("signup.work_email")}
               </Text>
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholder="nhap@email.com"
-                placeholderTextColor="#94A3B8"
-                onFocus={() => setFocusedInput("email")}
-                onBlur={() => setFocusedInput(null)}
-                className={`w-full px-4 py-3.5 bg-slate-50 border rounded-2xl text-slate-900 ${
+              <View
+                className={`w-full flex-row items-center bg-slate-50 border rounded-xl px-3.5 py-2.5 ${
                   focusedInput === "email"
                     ? "border-[#0052FF] bg-white"
                     : "border-slate-200"
                 }`}
-              />
+              >
+                <TextInput
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  placeholder="nhap@email.com"
+                  placeholderTextColor="#94A3B8"
+                  onFocus={() => setFocusedInput("email")}
+                  onBlur={() => setFocusedInput(null)}
+                  className="flex-1 text-sm text-slate-800 p-0"
+                />
+              </View>
             </View>
 
             {/* Input Mật khẩu */}
-            <View>
-              <Text className="block mb-1.5 text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            <View className="gap-1.5">
+              <Text className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
                 {t("signup.password")}
               </Text>
               <View
-                className={`w-full border rounded-2xl px-4 py-3.5 flex-row items-center bg-slate-50 ${
+                className={`w-full flex-row items-center bg-slate-50 border rounded-xl px-3.5 py-2.5 ${
                   focusedInput === "password"
                     ? "border-[#0052FF] bg-white"
                     : "border-slate-200"
@@ -198,16 +202,16 @@ export default function SignupScreen() {
                   placeholderTextColor="#94A3B8"
                   onFocus={() => setFocusedInput("password")}
                   onBlur={() => setFocusedInput(null)}
-                  className="flex-1 text-slate-900"
+                  className="flex-1 text-sm text-slate-800 p-0"
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
-                  className="pl-3"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                  <Ionicons
-                    name={showPassword ? "eye-outline" : "eye-off-outline"}
-                    size={20}
-                    color="#64748B"
+                  <Feather
+                    name={showPassword ? "eye-off" : "eye"}
+                    size={16}
+                    color="#94A3B8"
                   />
                 </TouchableOpacity>
               </View>

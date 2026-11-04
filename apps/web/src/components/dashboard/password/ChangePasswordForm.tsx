@@ -4,8 +4,7 @@ import { useState, useCallback } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { CheckCircle2, Circle } from "lucide-react";
-import { useChangePasswordMutation } from "@/lib/redux/api/usersApi";
-import { refreshWebSession } from "@/lib/auth/session";
+import { updateUserPassword } from "@/app/[locale]/auth/profile-actions";
 import { PasswordField } from "./PasswordField";
 import { PasswordActions } from "./PasswordActions";
 
@@ -92,7 +91,7 @@ export function ChangePasswordForm() {
     confirmPassword: false,
   });
 
-  const [changePassword, { isLoading }] = useChangePasswordMutation();
+  const [isLoading, setIsLoading] = useState(false);
 
   // --- Validation ---
   const validateField = useCallback(
@@ -206,44 +205,28 @@ export function ChangePasswordForm() {
     if (allErrors.currentPassword || allErrors.newPassword || allErrors.confirmPassword) return;
 
     try {
-      const res = await changePassword({
+      setIsLoading(true);
+      const res = await updateUserPassword({
         currentPassword: values.currentPassword,
         newPassword: values.newPassword,
-      }).unwrap();
+      });
 
-      console.log("[ChangePasswordForm] Result:", res);
-
-      if (res?.session) {
-        await refreshWebSession(res.session);
+      if (!res.success) {
+        if (res.isWrongCurrent) {
+          setErrors((prev) => ({ ...prev, currentPassword: t("error_wrong_current") }));
+          return;
+        }
+        setErrors((prev) => ({ ...prev, api: res.error || t("error_generic") }));
+        return;
       }
 
       toast.success(t("success"));
       handleCancel();
     } catch (err: unknown) {
       console.error('[ChangePasswordForm] Error:', err);
-      const apiErr = err as { code?: number; message?: string };
-      const code = apiErr?.code;
-      const message = (apiErr?.message ?? "").toLowerCase();
-
-      const isWrongCurrent =
-        code === 400 ||
-        code === 401 ||
-        message.includes("current") ||
-        message.includes("incorrect") ||
-        message.includes("invalid") ||
-        message.includes("wrong") ||
-        message.includes("khong chinh xac") ||
-        message.includes("sai mat khau");
-
-      if (isWrongCurrent) {
-        setErrors((prev) => ({ ...prev, currentPassword: t("error_wrong_current") }));
-        return;
-      }
-      if (code === 5000 || code === 503 || message.includes("connect")) {
-        setErrors((prev) => ({ ...prev, api: t("error_network") }));
-        return;
-      }
       setErrors((prev) => ({ ...prev, api: t("error_generic") }));
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -282,7 +265,7 @@ export function ChangePasswordForm() {
           onChange={handleChange("newPassword")}
           onBlur={handleBlur("newPassword")}
         />
-        {/* Password strength hints — chi hien khi dang nhap */}
+        {/* Password strength hints â€” chi hien khi dang nhap */}
         <PasswordStrengthHints password={values.newPassword} t={t} />
       </div>
 

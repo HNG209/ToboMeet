@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
-  Bot,
   Send,
   RotateCcw,
   Calendar,
@@ -411,9 +410,9 @@ export default function ToboAgentChat() {
             {/* Vòng hiệu ứng phát sáng nhẹ xung quanh */}
             <span className="absolute -inset-1 bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 rounded-full blur-md opacity-35 group-hover:opacity-65 transition-opacity duration-300 pointer-events-none" />
 
-            {/* Icon Robot trung tâm */}
+            {/* Icon Sparkle trung tâm */}
             <div className="relative flex items-center justify-center pointer-events-none">
-              <Bot className="w-7 h-7 text-white drop-shadow-sm group-hover:scale-110 transition-transform duration-200" />
+              <Sparkles className="w-7 h-7 text-white drop-shadow-sm group-hover:scale-110 transition-transform duration-200" />
             </div>
 
             {/* Chấm đỏ báo tin nhắn mới */}
@@ -430,7 +429,7 @@ export default function ToboAgentChat() {
                   }`}
               >
                 <div className="flex items-center gap-1.5">
-                  <Bot className="w-3.5 h-3.5 text-indigo-400" />
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                   <span>{t("title")}</span>
                 </div>
                 <span className="block text-[10px] text-slate-400 font-normal">
@@ -453,7 +452,7 @@ export default function ToboAgentChat() {
           <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 px-4 py-3.5 flex items-center justify-between text-white shrink-0 border-b border-indigo-900/50">
             <div className="flex items-center gap-2.5">
               <div className="relative flex items-center justify-center w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 shadow-inner">
-                <Bot className="w-5 h-5 text-white" />
+                <Sparkles className="w-5 h-5 text-white" />
               </div>
               <div>
                 <div className="flex items-center gap-1.5">

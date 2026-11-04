@@ -1262,210 +1262,6 @@ export class UsersService {
     }
   }
 
-  /**
-   * Đổi mật khẩu hoặc thiết lập mật khẩu lần đầu cho người dùng.
-   * - Nếu người dùng đã có mật khẩu: Bắt buộc phải nhập currentPassword và xác minh bằng signInWithPassword.
-   * - Cập nhật mật khẩu mới qua supabaseAdmin.auth.admin.updateUserById.
-   * - Tự động tạo phiên đăng nhập mới (newSession) trả về cho client để giữ nguyên phiên làm việc không bị đăng xuất.
-   */
-  async changePassword(
-    userId: string,
-    email: string,
-    currentPassword?: string,
-    newPassword?: string,
-  ): Promise<{
-    success: boolean;
-    message: string;
-    session?: {
-      access_token: string;
-      refresh_token: string;
-      expires_in?: number;
-      expires_at?: number;
-    };
-  }> {
-    if (!newPassword || !newPassword.trim()) {
-      throw new BadRequestException("Mật khẩu mới không được để trống.");
-    }
-
-    // Kiểm tra xem người dùng đã từng có mật khẩu hay chưa và lấy email chuẩn từ Supabase Admin
-    let hasExistingPassword = false;
-    let userEmail = (email || "").trim().toLowerCase();
-
-    try {
-      const { data: sbUserData } = await this.supabaseAdmin.auth.admin.getUserById(userId);
-      if (sbUserData?.user?.email) {
-        userEmail = sbUserData.user.email.trim().toLowerCase();
-      }
-      const identities = sbUserData?.user?.identities || [];
-      const providers = (sbUserData?.user?.app_metadata?.providers as string[]) || [];
-      hasExistingPassword =
-        identities.some((id: any) => id.provider === "email") ||
-        providers.includes("email");
-    } catch {
-      hasExistingPassword = Boolean(currentPassword && currentPassword.trim());
-    }
-
-    const supabasePublic = createClient(
-      this.supabaseUrl,
-      this.configService.get<string>("SUPABASE_ANON_KEY"),
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
-
-    if (hasExistingPassword) {
-      if (!currentPassword || !currentPassword.trim()) {
-        throw new BadRequestException("Vui lòng nhập mật khẩu hiện tại.");
-      }
-
-      // Bước 1: Xác minh mật khẩu hiện tại
-      const { data: authData, error: signInError } = await supabasePublic.auth.signInWithPassword({
-        email: userEmail,
-        password: currentPassword.trim(),
-      });
-
-      if (signInError || !authData?.session) {
-        throw new BadRequestException("Mật khẩu hiện tại không chính xác.");
-      }
-    }
-
-    // Bước 2: Cập nhật mật khẩu mới qua Supabase Admin API
-    const { error: updateError } = await this.supabaseAdmin.auth.admin.updateUserById(
-      userId,
-      { password: newPassword.trim(), email_confirm: true },
-    );
-
-    if (updateError) {
-      this.logger.error("Lỗi cập nhật mật khẩu: " + updateError.message);
-      throw new BadRequestException(
-        updateError.message || "Không thể cập nhật mật khẩu. Vui lòng thử lại.",
-      );
-    }
-
-    // Bước 3: Tạo session mới để cấp cho client giữ phiên đăng nhập không bị văng ra
-    let newSession: {
-      access_token: string;
-      refresh_token: string;
-      expires_in?: number;
-      expires_at?: number;
-    } | undefined = undefined;
-
-    // Cách 1: Sử dụng admin.generateLink + verifyOtp (100% thành công cho cả OAuth và Email, không bị rate-limit)
-    if (userEmail) {
-      try {
-        const { data: linkData, error: linkErr } = await this.supabaseAdmin.auth.admin.generateLink({
-          type: "magiclink",
-          email: userEmail,
-        });
-
-        if (!linkErr && linkData?.properties?.hashed_token) {
-          const { data: otpData, error: otpErr } = await supabasePublic.auth.verifyOtp({
-            token_hash: linkData.properties.hashed_token,
-            type: "email",
-          });
-
-          if (!otpErr && otpData?.session) {
-            newSession = {
-              access_token: otpData.session.access_token,
-              refresh_token: otpData.session.refresh_token,
-              expires_in: otpData.session.expires_in,
-              expires_at: otpData.session.expires_at,
-            };
-            this.logger.log(`[ChangePassword] Đã tạo new session thành công qua generateLink cho: ${userEmail}`);
-          } else if (otpErr) {
-            this.logger.warn(`[ChangePassword] verifyOtp warning: ${otpErr.message}`);
-          }
-        }
-      } catch (genErr) {
-        this.logger.error("[ChangePassword] Lỗi generateLink session: " + String(genErr));
-      }
-    }
-
-    // Cách 2: Fallback nếu generateLink chưa tạo được session
-    if (!newSession && userEmail) {
-      try {
-        const { data: newAuthData, error: newSignInError } = await supabasePublic.auth.signInWithPassword({
-          email: userEmail,
-          password: newPassword.trim(),
-        });
-
-        if (!newSignInError && newAuthData?.session) {
-          newSession = {
-            access_token: newAuthData.session.access_token,
-            refresh_token: newAuthData.session.refresh_token,
-            expires_in: newAuthData.session.expires_in,
-            expires_at: newAuthData.session.expires_at,
-          };
-          this.logger.log(`[ChangePassword] Đã tạo new session thành công qua signInWithPassword cho: ${userEmail}`);
-        }
-      } catch (sessionErr) {
-        this.logger.warn("[ChangePassword] signInWithPassword fallback warning: " + String(sessionErr));
-      }
-    }
-
-    return {
-      success: true,
-      message: hasExistingPassword
-        ? "Đổi mật khẩu thành công."
-        : "Thiết lập mật khẩu thành công.",
-      session: newSession,
-    };
-  }
-
-  /**
-   * Đặt lại mật khẩu bằng mã OTP (quên mật khẩu).
-   * Xác thực mã OTP và cập nhật mật khẩu mới trên server, tái sử dụng được cho cả Web và Mobile.
-   */
-  async resetPasswordWithOtp(
-    email: string,
-    token: string,
-    newPassword: string,
-  ): Promise<{ success: boolean; message: string }> {
-    if (!email || !token || !newPassword) {
-      throw new BadRequestException("Email, mã OTP và mật khẩu mới là bắt buộc.");
-    }
-
-    if (newPassword.trim().length < 8) {
-      throw new BadRequestException("Mật khẩu mới phải có ít nhất 8 ký tự.");
-    }
-
-    const supabasePublic = createClient(
-      this.supabaseUrl,
-      this.configService.get<string>("SUPABASE_ANON_KEY"),
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    );
-
-    // Xác thực mã OTP recovery
-    const { data: verifyData, error: verifyError } = await supabasePublic.auth.verifyOtp({
-      email: email.trim().toLowerCase(),
-      token: token.trim(),
-      type: "recovery",
-    });
-
-    if (verifyError || !verifyData?.session) {
-      throw new BadRequestException("Mã OTP không hợp lệ hoặc đã hết hạn.");
-    }
-
-    // Gán session vào client tạm để đổi mật khẩu
-    await supabasePublic.auth.setSession({
-      access_token: verifyData.session.access_token,
-      refresh_token: verifyData.session.refresh_token,
-    });
-
-    const { error: updateError } = await supabasePublic.auth.updateUser({
-      password: newPassword.trim(),
-    });
-
-    if (updateError) {
-      throw new BadRequestException(
-        updateError.message || "Không thể đặt lại mật khẩu. Vui lòng thử lại.",
-      );
-    }
-
-    // Đăng xuất session phục hồi tạm thời
-    await supabasePublic.auth.signOut({ scope: "local" });
-
-    return { success: true, message: "Đặt lại mật khẩu thành công." };
-  }
-
   private getR2Client(): S3Client {
     return new S3Client({
       region: "auto",
@@ -1474,6 +1270,7 @@ export class UsersService {
         accessKeyId: process.env.R2_ACCESS_KEY_ID || "",
         secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || "",
       },
+      forcePathStyle: true,
     });
   }
 
@@ -1485,7 +1282,7 @@ export class UsersService {
     fileName: string,
     contentType: string,
   ): Promise<{ signedUrl: string; publicUrl: string; key: string }> {
-    const bucketName = "tobomeet";
+    const bucketName = process.env.R2_BUCKET_NAME || "tobomeet-recordings";
     const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     if (!allowedTypes.includes(contentType)) {
       throw new BadRequestException(

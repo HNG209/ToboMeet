@@ -62,7 +62,21 @@
     "reset_policy_number": "Contains a number (0-9)",
     "reset_policy_no_consecutive_title": "Safety Rule:",
     "reset_policy_no_consecutive_desc": "Do not use 4 identical characters in a row (e.g., aaaa, 1111).",
-    "reset_submit_btn": "Update Password"
+    "reset_submit_btn": "Update Password",
+    "confirm_email_title": "Send verification code",
+    "confirm_email_desc": "A 6-digit verification code will be sent to your account email address:",
+    "btn_send_otp": "Send OTP via email",
+    "otp_title_screen": "Enter verification code",
+    "otp_desc_screen": "6-digit code has been sent to",
+    "resend_in": "Resend code in",
+    "resend_btn": "Resend OTP code",
+    "btn_verify_otp": "Verify OTP code",
+    "reset_title_screen": "Set new password",
+    "reset_desc_screen": "Recovery session verified successfully. Please enter your new password.",
+    "btn_save_new": "Save new password",
+    "success_title": "Password changed successfully!",
+    "success_desc": "Your password has been updated successfully. Your session continues with the new password without interruption.",
+    "btn_back_to_profile": "Back to personal profile"
   },
   "password_reset": {
     "new_password": "New password",
@@ -1387,6 +1401,10 @@
     "avatar_error": "Failed to upload avatar to cloud storage",
     "name_empty": "Display name cannot be empty",
     "name_updated": "Display name updated successfully!",
-    "name_error": "Failed to update display name"
+    "name_error": "Failed to update display name",
+    "forgot_password_link": "Forgot password?"
+  },
+  "screen": {
+    "loading": "Loading..."
   }
 }

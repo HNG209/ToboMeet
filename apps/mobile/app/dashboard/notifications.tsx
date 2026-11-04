@@ -75,7 +75,9 @@ export default function NotificationsScreen() {
       {isLoading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator size="large" color="#0052FF" />
-          <Text className="text-slate-400 mt-2">{t("screen.loading")}</Text>
+          <Text className="text-slate-400 mt-2">
+            {t("notification.screen.loading", "Đang tải thông báo...")}
+          </Text>
         </View>
       ) : notifications.length === 0 ? (
         <View className="flex-1 items-center justify-center opacity-70">

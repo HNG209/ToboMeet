@@ -10,8 +10,8 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import { supabaseAuth } from "../../../lib/supabase";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { supabase, supabaseAuth } from "../../../lib/supabase";
 import { validatePasswordPolicy } from "@tobomeet/shared/utils";
 import { useTranslation } from "react-i18next";
 
@@ -95,6 +95,15 @@ export default function ForgotPasswordScreen() {
   // };
 
   const passwordError = "";
+
+  // Chặn người dùng đã đăng nhập vào trang quên mật khẩu ngoài luồng public
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      if (data?.session && step === "email") {
+        router.replace("/dashboard");
+      }
+    });
+  }, [step, router]);
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -247,25 +256,29 @@ export default function ForgotPasswordScreen() {
               </View>
 
               <View className="space-y-4">
-                <View>
-                  <Text className="text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                <View className="gap-1.5">
+                  <Text className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                     {t("forgot_password.email_label")}
                   </Text>
-                  <TextInput
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    placeholder="nhap@email.com"
-                    placeholderTextColor="#94A3B8"
-                    onFocus={() => setFocusedInput("email")}
-                    onBlur={() => setFocusedInput(null)}
-                    className={`w-full px-4 py-3.5 bg-slate-50 border rounded-2xl text-slate-900 ${
+                  <View
+                    className={`w-full flex-row items-center bg-slate-50 border rounded-xl px-3.5 py-2.5 ${
                       focusedInput === "email"
                         ? "border-[#0052FF] bg-white"
                         : "border-slate-200"
                     }`}
-                  />
+                  >
+                    <TextInput
+                      value={email}
+                      onChangeText={setEmail}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      placeholder="nhap@email.com"
+                      placeholderTextColor="#94A3B8"
+                      onFocus={() => setFocusedInput("email")}
+                      onBlur={() => setFocusedInput(null)}
+                      className="flex-1 text-sm text-slate-800 p-0"
+                    />
+                  </View>
                   {errorMsg ? (
                     <View className="flex-row items-center mt-2">
                       <Ionicons
@@ -396,28 +409,19 @@ export default function ForgotPasswordScreen() {
 
               <View className="space-y-4">
                 {/* Mật khẩu mới */}
-                <View>
-                  <Text className="text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                <View className="gap-1.5">
+                  <Text className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                     {t("password_reset.new_password")}
                   </Text>
                   <View
-                    className="w-full border rounded-xl px-4 py-3 flex-row items-center pr-12 shadow-sm"
-                    style={{
-                      borderColor:
-                        focusedInput === "newPassword" ? "#0052FF" : "#E2E8F0",
-                      backgroundColor:
-                        focusedInput === "newPassword" ? "#FFFFFF" : "#F8FAFC",
-                    }}
+                    className={`w-full flex-row items-center bg-slate-50 border rounded-xl px-3.5 py-2.5 ${
+                      focusedInput === "newPassword"
+                        ? "border-[#0052FF] bg-white"
+                        : "border-slate-200"
+                    }`}
                   >
-                    <View className="mr-2">
-                      <Ionicons
-                        name="lock-closed-outline"
-                        size={20}
-                        color="#64748B"
-                      />
-                    </View>
                     <TextInput
-                      className="flex-1 text-base text-slate-800 ml-2"
+                      className="flex-1 text-sm text-slate-800 p-0"
                       placeholder={t("password_reset.new_password_placeholder")}
                       placeholderTextColor="#94A3B8"
                       secureTextEntry={!showPassword}
@@ -427,45 +431,32 @@ export default function ForgotPasswordScreen() {
                       onBlur={() => setFocusedInput(null)}
                     />
                     <TouchableOpacity
-                      className="absolute right-4"
                       onPress={() => setShowPassword(!showPassword)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons
-                        name={showPassword ? "eye-outline" : "eye-off-outline"}
-                        size={20}
-                        color="#64748B"
+                      <Feather
+                        name={showPassword ? "eye-off" : "eye"}
+                        size={16}
+                        color="#94A3B8"
                       />
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 {/* Xác nhận mật khẩu mới */}
-                <View className="mt-3">
-                  <Text className="text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">
+                <View className="gap-1.5 mt-3">
+                  <Text className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                     {t("password_reset.confirm_password")}
                   </Text>
                   <View
-                    className="w-full border rounded-xl px-4 py-3 flex-row items-center pr-12 shadow-sm"
-                    style={{
-                      borderColor:
-                        focusedInput === "confirmPassword"
-                          ? "#0052FF"
-                          : "#E2E8F0",
-                      backgroundColor:
-                        focusedInput === "confirmPassword"
-                          ? "#FFFFFF"
-                          : "#F8FAFC",
-                    }}
+                    className={`w-full flex-row items-center bg-slate-50 border rounded-xl px-3.5 py-2.5 ${
+                      focusedInput === "confirmPassword"
+                        ? "border-[#0052FF] bg-white"
+                        : "border-slate-200"
+                    }`}
                   >
-                    <View className="mr-2">
-                      <Ionicons
-                        name="lock-closed-outline"
-                        size={20}
-                        color="#64748B"
-                      />
-                    </View>
                     <TextInput
-                      className="flex-1 text-base text-slate-800 ml-2"
+                      className="flex-1 text-sm text-slate-800 p-0"
                       placeholder={t(
                         "password_reset.confirm_password_placeholder",
                       )}
@@ -477,13 +468,13 @@ export default function ForgotPasswordScreen() {
                       onBlur={() => setFocusedInput(null)}
                     />
                     <TouchableOpacity
-                      className="absolute right-4"
                       onPress={() => setShowConfirm(!showConfirm)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     >
-                      <Ionicons
-                        name={showConfirm ? "eye-outline" : "eye-off-outline"}
-                        size={20}
-                        color="#64748B"
+                      <Feather
+                        name={showConfirm ? "eye-off" : "eye"}
+                        size={16}
+                        color="#94A3B8"
                       />
                     </TouchableOpacity>
                   </View>

@@ -86,4 +86,94 @@ export async function getUserAuthInfo(): Promise<UserAuthInfoResult> {
   }
 }
 
+/**
+ * Server Action to update or set user password using Supabase Auth SSR.
+ * - If currentPassword is provided, Supabase validates it against the active password.
+ * - If currentPassword is not provided (e.g. user signed up via OAuth without a password),
+ *   Supabase links the new password directly.
+ * - Automatically updates the session cookies via @supabase/ssr without logging out.
+ */
+export async function updateUserPassword({
+  currentPassword,
+  newPassword,
+}: {
+  currentPassword?: string;
+  newPassword: string;
+}): Promise<{ success: boolean; error?: string; isWrongCurrent?: boolean }> {
+  try {
+    const supabase = await createClient();
+
+    const payload: { password: string; current_password?: string } = {
+      password: newPassword.trim(),
+    };
+
+    if (currentPassword && currentPassword.trim()) {
+      payload.current_password = currentPassword.trim();
+    }
+
+    const { error } = await supabase.auth.updateUser(payload);
+
+    if (error) {
+      console.error("[updateUserPassword] Supabase error:", error.message);
+      const msg = error.message.toLowerCase();
+      const isWrongCurrent =
+        msg.includes("current") ||
+        msg.includes("incorrect") ||
+        msg.includes("invalid") ||
+        msg.includes("wrong");
+
+      return {
+        success: false,
+        error: error.message,
+        isWrongCurrent,
+      };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error("[updateUserPassword] Unexpected error:", err);
+    return {
+      success: false,
+      error: err?.message || "Internal server error",
+    };
+  }
+}
+
+/**
+ * Server Action to reset password when in a recovery session (for logged-in user who verified OTP).
+ * Does NOT sign out, allowing the user to seamlessly transition to an active session with the new password.
+ */
+export async function resetUserPasswordWithRecoverySession(
+  newPassword: string,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword.trim(),
+    });
+
+    if (error) {
+      console.error(
+        "[resetUserPasswordWithRecoverySession] Error:",
+        error.message,
+      );
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err: any) {
+    console.error(
+      "[resetUserPasswordWithRecoverySession] Unexpected error:",
+      err,
+    );
+    return {
+      success: false,
+      error: err?.message || "Internal server error",
+    };
+  }
+}
+
+
+
 

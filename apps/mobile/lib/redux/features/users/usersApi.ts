@@ -27,20 +27,6 @@ export interface SessionsResponse {
   totalLoggedOut: number;
 }
 
-export interface ChangePasswordResponse {
-  success: boolean;
-  message: string;
-  session?: {
-    access_token: string;
-    refresh_token: string;
-    expires_in?: number;
-    expires_at?: number;
-  };
-}
-export interface ChangePasswordPayload {
-  currentPassword?: string;
-  newPassword: string;
-}
 
 export type SearchUsersArgs = {
   q: string;
@@ -138,17 +124,6 @@ export const usersApi = baseApi.injectEndpoints({
       invalidatesTags: ["UserSessions"],
     }),
 
-    changePassword: builder.mutation<
-      ChangePasswordResponse,
-      ChangePasswordPayload
-    >({
-      query: (data) => ({
-        url: "/users/me/password",
-        method: "PUT",
-        data,
-      }),
-    }),
-
     getAvatarUploadPresignedUrl: builder.mutation<
       { signedUrl: string; publicUrl: string; key: string },
       { fileName: string; contentType: string }
@@ -183,7 +158,6 @@ export const {
   useRevokeSessionMutation,
   useRevokeOtherSessionsMutation,
   useSearchUsersQuery,
-  useChangePasswordMutation,
   useGetAvatarUploadPresignedUrlMutation,
   useUpdateProfileMutation,
 } = usersApi;

@@ -85,13 +85,43 @@ export const supabaseAuth = {
   },
 
   /**
-   * 3. Đặt mật khẩu mới.
-   * Hàm này sẽ tự lấy Session từ AsyncStorage ở bước 2 để gửi lên server.
+   * 3. Đặt mật khẩu mới (dành cho luồng quên mật khẩu / recovery session).
+   * Sau khi đặt mật khẩu mới thành công, tự động đăng xuất để người dùng đăng nhập lại.
    */
   async updatePassword(password: string) {
     const { error } = await supabase.auth.updateUser({ password });
     if (error) throw new Error(error.message);
 
     await supabase.auth.signOut({ scope: "local" });
+  },
+
+  /**
+   * 4. Cập nhật hoặc thiết lập mật khẩu khi đang đăng nhập (Profile / Settings).
+   * - Nếu tài khoản đã có mật khẩu: Bắt buộc truyền currentPassword.
+   * - Nếu tài khoản OAuth chưa có mật khẩu: Không cần currentPassword.
+   * Supabase tự động cập nhật session trong AsyncStorage mà không đăng xuất.
+   */
+  async updateUserPassword(newPassword: string, currentPassword?: string) {
+    const payload: { password: string; current_password?: string } = {
+      password: newPassword.trim(),
+    };
+    if (currentPassword && currentPassword.trim()) {
+      payload.current_password = currentPassword.trim();
+    }
+    const { data, error } = await supabase.auth.updateUser(payload);
+    if (error) throw error;
+    return data;
+  },
+
+  /**
+   * 5. Đặt lại mật khẩu khi đang có recovery session (dành cho người dùng đang đăng nhập đổi mật khẩu qua OTP).
+   * Supabase tự động cập nhật mật khẩu và làm mới session trong AsyncStorage mà KHÔNG đăng xuất.
+   */
+  async resetPasswordStayLoggedIn(newPassword: string) {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword.trim(),
+    });
+    if (error) throw error;
+    return data;
   },
 };

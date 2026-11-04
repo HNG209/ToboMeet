@@ -89,17 +89,8 @@ export default function UserProfileMenu({
 
         {isOpen && (
           <div className="absolute right-0 top-full mt-2 w-72 bg-white rounded-2xl shadow-[0_8px_32px_rgba(0,0,0,0.08)] border border-slate-100 py-2 z-50 animate-in fade-in zoom-in-95 duration-150 text-slate-700">
-            {/* User info header — bấm vào để mở EditProfileModal */}
-            <div
-              onClick={() => {
-                setIsOpen(false);
-                setIsEditProfileOpen(true);
-              }}
-              className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 hover:bg-slate-50 cursor-pointer transition-colors group select-none"
-              title={t("view_edit_profile", {
-                defaultValue: "Bấm để xem & chỉnh sửa thông tin cá nhân",
-              })}
-            >
+            {/* User info header — chỉ hiển thị avatar, tên, email */}
+            <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 select-none">
               <div className="relative">
                 <UserAvatar
                   avatarUrl={user?.avatarUrl}
@@ -108,22 +99,32 @@ export default function UserProfileMenu({
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold text-slate-800 truncate group-hover:text-brand-600 transition-colors">
-                    {user?.displayName || user?.email?.split("@")[0] || "User"}
-                  </p>
-                </div>
+                <p className="text-sm font-bold text-slate-800 truncate">
+                  {user?.displayName || user?.email?.split("@")[0] || "User"}
+                </p>
                 <p className="text-xs text-slate-400 truncate">{user?.email}</p>
-                <span className="text-[10px] text-brand-600 font-medium group-hover:underline mt-0.5 inline-block">
-                  {t("edit_profile_hint", {
-                    defaultValue: "Chỉnh sửa trang cá nhân →",
-                  })}
-                </span>
               </div>
             </div>
 
             {/* Menu items */}
             <div className="py-1">
+              {/* Hồ sơ cá nhân */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  setIsEditProfileOpen(true);
+                }}
+                className="flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-brand-600 transition-colors w-full text-left cursor-pointer group"
+              >
+                <User className="w-4 h-4 text-slate-400 group-hover:text-brand-500 transition-colors" />
+                <span className="truncate">
+                  {t("profile_menu_item", {
+                    defaultValue: "Hồ sơ cá nhân",
+                  })}
+                </span>
+              </button>
+
               {/* Sao chép link cuộc họp cá nhân */}
               <button
                 type="button"

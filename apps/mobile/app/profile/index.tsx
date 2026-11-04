@@ -16,12 +16,11 @@ import { useTranslation } from "react-i18next";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
 import { toast } from "../../lib/toast";
-import { supabase } from "../../lib/supabase";
+import { supabase, supabaseAuth } from "../../lib/supabase";
 import {
   useGetMeQuery,
   useUpdateProfileMutation,
   useGetAvatarUploadPresignedUrlMutation,
-  useChangePasswordMutation,
 } from "../../lib/redux/features/users/usersApi";
 import { validatePasswordPolicy } from "@tobomeet/shared/utils";
 
@@ -32,8 +31,7 @@ export default function ProfileScreen() {
     useUpdateProfileMutation();
   const [getAvatarUploadPresignedUrl] =
     useGetAvatarUploadPresignedUrlMutation();
-  const [changePasswordMutation, { isLoading: isChangingPassword }] =
-    useChangePasswordMutation();
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   // Basic Info State
   const [displayName, setDisplayName] = useState("");
@@ -247,14 +245,11 @@ export default function ProfileScreen() {
     }
 
     try {
-      const res = await changePasswordMutation({
-        currentPassword: hasPassword ? currentPassword.trim() : undefined,
-        newPassword: newPassword.trim(),
-      }).unwrap();
-
-      if (res?.session) {
-        await supabase.auth.setSession(res.session);
-      }
+      setIsChangingPassword(true);
+      await supabaseAuth.updateUserPassword(
+        newPassword.trim(),
+        hasPassword ? currentPassword.trim() : undefined
+      );
 
       toast.success(
         hasPassword
@@ -272,11 +267,26 @@ export default function ProfileScreen() {
       setIsPasswordSectionExpanded(false);
     } catch (err: any) {
       console.error("[ProfileScreen] Change password error:", err);
+      const msg = (err?.message || "").toLowerCase();
+      const isWrongCurrent =
+        msg.includes("current") ||
+        msg.includes("incorrect") ||
+        msg.includes("invalid") ||
+        msg.includes("wrong");
+
+      if (isWrongCurrent) {
+        toast.error(
+          t("settings.password.error_wrong_current", "Mật khẩu hiện tại không chính xác")
+        );
+        return;
+      }
+
       toast.error(
-        err?.data?.message ||
-          err?.message ||
+        err?.message ||
           t("settings.password.error_generic", "Không thể đổi mật khẩu, vui lòng thử lại sau")
       );
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -528,9 +538,19 @@ export default function ProfileScreen() {
                 {/* Current password (only if user already has password) */}
                 {hasPassword && (
                   <View className="gap-1.5">
-                    <Text className="text-xs font-semibold text-slate-600">
-                      {t("settings.password.current_label", "Mật khẩu hiện tại")}
-                    </Text>
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-xs font-semibold text-slate-600">
+                        {t("settings.password.current_label", "Mật khẩu hiện tại")}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => router.push("/profile/forgot-password")}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <Text className="text-xs font-medium text-[#0052FF]">
+                          {t("profile.forgot_password_link", "Quên mật khẩu?")}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                     <View className="flex-row items-center bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5">
                       <TextInput
                         value={currentPassword}

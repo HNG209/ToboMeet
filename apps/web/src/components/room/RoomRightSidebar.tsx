@@ -114,9 +114,6 @@ export default function RoomRightSidebar({
                     <h3 className="text-xs font-bold text-slate-500 uppercase">
                       {t("people")} ({displayedMembers.length})
                     </h3>
-                    <button className="text-xs font-medium text-brand-600 hover:underline">
-                      {t("view_all")}
-                    </button>
                   </div>
 
                   <div className="relative mb-3">

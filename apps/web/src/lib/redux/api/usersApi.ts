@@ -5,13 +5,9 @@ export interface UserSession {
   id: string;
   ip: string;
   location?: string;
-  /** Thành phố từ geolocation */
   city?: string;
-  /** Quốc gia từ geolocation */
   country?: string;
-  /** Nhà mạng ISP từ geolocation */
   isp?: string;
-  /** IP thật thu nhận được (hoặc null nếu không có) */
   ipAddress?: string | null;
   isGps?: boolean;
   os: string;
@@ -40,21 +36,6 @@ export type SearchUsersArgs = {
   limit?: number;
 };
 
-export interface ChangePasswordPayload {
-  currentPassword?: string;
-  newPassword: string;
-}
-
-export interface ChangePasswordResponse {
-  success: boolean;
-  message: string;
-  session?: {
-    access_token: string;
-    refresh_token: string;
-    expires_in?: number;
-    expires_at?: number;
-  };
-}
 
 export const usersApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -66,36 +47,36 @@ export const usersApi = baseApi.injectEndpoints({
       providesTags: ["User"],
     }),
 
-    // Tìm kiếm toàn cục + phân trang cursor
+    // TÃ¬m kiáº¿m toÃ n cá»¥c + phÃ¢n trang cursor
     searchUsers: builder.query<PageResponse<UserResponse>, SearchUsersArgs>({
       query: (args) => ({
         url: "/users/search",
         params: args,
       }),
 
-      // Chỉ tạo khoá (Cache Key) dựa trên từ khóa tìm kiếm (q), bỏ qua cursor và limit
+      // Chá»‰ táº¡o khoÃ¡ (Cache Key) dá»±a trÃªn tá»« khÃ³a tÃ¬m kiáº¿m (q), bá» qua cursor vÃ  limit
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
         const queryKey = queryArgs.q || "";
         return `${endpointName}-${queryKey}`;
       },
 
-      // Gộp (Merge) dữ liệu mới vào cache cũ khi cuộn tải thêm
+      // Gá»™p (Merge) dá»¯ liá»‡u má»›i vÃ o cache cÅ© khi cuá»™n táº£i thÃªm
       merge: (currentCache, newItems, { arg }) => {
         if (!arg.cursor) {
-          // Nếu gọi lại không có cursor (khi search từ khóa mới hoặc refresh), ghi đè toàn bộ
+          // Náº¿u gá»i láº¡i khÃ´ng cÃ³ cursor (khi search tá»« khÃ³a má»›i hoáº·c refresh), ghi Ä‘Ã¨ toÃ n bá»™
           return newItems;
         }
 
-        // Nếu gọi các trang tiếp theo, nối (push) thêm dữ liệu vào mảng items cũ
+        // Náº¿u gá»i cÃ¡c trang tiáº¿p theo, ná»‘i (push) thÃªm dá»¯ liá»‡u vÃ o máº£ng items cÅ©
         currentCache.items.push(...newItems.items);
 
-        // Cập nhật lại các thông tin phân trang
+        // Cáº­p nháº­t láº¡i cÃ¡c thÃ´ng tin phÃ¢n trang
         currentCache.nextCursor = newItems.nextCursor;
         currentCache.hasNext = newItems.hasNext;
         currentCache.limit = newItems.limit;
       },
 
-      // Bắt buộc gọi lại API khi cursor thay đổi hoặc từ khóa q thay đổi
+      // Báº¯t buá»™c gá»i láº¡i API khi cursor thay Ä‘á»•i hoáº·c tá»« khÃ³a q thay Ä‘á»•i
       forceRefetch({ currentArg, previousArg }) {
         return (
           currentArg?.cursor !== previousArg?.cursor ||
@@ -175,17 +156,6 @@ export const usersApi = baseApi.injectEndpoints({
       }),
     }),
 
-    changePassword: builder.mutation<
-      ChangePasswordResponse,
-      ChangePasswordPayload
-    >({
-      query: (data) => ({
-        url: "/users/me/password",
-        method: "PUT",
-        data,
-      }),
-    }),
-
     getAvatarUploadPresignedUrl: builder.mutation<
       { signedUrl: string; publicUrl: string; key: string },
       { fileName: string; contentType: string }
@@ -222,7 +192,6 @@ export const {
   useUpdateCurrentSessionLocationMutation,
   useSearchUsersQuery,
   useLazyReverseGeocodeQuery,
-  useChangePasswordMutation,
   useGetAvatarUploadPresignedUrlMutation,
   useUpdateProfileMutation,
 } = usersApi;
