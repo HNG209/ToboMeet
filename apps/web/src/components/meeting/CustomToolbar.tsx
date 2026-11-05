@@ -43,6 +43,7 @@ import { useToolbarActions } from "@/hooks/useToolbarActions";
 import CreateBreakoutModal from "./CreateBreakoutModal";
 import JoinBreakoutModal from "./JoinBreakoutModal";
 import { useSafeMeetingWhiteboard } from "./contexts/MeetingWhiteboardContext";
+import { useMediaDeviceSelect } from "@livekit/components-react";
 
 /**
  * COMPONENT: Thanh điều khiển (Toolbar)
@@ -73,6 +74,20 @@ export default function CustomToolbar({
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isRecordMenuOpen, setIsRecordMenuOpen] = useState(false);
   const [isLeaveMenuOpen, setIsLeaveMenuOpen] = useState(false);
+  const [isCamMenuOpen, setIsCamMenuOpen] = useState(false);
+  const [isMicMenuOpen, setIsMicMenuOpen] = useState(false);
+
+  const {
+    devices: videoDevices,
+    activeDeviceId: activeVideoDeviceId,
+    setActiveMediaDevice: setActiveVideoDevice,
+  } = useMediaDeviceSelect({ kind: "videoinput" });
+
+  const {
+    devices: audioDevices,
+    activeDeviceId: activeAudioDeviceId,
+    setActiveMediaDevice: setActiveAudioDevice,
+  } = useMediaDeviceSelect({ kind: "audioinput" });
 
   const { isLocalHandRaised, toggleHandRaise } = useHandRaise();
   const isElectron = useIsElectron();
@@ -212,72 +227,219 @@ export default function CustomToolbar({
 
   const getBtnStyle = (
     isActive: boolean,
-    customActiveColor = "bg-[#232328] text-white",
+    customActiveColor = "border-blue-500/40 bg-blue-500/15 text-blue-400",
   ) =>
-    `relative flex flex-col items-center justify-center min-w-[55px] sm:min-w-[65px] h-full transition-colors ${isActive ? customActiveColor : "text-gray-300 hover:bg-[#1a1a1e]"
+    `relative flex flex-col items-center justify-center min-w-[50px] sm:min-w-[58px] h-11 px-2 rounded-lg border transition-all cursor-pointer shadow-xs ${
+      isActive
+        ? customActiveColor
+        : "border-[#232328] bg-[#161619] text-slate-300 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
     }`;
 
   return (
-    <footer className="flex flex-row items-center justify-center lg:justify-between h-14 bg-[#111113] border-t border-[#232328] z-30 w-full shrink-0 select-none">
-      {/* ================= PHẦN BÊN TRÁI ================= */}
-      <div className="flex items-center space-x-1 mr-1 h-full lg:flex-1 justify-center lg:justify-start lg:pl-2 shrink-0">
-        <button
-          onClick={toggleCam}
-          disabled={isCamLoading}
-          className={getBtnStyle(
-            !isCameraEnabled,
-            "text-red-500 hover:bg-[#1a1a1e]",
-          )}
-        >
-          {isCamLoading ? (
-            <Loader2 size={20} className="animate-spin text-red-500" />
-          ) : isCameraEnabled ? (
-            <VideoIcon size={20} />
-          ) : (
-            <VideoOff size={20} />
-          )}
-          <span className="text-[10px] mt-1 hidden sm:block font-medium">
-            {t("camera")}
-          </span>
-        </button>
+    <footer className="flex flex-row items-center justify-center lg:justify-between h-16 px-2 sm:px-3 bg-[#111113] border-t border-[#232328] z-30 w-full shrink-0 select-none">
+      {/* ================= PHẦN BÊN TRÁI: CAMERA & MICROPHONE KÈM LỰA CHỌN THIẾT BỊ ================= */}
+      <div className="flex items-center gap-1 sm:gap-1.5 mr-1 sm:mr-2 h-full lg:flex-1 justify-center lg:justify-start lg:pl-1 shrink-0">
+        {/* Nút Camera + Menu chọn Camera */}
+        <div className="relative flex items-center h-11">
+          <button
+            onClick={toggleCam}
+            disabled={isCamLoading}
+            title={isCameraEnabled ? t("camera") : `${t("camera")} (Off)`}
+            className={`h-11 px-2.5 rounded-l-lg border border-[#232328] flex flex-col items-center justify-center transition-all cursor-pointer shadow-xs ${
+              !isCameraEnabled
+                ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/15"
+                : "bg-[#161619] text-slate-300 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
+            }`}
+          >
+            {isCamLoading ? (
+              <Loader2 size={21} className="animate-spin text-red-400" />
+            ) : isCameraEnabled ? (
+              <VideoIcon size={21} />
+            ) : (
+              <VideoOff size={21} />
+            )}
+            <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
+              {t("camera")}
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              setIsCamMenuOpen(!isCamMenuOpen);
+              setIsMicMenuOpen(false);
+            }}
+            title={t("select_camera")}
+            className={`h-11 px-1.5 rounded-r-lg border-y border-r border-[#232328] -ml-px flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+              !isCameraEnabled
+                ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                : "bg-[#161619] text-slate-400 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
+            } ${isCamMenuOpen ? "border-blue-500/50 text-white bg-[#1e1e22]" : ""}`}
+          >
+            <ChevronUp
+              size={13}
+              className={`transition-transform duration-200 ${
+                isCamMenuOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
 
-        <button
-          onClick={toggleMic}
-          disabled={isMicLoading}
-          className={getBtnStyle(
-            !isMicrophoneEnabled,
-            "text-red-500 hover:bg-[#1a1a1e]",
+          {/* Popover danh sách Camera */}
+          {isCamMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsCamMenuOpen(false)}
+              />
+              <div className="absolute bottom-full mb-2 left-0 z-50 w-72 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-2.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#232328] mb-1 flex items-center gap-1.5">
+                  <VideoIcon size={12} className="text-blue-400" />
+                  <span>{t("select_camera")}</span>
+                </div>
+                <div className="max-h-56 overflow-y-auto space-y-0.5 custom-scrollbar">
+                  {videoDevices.length === 0 ? (
+                    <div className="px-2.5 py-2 text-xs text-slate-500">
+                      {t("no_camera_found")}
+                    </div>
+                  ) : (
+                    videoDevices.map((device, idx) => {
+                      const isSelected = device.deviceId === activeVideoDeviceId;
+                      return (
+                        <button
+                          key={device.deviceId || idx}
+                          onClick={async () => {
+                            await setActiveVideoDevice(device.deviceId);
+                            setIsCamMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 text-xs rounded-md flex items-center justify-between transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-blue-600/15 text-blue-400 font-semibold border border-blue-500/20"
+                              : "text-slate-300 hover:bg-[#232328] hover:text-white"
+                          }`}
+                        >
+                          <span className="truncate mr-2">
+                            {device.label || t("default_camera_label", { number: idx + 1 })}
+                          </span>
+                          {isSelected && (
+                            <Check size={14} className="shrink-0 text-blue-400" />
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
           )}
-        >
-          {isMicLoading ? (
-            <Loader2 size={20} className="animate-spin text-red-500" />
-          ) : isMicrophoneEnabled ? (
-            <Mic size={20} />
-          ) : (
-            <MicOff size={20} />
+        </div>
+
+        {/* Nút Microphone + Menu chọn Microphone */}
+        <div className="relative flex items-center h-11">
+          <button
+            onClick={toggleMic}
+            disabled={isMicLoading}
+            title={isMicrophoneEnabled ? t("mic") : `${t("mic")} (Muted)`}
+            className={`h-11 px-2.5 rounded-l-lg border border-[#232328] flex flex-col items-center justify-center transition-all cursor-pointer shadow-xs ${
+              !isMicrophoneEnabled
+                ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/15"
+                : "bg-[#161619] text-slate-300 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
+            }`}
+          >
+            {isMicLoading ? (
+              <Loader2 size={21} className="animate-spin text-red-400" />
+            ) : isMicrophoneEnabled ? (
+              <Mic size={21} />
+            ) : (
+              <MicOff size={21} />
+            )}
+            <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
+              {t("mic")}
+            </span>
+          </button>
+          <button
+            onClick={() => {
+              setIsMicMenuOpen(!isMicMenuOpen);
+              setIsCamMenuOpen(false);
+            }}
+            title={t("select_microphone")}
+            className={`h-11 px-1.5 rounded-r-lg border-y border-r border-[#232328] -ml-px flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+              !isMicrophoneEnabled
+                ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
+                : "bg-[#161619] text-slate-400 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
+            } ${isMicMenuOpen ? "border-blue-500/50 text-white bg-[#1e1e22]" : ""}`}
+          >
+            <ChevronUp
+              size={13}
+              className={`transition-transform duration-200 ${
+                isMicMenuOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          {/* Popover danh sách Microphone */}
+          {isMicMenuOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsMicMenuOpen(false)}
+              />
+              <div className="absolute bottom-full mb-2 left-0 z-50 w-72 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-150">
+                <div className="px-2.5 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#232328] mb-1 flex items-center gap-1.5">
+                  <Mic size={12} className="text-blue-400" />
+                  <span>{t("select_microphone")}</span>
+                </div>
+                <div className="max-h-56 overflow-y-auto space-y-0.5 custom-scrollbar">
+                  {audioDevices.length === 0 ? (
+                    <div className="px-2.5 py-2 text-xs text-slate-500">
+                      {t("no_mic_found")}
+                    </div>
+                  ) : (
+                    audioDevices.map((device, idx) => {
+                      const isSelected = device.deviceId === activeAudioDeviceId;
+                      return (
+                        <button
+                          key={device.deviceId || idx}
+                          onClick={async () => {
+                            await setActiveAudioDevice(device.deviceId);
+                            setIsMicMenuOpen(false);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 text-xs rounded-md flex items-center justify-between transition-colors cursor-pointer ${
+                            isSelected
+                              ? "bg-blue-600/15 text-blue-400 font-semibold border border-blue-500/20"
+                              : "text-slate-300 hover:bg-[#232328] hover:text-white"
+                          }`}
+                        >
+                          <span className="truncate mr-2">
+                            {device.label || t("default_mic_label", { number: idx + 1 })}
+                          </span>
+                          {isSelected && (
+                            <Check size={14} className="shrink-0 text-blue-400" />
+                          )}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
           )}
-          <span className="text-[10px] mt-1 hidden sm:block font-medium">
-            {t("mic")}
-          </span>
-        </button>
+        </div>
       </div>
 
       {/* ================= PHẦN CHÍNH GIỮA ================= */}
-      <div className="flex items-center space-x-1 justify-center h-full shrink-0">
+      <div className="flex items-center gap-1 sm:gap-1.5 justify-center h-full shrink-0">
         <button
           onClick={() => onToggleSidebar("people")}
           className={getBtnStyle(activeTab === "people")}
         >
           <div className="relative flex items-center justify-center">
             <Users
-              size={20}
+              size={21}
               className={activeTab === "people" ? "text-brand-400" : ""}
             />
             <span className="absolute -top-1 -right-2.5 text-[10px] font-semibold text-slate-300">
               {displayParticipants.length}
             </span>
           </div>
-          <span className="text-[10px] mt-1 hidden sm:block font-medium">
+          <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
             {t("participants")}
           </span>
         </button>
@@ -288,7 +450,7 @@ export default function CustomToolbar({
         >
           <div className="relative flex items-center justify-center">
             <MessageSquare
-              size={20}
+              size={21}
               className={activeTab === "chat" ? "text-brand-400" : ""}
             />
             {hasUnreadChat && activeTab !== "chat" && (
@@ -298,7 +460,7 @@ export default function CustomToolbar({
               </span>
             )}
           </div>
-          <span className="text-[10px] mt-1 hidden sm:block font-medium">
+          <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
             {t("chat")}
           </span>
         </button>
@@ -308,47 +470,47 @@ export default function CustomToolbar({
           disabled={isSomeoneElseSharing || isScreenShareLoading}
           className={`hidden md:flex ${getBtnStyle(
             isScreenShareEnabled,
-            "bg-green-600 text-white hover:bg-green-700",
-          )} ${isSomeoneElseSharing || isScreenShareLoading ? "opacity-40 cursor-not-allowed hover:bg-[#1a1a1e]" : ""}`}
+            "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/20",
+          )} ${isSomeoneElseSharing || isScreenShareLoading ? "opacity-40 cursor-not-allowed" : ""}`}
         >
           {isScreenShareLoading ? (
-            <Loader2 size={20} className="animate-spin text-green-500" />
+            <Loader2 size={21} className="animate-spin text-emerald-400" />
           ) : (
             <MonitorUp
-              size={20}
+              size={21}
               className={
                 !isScreenShareEnabled && !isSomeoneElseSharing
-                  ? "text-green-500"
+                  ? "text-emerald-400"
                   : ""
               }
             />
           )}
-          <span className="text-[10px] mt-1 hidden sm:block font-medium">
+          <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
             {t("share_screen")}
           </span>
         </button>
 
         {/* ================= NÚT GHI HÌNH VỚI TOOLTIP / POPOVER MENU ================= */}
-        <div className="relative h-full hidden md:flex">
+        <div className="relative h-11 hidden md:flex items-center">
           <button
             onClick={() => setIsRecordMenuOpen(!isRecordMenuOpen)}
             disabled={isCloudRecordingLoading}
             className={getBtnStyle(
               isRecordMenuOpen || isEffectiveCloudRecording || isLocalRecording,
               isEffectiveCloudRecording
-                ? "bg-[#232328] text-red-500 hover:bg-[#1a1a1e]"
+                ? "border-red-500/40 bg-red-500/15 text-red-400 hover:bg-red-500/20"
                 : isLocalRecording
-                  ? "bg-[#232328] text-amber-500 hover:bg-[#1a1a1e]"
-                  : "bg-[#232328] text-white",
+                  ? "border-amber-500/40 bg-amber-500/15 text-amber-400 hover:bg-amber-500/20"
+                  : "border-blue-500/40 bg-blue-500/15 text-blue-400",
             )}
             title={t("record")}
           >
             <div className="relative flex items-center justify-center">
               {isCloudRecordingLoading ? (
-                <Loader2 size={20} className="animate-spin text-red-500" />
+                <Loader2 size={21} className="animate-spin text-red-500" />
               ) : isEffectiveCloudRecording ? (
                 <div className="relative flex items-center justify-center">
-                  <Disc size={20} className="text-red-500 animate-spin" />
+                  <Disc size={21} className="text-red-500 animate-spin" />
                   <span className="absolute -top-1 -right-1 flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
@@ -356,14 +518,14 @@ export default function CustomToolbar({
                 </div>
               ) : isLocalRecording ? (
                 <div className="relative flex items-center justify-center">
-                  <Disc size={20} className="text-amber-500 animate-pulse" />
+                  <Disc size={21} className="text-amber-500 animate-pulse" />
                   <span className="absolute -top-1 -right-1 flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
                   </span>
                 </div>
               ) : (
-                <Disc size={20} className="text-slate-300" />
+                <Disc size={21} className="text-slate-300" />
               )}
               <ChevronUp
                 size={11}
@@ -372,7 +534,7 @@ export default function CustomToolbar({
               />
             </div>
             <span
-              className={`text-[10px] mt-1 hidden sm:block font-medium ${isEffectiveCloudRecording
+              className={`text-[10px] mt-0.5 hidden sm:block font-medium ${isEffectiveCloudRecording
                 ? "text-red-500 font-semibold"
                 : isLocalRecording
                   ? "text-amber-500 font-semibold"
@@ -390,7 +552,7 @@ export default function CustomToolbar({
                 className="fixed inset-0 z-40"
                 onClick={() => setIsRecordMenuOpen(false)}
               ></div>
-              <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 z-50 w-72 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl py-1.5 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-150">
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-72 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl py-1.5 animate-in fade-in zoom-in-95 duration-150">
                 <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#232328] mb-1 flex items-center justify-between">
                   <span>{t("record_options")}</span>
                   {(isEffectiveCloudRecording || isLocalRecording) && (
@@ -583,13 +745,16 @@ export default function CustomToolbar({
 
         <button
           onClick={toggleHandRaise}
-          className={getBtnStyle(isLocalHandRaised, "bg-[#232328] text-amber-500")}
+          className={getBtnStyle(
+            isLocalHandRaised,
+            "border-amber-500/40 bg-amber-500/15 text-amber-400 hover:bg-amber-500/20",
+          )}
         >
           <Hand
-            size={20}
+            size={21}
             className={isLocalHandRaised ? "animate-bounce" : ""}
           />
-          <span className="text-[10px] mt-1 hidden sm:block font-medium">
+          <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
             {t("raise_hand")}
           </span>
         </button>
@@ -598,26 +763,29 @@ export default function CustomToolbar({
         {isBreakoutActive && (
           <button
             onClick={() => setIsJoinBreakoutModalOpen(true)}
-            className={getBtnStyle(false, "bg-[#232328] text-white")}
+            className={getBtnStyle(
+              false,
+              "border-blue-500/40 bg-blue-500/15 text-blue-400",
+            )}
           >
             <Network
-              size={20}
+              size={21}
               className="text-blue-400 animate-pulse drop-shadow-md"
             />
-            <span className="text-[10px] mt-1 hidden sm:block font-medium text-blue-400">
+            <span className="text-[10px] mt-0.5 hidden sm:block font-medium text-blue-400">
               {t("breakout")}
             </span>
           </button>
         )}
 
         {/* Nút Tuỳ chọn và phần menu còn lại */}
-        <div className="relative h-full flex">
+        <div className="relative h-11 flex items-center">
           <button
             onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
             className={getBtnStyle(isMoreMenuOpen)}
           >
-            <MoreVertical size={20} />
-            <span className="text-[10px] mt-1 hidden sm:block font-medium">
+            <MoreVertical size={21} />
+            <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
               {t("options")}
             </span>
           </button>
@@ -628,7 +796,7 @@ export default function CustomToolbar({
                 className="fixed inset-0 z-40"
                 onClick={() => setIsMoreMenuOpen(false)}
               ></div>
-              <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 z-50 w-56 bg-[#161619] border border-[#232328] rounded shadow-2xl py-1.5 backdrop-blur-xl">
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-56 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl py-1.5 animate-in fade-in zoom-in-95 duration-150">
                 <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#232328] mb-1">
                   {t("general_options")}
                 </div>
@@ -846,7 +1014,7 @@ export default function CustomToolbar({
                         </div>
 
                         {isApprovalSubmenuOpen && (
-                          <div className="absolute left-full bottom-0 ml-1 w-48 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl py-1.5 overflow-hidden backdrop-blur-xl">
+                          <div className="absolute left-full bottom-0 ml-1 w-48 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl py-1.5 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -917,7 +1085,7 @@ export default function CustomToolbar({
       </div>
 
       {/* ================= PHẦN BÊN PHẢI (GỘP NÚT RỜI PHÒNG) ================= */}
-      <div className="relative flex items-center h-full lg:flex-1 justify-center lg:justify-end lg:pr-2 shrink-0">
+      <div className="relative flex items-center h-full lg:flex-1 justify-center lg:justify-end lg:pr-1 shrink-0">
         <button
           onClick={() => {
             if (isInBreakoutRoom) {
@@ -930,17 +1098,17 @@ export default function CustomToolbar({
           }}
           disabled={isLeavingBreakout}
           title={isInBreakoutRoom ? t("leave_short") : t("leave_meeting")}
-          className="group h-full px-2.5 sm:px-3 lg:px-4 mx-1 lg:mx-0 bg-transparent text-red-500 hover:text-red-400 font-semibold hover:font-bold hover:drop-shadow-[0_0_8px_rgba(248,113,113,0.5)] transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
+          className="group h-11 px-3 sm:px-3.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLeavingBreakout ? (
-            <Loader2 size={18} className="animate-spin text-red-500" />
+            <Loader2 size={19} className="animate-spin text-red-500" />
           ) : (
             <LogOut
-              size={18}
-              className="transition-transform duration-300 group-hover:translate-x-1 group-hover:scale-110"
+              size={19}
+              className="transition-transform duration-200 group-hover:translate-x-0.5"
             />
           )}
-          <span className="hidden lg:inline text-sm transition-all duration-300">
+          <span className="hidden lg:inline text-xs font-semibold">
             {isInBreakoutRoom ? t("leave_short") : t("leave_meeting")}
           </span>
         </button>
@@ -952,7 +1120,7 @@ export default function CustomToolbar({
               className="fixed inset-0 z-40"
               onClick={() => setIsLeaveMenuOpen(false)}
             ></div>
-            <div className="absolute bottom-full right-2 lg:right-4 mb-2 z-50 w-52 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl py-1.5 overflow-hidden backdrop-blur-xl animate-in fade-in zoom-in duration-200">
+            <div className="absolute bottom-full right-2 lg:right-4 mb-2 z-50 w-52 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl py-1.5 overflow-hidden animate-in fade-in zoom-in duration-200">
               <button
                 onClick={() => {
                   setIsLeaveMenuOpen(false);

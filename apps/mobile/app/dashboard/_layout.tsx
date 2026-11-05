@@ -1,6 +1,7 @@
 import React from "react";
 import { Tabs } from "expo-router";
-import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Bot } from "../../components/common/BotIcon";
 import { View, Text, TouchableOpacity } from "react-native";
 import { useGetMeQuery } from "../../lib/redux/features/users/usersApi";
 import { useNotificationCacheManager } from "../../hooks/useNotificationCacheManager";
@@ -111,8 +112,7 @@ function DashboardTabs() {
                       borderColor: "#ffffff",
                     }}
                   >
-                    <Ionicons
-                      name="sparkles"
+                    <Bot
                       size={24}
                       color="#ffffff"
                     />

@@ -9,14 +9,19 @@ export async function GET(request: NextRequest) {
 
   // Xác định locale từ query param hoặc cookie
   const searchParams = request.nextUrl.searchParams;
-  const locale = searchParams.get("locale") ||
+  const locale =
+    searchParams.get("locale") ||
     request.cookies.get("NEXT_LOCALE")?.value ||
     "vi";
+  const redirectTarget = searchParams.get("redirect");
 
   // Đăng xuất khỏi Supabase (xoá session cookie)
   await supabase.auth.signOut({ scope: "local" });
 
-  // Redirect về trang login với locale đúng
+  // Redirect về trang login với locale đúng (và mang theo param redirect nếu có)
   const loginUrl = new URL(`/${locale}/login`, request.url);
+  if (redirectTarget) {
+    loginUrl.searchParams.set("redirect", redirectTarget);
+  }
   return NextResponse.redirect(loginUrl);
 }

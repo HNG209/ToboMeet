@@ -128,11 +128,12 @@ export async function loginWithOAuth(
   const redirectUrl = formData.get("redirect") as string;
   // Xác định đường dẫn tiếp theo sau khi OAuth thành công
   const nextPath = redirectUrl || `/${locale}`;
+  const nextParam = nextPath.startsWith("/") ? nextPath : `/${nextPath}`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: `${siteUrl}/auth/callback?next=/${encodeURIComponent(nextPath)}`,
+      redirectTo: `${siteUrl}/auth/callback?next=${encodeURIComponent(nextParam)}`,
     },
   });
 

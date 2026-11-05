@@ -70,6 +70,11 @@ export async function middleware(request: NextRequest) {
     pathWithoutLocale === "/signup" ||
     pathWithoutLocale === "/forgot-password";
   if (user && (isAuthRestricted || isHomePage) && !isResetting) {
+    const redirectParam = request.nextUrl.searchParams.get("redirect");
+    if (redirectParam) {
+      return NextResponse.redirect(new URL(redirectParam, request.url));
+    }
+
     // Nếu là admin -> Bẻ lái vào /admin
     if (role === "admin") {
       return NextResponse.redirect(

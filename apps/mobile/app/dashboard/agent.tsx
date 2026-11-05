@@ -12,7 +12,8 @@ import {
   KeyboardEvent,
   LayoutAnimation,
 } from "react-native";
-import { Feather, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Bot } from "../../components/common/BotIcon";
 import { useTranslation } from "react-i18next";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useDispatch } from "react-redux";
@@ -423,7 +424,7 @@ export default function AgentScreen() {
       >
         {!isUser && (
           <View className="w-8 h-8 rounded-full bg-indigo-600 items-center justify-center mr-2 mt-0.5 shadow-xs">
-            <Ionicons name="sparkles" size={16} color="#ffffff" />
+            <Bot size={16} color="#ffffff" />
           </View>
         )}
 
@@ -450,7 +451,7 @@ export default function AgentScreen() {
   const renderEmptyState = () => (
     <View className="px-5 py-6 items-center">
       <View className="w-16 h-16 rounded-3xl bg-indigo-600 items-center justify-center shadow-lg shadow-indigo-200 mb-3.5">
-        <Ionicons name="sparkles" size={32} color="#ffffff" />
+        <Bot size={32} color="#ffffff" />
       </View>
 
       <Text className="text-lg font-bold text-slate-800 text-center mb-1.5">
@@ -540,7 +541,7 @@ export default function AgentScreen() {
           loading ? (
             <View className="mb-3 px-4 flex-row justify-start items-center">
               <View className="w-8 h-8 rounded-full bg-indigo-600 items-center justify-center mr-2 shadow-xs">
-                <MaterialCommunityIcons name="robot" size={18} color="#ffffff" />
+                <Bot size={18} color="#ffffff" />
               </View>
               <View className="bg-white border border-slate-200/80 rounded-2xl rounded-tl-xs px-3.5 py-2.5 shadow-xs flex-row items-center">
                 <ActivityIndicator size="small" color="#4F46E5" />

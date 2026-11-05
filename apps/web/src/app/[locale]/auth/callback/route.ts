@@ -9,8 +9,9 @@ export async function GET(request: Request) {
 
   // Nếu có tham số 'next' trên URL (ví dụ: muốn chuyển về /vi sau khi login), nếu không thì mặc định về /vi
   const next = searchParams.get("next") ?? "/";
+  const normalizedNext = next.startsWith("/") ? next : `/${next}`;
 
-  const localeMatch = next.match(/^\/(vi|en)/);
+  const localeMatch = normalizedNext.match(/^\/(vi|en)/);
   const locale = localeMatch ? localeMatch[1] : "vi";
 
   // Nếu Facebook/Google có trả về mã 'code'
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${origin}${normalizedNext}`);
     }
   }
 

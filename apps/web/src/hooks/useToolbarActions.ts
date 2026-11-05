@@ -78,7 +78,11 @@ export function useToolbarActions() {
       setIsScreenShareLoading(true);
       if (!isScreenShareEnabled) {
         await startScreenShare({ meetingCode: code }).unwrap();
-        await localParticipant.setScreenShareEnabled(true);
+        await localParticipant.setScreenShareEnabled(true, {
+          audio: true,
+          selfBrowserSurface: "include",
+          systemAudio: "include",
+        });
       } else {
         await localParticipant.setScreenShareEnabled(false);
         await stopScreenShare({ meetingCode: code }).unwrap();

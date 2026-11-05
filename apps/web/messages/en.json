@@ -244,7 +244,7 @@
     "made_with": "Graduation Thesis Project"
   },
   "login": {
-    "welcome_back": "Welcome back",
+    "welcome_back": "Welcome Back",
     "sign_in_to_continue": "Sign in to connect with your team",
     "sign_in": "Sign In",
     "signing_in": "Signing in...",
@@ -1106,6 +1106,10 @@
     "invite_error_empty": "Please enter email or account name",
     "join_room_title": "Join new group",
     "already_member_title": "Already a member",
+    "unauth_join_title": "Join group",
+    "unauth_join_desc": "You are not logged in. Please log in on web or open ToboMeet App to continue joining the group.",
+    "unauth_open_app": "Open ToboMeet App",
+    "unauth_login_web": "Log in on Web",
     "join_room_confirm": "Do you want to join the group <strong2>{name}</strong2>?",
     "already_member_confirm": "You are already a member of the group <strong2>{name}</strong2>. Do you want to enter the room now?",
     "confirm_join_action": "Accept",
@@ -1719,6 +1723,12 @@
     "toolbar": {
       "camera": "Camera",
       "mic": "Mic",
+      "select_camera": "Select Camera",
+      "select_microphone": "Select Microphone",
+      "no_camera_found": "No camera found",
+      "no_mic_found": "No microphone found",
+      "default_camera_label": "Camera {number}",
+      "default_mic_label": "Microphone {number}",
       "participants": "Participants",
       "chat": "Chat",
       "share_screen": "Share",

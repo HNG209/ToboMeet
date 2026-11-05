@@ -10,11 +10,14 @@ import {
   ChevronDown,
   Reply,
   Info,
+  Check,
+  Users,
+  User,
 } from "lucide-react";
 import { ChatMessage } from "@tobomeet/shared/types";
 import { useChatManager } from "@/hooks/useChatManager";
 import { useRoomSettings } from "@/hooks/useRoomSettings";
-import { useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useTranslations } from "next-intl";
 
 interface MeetingChatProps {
@@ -76,6 +79,13 @@ export default function MeetingChat({
   } = useChatManager({ messages, setMessages, meetingCode });
 
   const messageGroups = useMemo(() => groupMessages(messages), [messages]);
+  const [isTargetDropdownOpen, setIsTargetDropdownOpen] = useState(false);
+
+  const currentTargetLabel = useMemo(() => {
+    if (selectedTarget === "all") return t("chat_target_all");
+    const p = otherParticipants.find((item) => item.identity === selectedTarget);
+    return t("chat_target_specific", { name: p?.name || "" });
+  }, [selectedTarget, otherParticipants, t]);
 
   return (
     <div className="flex flex-col h-full bg-transparent relative">
@@ -88,21 +98,21 @@ export default function MeetingChat({
             onClick={() => setReactionDetails(null)}
           >
             <div
-              className="bg-[#1c1c1c] border border-[#333] rounded-2xl w-full max-w-xs shadow-2xl overflow-hidden flex flex-col animate-scale-in"
+              className="bg-[#161619] border border-[#232328] rounded-2xl w-full max-w-xs shadow-2xl overflow-hidden flex flex-col animate-scale-in"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex justify-between items-center px-4 py-3 border-b border-[#333] bg-[#111]">
+              <div className="flex justify-between items-center px-4 py-3 border-b border-[#232328] bg-[#161619]">
                 <h3 className="text-sm font-semibold text-white">
                   {t("chat_reaction_details_title")}
                 </h3>
                 <button
                   onClick={() => setReactionDetails(null)}
-                  className="text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-[#333]"
+                  className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-[#232328] cursor-pointer"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
-              <div className="p-3 max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-3 bg-[#111]">
+              <div className="p-3 max-h-60 overflow-y-auto custom-scrollbar flex flex-col gap-3 bg-[#111113]">
                 {Object.entries(reactionDetails).map(([emoji, users]) => {
                   if (users.length === 0) return null;
                   return (
@@ -452,12 +462,12 @@ export default function MeetingChat({
         )}
       </div>
 
-      {/* ===== VÙNG NHẬP (đã thu gọn) ===== */}
+      {/* ===== VÙNG NHẬP (đồng bộ màu với Breakout) ===== */}
       <div className="shrink-0 flex flex-col gap-1.5 relative">
         {/* Overlay khi chat bị khóa */}
         {!canChat && (
-          <div className="absolute inset-0 z-10 bg-black/70 backdrop-blur-[2px] flex flex-col items-center justify-center rounded-xl pointer-events-none border border-[#333]">
-            <div className="bg-[#1c1c1c] text-slate-300 px-3.5 py-1.5 rounded-lg flex items-center gap-2 text-xs shadow-lg border border-[#333]">
+          <div className="absolute inset-0 z-10 bg-[#111113]/80 backdrop-blur-xs flex flex-col items-center justify-center rounded-lg pointer-events-none border border-[#232328]">
+            <div className="bg-[#161619] text-slate-300 px-3.5 py-1.5 rounded-lg flex items-center gap-2 text-xs shadow-lg border border-[#232328]">
               <Lock size={13} className="text-rose-400" />
               {t("chat_locked")}
             </div>
@@ -466,7 +476,7 @@ export default function MeetingChat({
 
         {/* Banner đang trả lời */}
         {replyingTo && (
-          <div className="bg-[#1c1c1c] border border-[#333] px-2.5 py-1.5 rounded-lg text-[11px] text-slate-300 flex justify-between items-center">
+          <div className="bg-[#161619] border border-[#232328] px-3 py-2 rounded-lg text-xs text-slate-300 flex justify-between items-center shadow-sm">
             <div className="truncate pr-2">
               <span className="font-semibold text-blue-400 mr-1">
                 {t("chat_replying_to", { name: replyingTo.senderName })}
@@ -478,7 +488,7 @@ export default function MeetingChat({
             </div>
             <button
               onClick={() => setReplyingTo(null)}
-              className="p-0.5 rounded-full hover:bg-[#333] text-slate-400 hover:text-white transition-colors shrink-0"
+              className="p-1 rounded-lg hover:bg-[#232328] text-slate-400 hover:text-white transition-colors shrink-0 cursor-pointer"
             >
               <X size={13} />
             </button>
@@ -487,34 +497,117 @@ export default function MeetingChat({
 
         {/* Select đối tượng + Form nhập gộp gọn */}
         <div className="flex flex-col gap-1.5">
+          {/* Custom Select đối tượng (Mở chiều ngược lên, phong cách tương tự Calendar view select) */}
           <div className="relative">
-            <select
-              value={selectedTarget}
+            <button
+              type="button"
               disabled={!canChat}
-              onChange={(e) => setSelectedTarget(e.target.value)}
-              className="w-full appearance-none text-[11px] pl-2.5 pr-7 py-2 rounded-lg border bg-[#222] text-slate-300 border-[#333] focus:outline-none focus:border-blue-500/50 cursor-pointer transition-colors"
+              onClick={() => setIsTargetDropdownOpen(!isTargetDropdownOpen)}
+              className="w-full flex items-center justify-between text-xs px-3 py-2 rounded-lg border border-[#232328] hover:border-[#333338] bg-[#161619] text-slate-200 focus:outline-none focus:ring-1 focus:ring-blue-500/40 cursor-pointer transition-all disabled:opacity-50 select-none shadow-xs active:scale-[0.99]"
+              aria-label="Chọn đối tượng nhận tin nhắn"
             >
-              <option value="all">{t("chat_target_all")}</option>
-              {otherParticipants.map((p) => (
-                <option key={p.identity} value={p.identity}>
-                  {t("chat_target_specific", { name: p.name || "" })}
-                </option>
-              ))}
-            </select>
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500">
-              <ChevronDown size={12} />
-            </div>
+              <div className="flex items-center gap-2 min-w-0 pr-2">
+                {selectedTarget === "all" ? (
+                  <Users className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                ) : (
+                  <User className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                )}
+                <span className="truncate font-medium text-slate-200">
+                  {currentTargetLabel}
+                </span>
+              </div>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                  isTargetDropdownOpen ? "rotate-180 text-blue-400" : ""
+                }`}
+              />
+            </button>
+
+            {isTargetDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-[60]"
+                  onClick={() => setIsTargetDropdownOpen(false)}
+                />
+                <div className="absolute bottom-full mb-1.5 left-0 right-0 z-[70] bg-[#161619] rounded-xl border border-[#232328] shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1.5 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="max-h-56 overflow-y-auto space-y-1 custom-scrollbar">
+                    {/* Mục: Tất cả mọi người */}
+                    <button
+                      key="target-all"
+                      type="button"
+                      onClick={() => {
+                        setSelectedTarget("all");
+                        setIsTargetDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg transition-all cursor-pointer ${
+                        selectedTarget === "all"
+                          ? "bg-blue-600/15 text-blue-400 font-semibold border border-blue-500/25"
+                          : "text-slate-300 hover:bg-[#232328] hover:text-white"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 mr-2">
+                        <Users
+                          className={`w-3.5 h-3.5 shrink-0 ${
+                            selectedTarget === "all"
+                              ? "text-blue-400"
+                              : "text-slate-400"
+                          }`}
+                        />
+                        <span className="truncate">{t("chat_target_all")}</span>
+                      </div>
+                      {selectedTarget === "all" && (
+                        <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      )}
+                    </button>
+
+                    {/* Danh sách từng thành viên khác */}
+                    {otherParticipants.map((p) => {
+                      const isSelected = selectedTarget === p.identity;
+                      return (
+                        <button
+                          key={p.identity}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTarget(p.identity);
+                            setIsTargetDropdownOpen(false);
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg transition-all cursor-pointer ${
+                            isSelected
+                              ? "bg-blue-600/15 text-blue-400 font-semibold border border-blue-500/25"
+                              : "text-slate-300 hover:bg-[#232328] hover:text-white"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0 mr-2">
+                            <User
+                              className={`w-3.5 h-3.5 shrink-0 ${
+                                isSelected ? "text-blue-400" : "text-slate-400"
+                              }`}
+                            />
+                            <span className="truncate">
+                              {t("chat_target_specific", { name: p.name || "" })}
+                            </span>
+                          </div>
+                          {isSelected && (
+                            <Check className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           <form
             onSubmit={handleSendMessage}
-            className="relative flex items-center rounded-xl border bg-[#222] border-[#333] px-1 py-0.5 focus-within:border-blue-500/50 transition-colors"
+            className="relative flex items-center rounded-lg border border-[#232328] hover:border-[#333338] bg-[#161619] px-2 py-1.5 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500/20 transition-all"
           >
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={!canChat}
-              className="p-1.5 text-slate-400 hover:text-blue-400 disabled:opacity-40 transition-colors shrink-0"
+              className="p-1.5 text-slate-400 hover:text-blue-400 disabled:opacity-40 transition-colors shrink-0 cursor-pointer"
             >
               <Paperclip size={16} />
             </button>
@@ -528,12 +621,12 @@ export default function MeetingChat({
                   ? t("chat_input_placeholder")
                   : t("chat_input_placeholder_locked")
               }
-              className="flex-1 bg-transparent text-[13px] text-slate-200 px-1.5 py-1.5 focus:outline-none min-w-0 placeholder:text-slate-500"
+              className="flex-1 bg-transparent text-xs text-slate-200 px-2 py-1 focus:outline-none min-w-0 placeholder:text-slate-500"
             />
             <button
               type="submit"
               disabled={!inputValue.trim() || !canChat}
-              className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-40 disabled:bg-[#333] ml-0.5 transition-colors shrink-0 shadow-sm"
+              className="p-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white disabled:opacity-30 disabled:bg-[#232328] ml-1 transition-all shrink-0 shadow-sm cursor-pointer"
             >
               <Send size={14} />
             </button>

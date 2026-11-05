@@ -11,6 +11,7 @@ import {
   Clock,
   ShieldCheck,
   UserCheck,
+  X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
@@ -410,40 +411,66 @@ export default function ParticipantList({
         )}
       </div>
 
-      {/* Modal đổi tên */}
+      {/* Modal đổi tên đồng bộ thiết kế Breakout */}
       {renameState?.isOpen &&
         createPortal(
-          <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4 animate-fade-in">
-            <div className="bg-[#161619] border border-[#232328] rounded-2xl shadow-2xl w-full max-w-sm p-5 animate-scale-in">
-              <h3 className="text-sm font-bold text-white mb-3">
-                {t("rename_display_name")}
-              </h3>
-
-              <input
-                type="text"
-                value={renameState.newName}
-                onChange={(e) =>
-                  setRenameState({ ...renameState, newName: e.target.value })
-                }
-                disabled={isRenaming}
-                placeholder={t("enter_new_name")}
-                className="w-full px-3 py-2 bg-[#111113] border border-[#232328] rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-slate-500 mb-4 transition-colors disabled:opacity-50"
-                autoFocus
-                onKeyDown={(e) => e.key === "Enter" && !isRenaming && handleRenameSubmit()}
-              />
-
-              <div className="flex justify-end gap-2">
+          <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4 animate-fade-in">
+            <div className="bg-[#161619] border border-[#232328] rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-in">
+              {/* Header */}
+              <div className="px-5 py-3.5 border-b border-[#232328] flex items-center justify-between bg-[#161619]">
+                <div className="flex items-center gap-2 text-white">
+                  <div className="p-1.5 rounded-lg bg-blue-600/10 text-blue-400 border border-blue-500/20">
+                    <Edit2 size={15} />
+                  </div>
+                  <h3 className="text-sm font-bold tracking-tight text-white">
+                    {t("rename_display_name")}
+                  </h3>
+                </div>
                 <button
+                  type="button"
+                  onClick={() => setRenameState(null)}
+                  className="p-1.5 text-slate-400 hover:text-white hover:bg-[#232328] rounded-lg transition-colors cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 bg-[#111113] space-y-2.5">
+                <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  {t("enter_new_name")}
+                </label>
+                <input
+                  type="text"
+                  value={renameState.newName}
+                  onChange={(e) =>
+                    setRenameState({ ...renameState, newName: e.target.value })
+                  }
+                  disabled={isRenaming}
+                  placeholder={t("enter_new_name")}
+                  className="w-full px-3.5 py-2.5 bg-[#161619] border border-[#232328] hover:border-[#333338] rounded-xl text-xs text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-all disabled:opacity-50"
+                  autoFocus
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && !isRenaming && handleRenameSubmit()
+                  }
+                />
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3.5 border-t border-[#232328] bg-[#111113] flex items-center justify-end gap-2">
+                <button
+                  type="button"
                   onClick={() => setRenameState(null)}
                   disabled={isRenaming}
-                  className="px-3.5 py-1.5 text-xs font-semibold text-slate-400 hover:text-white hover:bg-[#232328] rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white hover:bg-[#232328] border border-[#232328] rounded-xl transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {t("cancel")}
                 </button>
                 <button
+                  type="button"
                   onClick={handleRenameSubmit}
                   disabled={!renameState.newName.trim() || isRenaming}
-                  className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold bg-[#2a2a2f] hover:bg-[#35353c] text-white border border-[#3e3e46] rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-xl shadow-md shadow-blue-600/20 transition-all disabled:opacity-50 cursor-pointer"
                 >
                   {isRenaming && <Loader2 size={13} className="animate-spin" />}
                   <span>{t("save_changes")}</span>

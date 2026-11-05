@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 import {
   useJoinRoomMutation,
@@ -82,21 +83,6 @@ function JoinRoomContent() {
     router.replace("/dashboard");
   };
 
-  // Khi deploy thì uncomment do test trình duyệt trên mobile chưa gọi BE được
-  // if (isCheckingMember || isFetchRoomLoading) {
-  //   return (
-  //     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-  //       <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
-  //         <Loader2 className="w-12 h-12 text-brand-600 animate-spin mx-auto mb-4" />
-  //         <h1 className="text-lg font-bold text-slate-900 mb-2">
-  //           {t("loading_processing")}
-  //         </h1>
-  //         <p className="text-sm text-slate-500">{t("loading_preparing")}</p>
-  //       </div>
-  //     </div>
-  //   );
-  // }
-
   if (!code) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -114,6 +100,21 @@ function JoinRoomContent() {
           >
             {t("back_home")}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Đang kiểm tra xác thực và nạp dữ liệu phòng
+  if (isCheckingMember || isFetchRoomLoading || isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
+          <Loader2 className="w-12 h-12 text-brand-600 animate-spin mx-auto mb-4" />
+          <h1 className="text-lg font-bold text-slate-900 mb-2">
+            {t("loading_title", { defaultValue: "Đang tải..." })}
+          </h1>
+          <p className="text-sm text-slate-500">{t("loading_preparing")}</p>
         </div>
       </div>
     );
@@ -169,23 +170,39 @@ function JoinRoomContent() {
         </div>
 
         <h1 className="text-xl font-extrabold text-slate-900 mb-2">
-          {isAlreadyMember ? t("already_member_title") : t("join_room_title")}
+          {isAuthenticated === false
+            ? t("unauth_join_title", { defaultValue: "Tham gia nhóm" })
+            : isAlreadyMember
+              ? t("already_member_title")
+              : t("join_room_title")}
         </h1>
 
         <p className="text-sm text-slate-600 mb-6">
-          {isAlreadyMember
-            ? t.rich("already_member_confirm", {
-                name: roomDetails?.name || "",
-                strong2: (chunks) => (
-                  <strong className="text-slate-950 font-bold">{chunks}</strong>
-                ),
-              })
-            : t.rich("join_room_confirm", {
-                name: roomDetails?.name || "",
-                strong2: (chunks) => (
-                  <strong className="text-slate-950 font-bold">{chunks}</strong>
-                ),
-              })}
+          {isAuthenticated === false
+            ? (roomDetails?.name
+                ? t.rich("join_room_confirm", {
+                    name: roomDetails.name,
+                    strong2: (chunks) => (
+                      <strong className="text-slate-950 font-bold">{chunks}</strong>
+                    ),
+                  })
+                : t("unauth_join_desc", {
+                    defaultValue:
+                      "Bạn chưa đăng nhập. Vui lòng đăng nhập trên web hoặc mở ứng dụng ToboMeet để tiếp tục tham gia nhóm.",
+                  }))
+            : isAlreadyMember
+              ? t.rich("already_member_confirm", {
+                  name: roomDetails?.name || "",
+                  strong2: (chunks) => (
+                    <strong className="text-slate-950 font-bold">{chunks}</strong>
+                  ),
+                })
+              : t.rich("join_room_confirm", {
+                  name: roomDetails?.name || "",
+                  strong2: (chunks) => (
+                    <strong className="text-slate-950 font-bold">{chunks}</strong>
+                  ),
+                })}
         </p>
 
         {error && (
@@ -195,13 +212,13 @@ function JoinRoomContent() {
           </div>
         )}
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {/* NÚT TRÊN WEB: Chờ xác định xong auth (isAuthenticated === true) mới hiện */}
           {isAuthenticated === true && (
             <div className="flex gap-4">
               <button
                 onClick={handleCancelJoin}
-                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all"
+                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all cursor-pointer"
               >
                 {t("cancel_action")}
               </button>
@@ -209,7 +226,7 @@ function JoinRoomContent() {
               {isAlreadyMember ? (
                 <button
                   onClick={handleGoToRoom}
-                  className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all shadow-md shadow-brand-600/10"
+                  className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all shadow-md shadow-brand-600/10 cursor-pointer"
                 >
                   {t("go_to_room_action")}
                 </button>
@@ -217,7 +234,7 @@ function JoinRoomContent() {
                 <button
                   onClick={handleConfirmJoin}
                   disabled={isJoining}
-                  className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-brand-600/10"
+                  className="flex-1 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-md shadow-brand-600/10 cursor-pointer"
                 >
                   {isJoining && <Loader2 className="w-4 h-4 animate-spin" />}
                   <span>{t("confirm_join_action")}</span>
@@ -226,14 +243,24 @@ function JoinRoomContent() {
             </div>
           )}
 
-          {/* NÚT MỞ APP TRÊN MOBILE: Hiện khi CHƯA đăng nhập (false hoặc null) */}
-          {isAuthenticated !== true && code && (
-            <a
-              href={`intent://room/join?code=${code.trim()}#Intent;scheme=tobomeet;package=com.hng209.mobile;end;`}
-              className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-brand-600/10"
-            >
-              Mở ToboMeet App
-            </a>
+          {/* NÚT KHI CHƯA ĐĂNG NHẬP: Có cả mở app mobile lẫn đăng nhập trên web kèm redirect */}
+          {isAuthenticated === false && (
+            <div className="flex flex-col gap-3">
+              {code && (
+                <a
+                  href={`intent://room/join?code=${code.trim()}#Intent;scheme=tobomeet;package=com.hng209.mobile;end;`}
+                  className="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-brand-600/10"
+                >
+                  {t("unauth_open_app", { defaultValue: "Mở ToboMeet App" })}
+                </a>
+              )}
+              <Link
+                href={`/login?redirect=${encodeURIComponent(`/room/join?code=${code?.trim() || ""}`)}`}
+                className="w-full py-3 bg-[#333] hover:bg-[#444] text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-md border border-[#444]"
+              >
+                {t("unauth_login_web", { defaultValue: "Đăng nhập trên Web" })}
+              </Link>
+            </div>
           )}
         </div>
       </div>
@@ -252,7 +279,7 @@ export default function JoinRoomPage() {
             <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center">
               <Loader2 className="w-12 h-12 text-brand-600 animate-spin mx-auto mb-4" />
               <h1 className="text-lg font-bold text-slate-900 mb-2">
-                {t("loading_title")}
+                {t("loading_title", { defaultValue: "Đang tải..." })}
               </h1>
             </div>
           </div>

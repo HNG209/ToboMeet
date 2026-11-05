@@ -114,25 +114,9 @@ export function useMeetingSession() {
     }
   }, [meetingCode]);
 
-  // Lắng nghe sự kiện F5 hoặc tắt Tab (Xác nhận khi đang trong phòng họp)
+  // Lắng nghe sự kiện F5 hoặc tắt Tab: ngắt kết nối trực tiếp, không hiện dialog xác nhận
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Trên desktop, Electron đã chặn và xử lý close event riêng
-      if (
-        typeof window !== "undefined" &&
-        (window as any).electronAPI?.isDesktop
-      ) {
-        isUnloadingRef.current = true;
-        return;
-      }
-
-      // Trên Web: Nếu đang trong phòng họp thì kích hoạt dialog xác nhận của trình duyệt
-      if (status === "JOINED") {
-        e.preventDefault();
-        e.returnValue = "";
-        return "";
-      }
-
+    const handleBeforeUnload = () => {
       isUnloadingRef.current = true;
     };
 
