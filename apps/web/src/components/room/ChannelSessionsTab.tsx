@@ -8,7 +8,7 @@ import {
   useGetSessionAttendanceQuery,
 } from "@/lib/redux/api/meetingsApi";
 import { useFetchMeetingSession } from "@/hooks/useFetchMeetingSession";
-import { MeetingSessionResponse, SessionAttendanceItem, SessionRecording } from "@tobomeet/shared/types";
+import { MeetingSessionResponse, SessionAttendanceItem, SessionRecording, PollResponse } from "@tobomeet/shared/types";
 import {
   Video,
   Clock,
@@ -27,11 +27,15 @@ import {
   FileSpreadsheet,
   HardDrive,
   Film,
+  BarChart2,
+  Eye,
 } from "lucide-react";
 import axios from "axios";
 import { toast } from "sonner";
 import ExportAttendanceModal, { ExportMode } from "./ExportAttendanceModal";
 import HlsRecordingPlayer from "./HlsRecordingPlayer";
+import { useGetPollsQuery } from "@/lib/redux/api/pollsApi";
+import PollDetailsModal from "@/components/meeting/PollDetailsModal";
 
 interface ChannelSessionsTabProps {
   roomId: string;
@@ -442,6 +446,20 @@ function SessionDetailView({
   const locale = useLocale();
   const [isExporting, setIsExporting] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [selectedDetailPoll, setSelectedDetailPoll] = useState<PollResponse | null>(null);
+
+  const {
+    data: sessionPolls = [],
+    isLoading: isPollsLoading,
+    refetch: refetchPolls,
+    isFetching: isPollsFetching,
+  } = useGetPollsQuery(
+    {
+      meetingCode: session.meetingCode,
+      sessionId: session._id,
+    },
+    { skip: !session.meetingCode || !session._id },
+  );
   const [activeRecording, setActiveRecording] = useState<SessionRecording | null>(null);
 
   const recordings = session.recordings || [];
@@ -738,6 +756,113 @@ function SessionDetailView({
           </div>
         </div>
 
+        {/* Phần Bình chọn trong cuộc họp (Polls Section) */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <BarChart2 size={18} className="text-blue-600" />
+              <h3 className="text-sm font-bold text-slate-900">
+                {t("session_polls_title")}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 font-semibold">
+                {t("session_polls_count", { count: sessionPolls.length })}
+              </span>
+              <button
+                onClick={() => refetchPolls()}
+                disabled={isPollsFetching}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
+                title="Refresh polls"
+              >
+                <RefreshCw
+                  size={14}
+                  className={isPollsFetching ? "animate-spin" : ""}
+                />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6">
+            {isPollsLoading ? (
+              <div className="py-8 flex flex-col items-center justify-center text-slate-400">
+                <Loader2 size={24} className="animate-spin mb-2 text-brand-500" />
+                <p className="text-xs font-medium">{t("session_loading")}</p>
+              </div>
+            ) : sessionPolls.length === 0 ? (
+              <div className="py-8 text-center text-slate-400">
+                <BarChart2 size={32} className="mx-auto mb-2 text-slate-300" />
+                <p className="text-xs font-medium">
+                  {t("session_polls_empty")}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {sessionPolls.map((poll, idx) => {
+                  const totalVotes = poll.options.reduce(
+                    (sum, opt) => sum + (opt.voters?.length || 0),
+                    0,
+                  );
+
+                  return (
+                    <div
+                      key={poll._id || idx}
+                      className="p-4 rounded-xl border border-slate-200 bg-slate-50/70 hover:bg-slate-50 transition-all flex flex-col justify-between gap-3 shadow-2xs"
+                    >
+                      <div className="space-y-2">
+                        <h4 className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug">
+                          {poll.question}
+                        </h4>
+
+                        <div className="text-[11px] text-slate-500 flex items-center gap-1.5 pt-1">
+                          <span>{t("session_polls_created_by")}: <strong>{poll.creatorName}</strong></span>
+                        </div>
+
+                        {/* Options Progress list */}
+                        <div className="space-y-2 pt-2 border-t border-slate-200/70">
+                          {poll.options.map((opt) => {
+                            const count = opt.voters?.length || 0;
+                            const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                            return (
+                              <div key={opt.id} className="space-y-1">
+                                <div className="flex justify-between text-[11px] text-slate-700">
+                                  <span className="truncate pr-2 font-medium">{opt.text}</span>
+                                  <span className="shrink-0 font-semibold text-slate-500 font-mono">
+                                    {pct}% ({count})
+                                  </span>
+                                </div>
+                                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                  <div
+                                    className="h-full bg-blue-600 rounded-full transition-all duration-300"
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="pt-3 border-t border-slate-200/60 flex items-center justify-between gap-2">
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {t("session_polls_votes_count", { count: totalVotes })}
+                        </span>
+                        <button
+                          onClick={() => setSelectedDetailPoll(poll)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-white hover:bg-blue-50 text-blue-600 border border-slate-200 hover:border-blue-300 transition-colors cursor-pointer shadow-2xs"
+                        >
+                          <Eye size={13} />
+                          <span>{t("session_polls_view_details")}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Danh sách người tham gia / Điểm danh */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -847,6 +972,14 @@ function SessionDetailView({
           )}
         </div>
       </div>
+
+      {/* Modal xem chi tiết bình chọn */}
+      <PollDetailsModal
+        isOpen={!!selectedDetailPoll}
+        onClose={() => setSelectedDetailPoll(null)}
+        poll={selectedDetailPoll}
+        theme="light"
+      />
 
       {/* Modal tùy chỉnh xuất Excel */}
       <ExportAttendanceModal

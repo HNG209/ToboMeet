@@ -18,6 +18,8 @@ import MobileToolbar from "../../components/meeting/MobileToolbar";
 import MobileVideoGrid from "../../components/meeting/MobileVideoGrid";
 import MembersModal from "../../components/meeting/MembersModal";
 import MobileChatModal from "../../components/meeting/MobileChatModal";
+import MobilePollsModal from "../../components/meeting/MobilePollsModal";
+import MobileCreatePollModal from "../../components/meeting/MobileCreatePollModal";
 // Lazy load để tránh crash native module 'RNCWebViewModule' khi APK chưa có react-native-webview
 const MobileWhiteboardModal = lazy(
   () => import("../../components/meeting/MobileWhiteboardModal"),
@@ -41,7 +43,7 @@ export default function MeetingRoomContent({
   // Lắng nghe các sự kiện đồng bộ breakout
   useBreakoutSync();
 
-  const { roomName, roomType, breakoutStartedAt, breakoutDuration } =
+  const { roomName, roomType, breakoutStartedAt, breakoutDuration, isHost } =
     useRoomSettings({
       meetingCode,
     });
@@ -58,6 +60,8 @@ export default function MeetingRoomContent({
   const [showChatModal, setShowChatModal] = useState(false);
   const [showWhiteboardModal, setShowWhiteboardModal] = useState(false);
   const [isLiveCaptionEnabled, setIsLiveCaptionEnabled] = useState(false);
+  const [showPollsModal, setShowPollsModal] = useState(false);
+  const [showCreatePollModal, setShowCreatePollModal] = useState(false);
 
   const handleToggleLiveCaption = () => {
     setIsLiveCaptionEnabled((prev) => {
@@ -348,6 +352,8 @@ export default function MeetingRoomContent({
         onOpenWhiteboard={() => setShowWhiteboardModal(true)}
         isLiveCaptionEnabled={isLiveCaptionEnabled}
         onToggleLiveCaption={handleToggleLiveCaption}
+        onOpenPolls={() => setShowPollsModal(true)}
+        onOpenCreatePoll={() => setShowCreatePollModal(true)}
       />
 
       <MembersModal
@@ -371,6 +377,18 @@ export default function MeetingRoomContent({
           />
         </Suspense>
       )}
+      <MobilePollsModal
+        visible={showPollsModal}
+        onClose={() => setShowPollsModal(false)}
+        meetingCode={meetingCode}
+        isHost={isHost}
+      />
+
+      <MobileCreatePollModal
+        visible={showCreatePollModal}
+        onClose={() => setShowCreatePollModal(false)}
+        meetingCode={meetingCode}
+      />
     </View>
   );
 }

@@ -11,6 +11,8 @@ import ParticipantList from "@/components/meeting/ParticipantList";
 import CustomToolbar from "@/components/meeting/CustomToolbar";
 import CustomVideoGrid from "@/components/meeting/CustomVideoGrid";
 import MeetingChat from "@/components/meeting/MeetingChat";
+import MeetingPolls from "@/components/meeting/MeetingPolls";
+import CreatePollModal from "@/components/meeting/CreatePollModal";
 import LiveCaptionOverlay from "@/components/meeting/LiveCaptionOverlay";
 import { axiosInstance } from "@/lib/axios";
 import { ChatMessage } from "@tobomeet/shared/types";
@@ -31,6 +33,7 @@ export default function MeetingRoomContent({
     breakoutDuration,
     recordingInfo,
     isCloudRecordingActive,
+    isHost,
   } = useRoomSettings({ meetingCode: meetingCode });
   const isBreakoutRoom = roomType === "breakout";
   const isRecording = isLivekitRecording || isCloudRecordingActive || !!recordingInfo?.isRecording;
@@ -42,7 +45,8 @@ export default function MeetingRoomContent({
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<"chat" | "people">("chat");
+  const [sidebarTab, setSidebarTab] = useState<"chat" | "people" | "polls">("chat");
+  const [isCreatePollOpen, setIsCreatePollOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [screenSources, setScreenSources] = useState<any[]>([]);
@@ -211,7 +215,6 @@ export default function MeetingRoomContent({
         </main>
 
         <div className="shrink-0 w-full relative z-[500]">
-
           {/* MODAL CHỌN MÀN HÌNH CHIA SẺ (CHỈ HIỂN THỊ KHI CHẠY TRÊN ELECTRON) */}
           {screenSources.length > 0 && (
             <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 p-4">
@@ -269,6 +272,7 @@ export default function MeetingRoomContent({
             activeTab={isSidebarOpen ? sidebarTab : null}
             isLiveCaptionEnabled={isLiveCaptionEnabled}
             onToggleLiveCaption={handleToggleLiveCaption}
+            onCreatePoll={() => setIsCreatePollOpen(true)}
             onToggleSidebar={(tab) => {
               if (isSidebarOpen && sidebarTab === tab) setIsSidebarOpen(false);
               else {
@@ -280,13 +284,17 @@ export default function MeetingRoomContent({
         </div>
       </div>
 
-      {/* SIDEBAR CỤM CHAT & PARTICIPANTS NẰM NGOÀI CÙNG */}
+      {/* SIDEBAR CỤM CHAT, PARTICIPANTS & POLLS NẰM NGOÀI CÙNG */}
       {isSidebarOpen && (
         <aside className="fixed inset-0 z-50 flex flex-col bg-[#111113] lg:static lg:w-[360px] xl:w-[380px] lg:z-auto lg:border-l lg:border-[#232328] shadow-2xl transition-all duration-300 ease-in-out shrink-0 h-full">
           {/* Header với Tiêu đề & Nút đóng */}
           <div className="h-14 px-5 flex items-center justify-between border-b border-[#232328] bg-[#111113] shrink-0">
             <h2 className="text-sm font-semibold text-slate-100 tracking-wide">
-              {sidebarTab === "chat" ? t("chat_header") : t("participant_header")}
+              {sidebarTab === "chat"
+                ? t("chat_header")
+                : sidebarTab === "people"
+                  ? t("participant_header")
+                  : t("polls_header")}
             </h2>
 
             <button
@@ -306,12 +314,25 @@ export default function MeetingRoomContent({
                 messages={messages}
                 setMessages={setMessages}
               />
-            ) : (
+            ) : sidebarTab === "people" ? (
               <ParticipantList meetingCode={meetingCode} />
+            ) : (
+              <MeetingPolls
+                meetingCode={meetingCode}
+                isHost={isHost}
+                onCreatePoll={() => setIsCreatePollOpen(true)}
+              />
             )}
           </div>
         </aside>
       )}
+
+      {/* MODAL TẠO BÌNH CHỌN CHO HOST/ADMIN */}
+      <CreatePollModal
+        isOpen={isCreatePollOpen}
+        onClose={() => setIsCreatePollOpen(false)}
+        meetingCode={meetingCode}
+      />
     </div>
   );
 }

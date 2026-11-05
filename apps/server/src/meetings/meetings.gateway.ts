@@ -40,6 +40,38 @@ export class MeetingsGateway {
   }
 
   /**
+   * Khi User truy cập vào phòng meeting (meeting/:code), đăng ký socket vào room của meeting
+   */
+  @SubscribeMessage("join_meeting")
+  handleJoinMeeting(
+    @MessageBody() data: { meetingCode: string } | string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const meetingCode = typeof data === "string" ? data : data?.meetingCode;
+    if (meetingCode) {
+      const room = `meeting:${meetingCode}`;
+      client.join(room);
+      console.log(`[Socket] Client ${client.id} joined meeting room: ${room}`);
+    }
+  }
+
+  /**
+   * Khi User rời phòng meeting
+   */
+  @SubscribeMessage("leave_meeting")
+  handleLeaveMeeting(
+    @MessageBody() data: { meetingCode: string } | string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const meetingCode = typeof data === "string" ? data : data?.meetingCode;
+    if (meetingCode) {
+      const room = `meeting:${meetingCode}`;
+      client.leave(room);
+      console.log(`[Socket] Client ${client.id} left meeting room: ${room}`);
+    }
+  }
+
+  /**
    * Cập nhật trạng thái cuộc họp mới cho tất cả người dùng trong kênh
    */
   notifyMeetingStatus(
@@ -47,5 +79,24 @@ export class MeetingsGateway {
     data: { isOngoing: boolean; meetingCode?: string },
   ) {
     this.server.to(channelId).emit("meeting_status_changed", data);
+  }
+
+  /**
+   * Broadcast các sự kiện bình chọn tới phòng meeting tương ứng
+   */
+  notifyPollCreated(meetingCode: string, poll: any) {
+    this.server.to(`meeting:${meetingCode}`).emit("poll_created", poll);
+  }
+
+  notifyPollVoted(meetingCode: string, poll: any) {
+    this.server.to(`meeting:${meetingCode}`).emit("poll_voted", poll);
+  }
+
+  notifyPollClosed(meetingCode: string, poll: any) {
+    this.server.to(`meeting:${meetingCode}`).emit("poll_closed", poll);
+  }
+
+  notifyPollDeleted(meetingCode: string, pollId: string) {
+    this.server.to(`meeting:${meetingCode}`).emit("poll_deleted", { pollId });
   }
 }

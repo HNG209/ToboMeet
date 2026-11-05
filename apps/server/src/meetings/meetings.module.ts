@@ -30,8 +30,10 @@ import { Attendance, AttendanceSchema } from "./schemas/attendance.schema";
 import { AttendanceService } from "./attendance.service";
 import { RecordingsController } from "./recordings.controller";
 import { RecordingsService } from "./recordings.service";
-
 import { WhiteboardService } from "./whiteboard.service";
+import { Poll, PollSchema } from "./schemas/poll.schema";
+import { PollsController } from "./polls.controller";
+import { PollsService } from "./polls.service";
 
 @Module({
   imports: [
@@ -42,6 +44,7 @@ import { WhiteboardService } from "./whiteboard.service";
       { name: RoomActivity.name, schema: RoomActivitySchema },
       { name: MeetingSession.name, schema: MeetingSessionSchema },
       { name: Attendance.name, schema: AttendanceSchema },
+      { name: Poll.name, schema: PollSchema },
     ]),
     BullModule.registerQueue({
       name: "meeting",
@@ -55,6 +58,7 @@ import { WhiteboardService } from "./whiteboard.service";
     MeetingsController,
     ChannelMeetingsController,
     RecordingsController,
+    PollsController,
   ],
   providers: [
     BreakoutRoomsService,
@@ -65,6 +69,7 @@ import { WhiteboardService } from "./whiteboard.service";
     RecordingsService,
     MeetingsGateway,
     MeetingProcessor,
+    PollsService,
   ],
   exports: [
     AttendanceService,
@@ -74,7 +79,7 @@ import { WhiteboardService } from "./whiteboard.service";
     RecordingsService,
     MeetingInviteService,
     MeetingsGateway,
+    PollsService,
   ],
 })
-export class MeetingsModule { }
-
+export class MeetingsModule {}

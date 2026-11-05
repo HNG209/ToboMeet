@@ -31,6 +31,7 @@ import {
   PenTool,
   Settings,
   Captions,
+  BarChart2,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -54,13 +55,15 @@ export default function CustomToolbar({
   meetingCode,
   activeTab,
   onToggleSidebar,
+  onCreatePoll,
   hasUnreadChat,
   isLiveCaptionEnabled,
   onToggleLiveCaption,
 }: {
   meetingCode: string;
-  activeTab: "chat" | "people" | null;
-  onToggleSidebar: (tab: "chat" | "people") => void;
+  activeTab: "chat" | "people" | "polls" | null;
+  onToggleSidebar: (tab: "chat" | "people" | "polls") => void;
+  onCreatePoll?: () => void;
   hasUnreadChat: boolean;
   isLiveCaptionEnabled?: boolean;
   onToggleLiveCaption?: () => void;
@@ -227,12 +230,12 @@ export default function CustomToolbar({
 
   const getBtnStyle = (
     isActive: boolean,
-    customActiveColor = "border-blue-500/40 bg-blue-500/15 text-blue-400",
+    customActiveColor = "text-blue-400",
   ) =>
-    `relative flex flex-col items-center justify-center min-w-[50px] sm:min-w-[58px] h-11 px-2 rounded-lg border transition-all cursor-pointer shadow-xs ${
+    `relative flex flex-col items-center justify-center min-w-[50px] sm:min-w-[58px] h-11 px-2 rounded-lg transition-all cursor-pointer ${
       isActive
-        ? customActiveColor
-        : "border-[#232328] bg-[#161619] text-slate-300 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
+        ? `${customActiveColor} hover:bg-white/5`
+        : "bg-transparent text-slate-300 hover:bg-white/5 hover:text-white"
     }`;
 
   return (
@@ -245,10 +248,10 @@ export default function CustomToolbar({
             onClick={toggleCam}
             disabled={isCamLoading}
             title={isCameraEnabled ? t("camera") : `${t("camera")} (Off)`}
-            className={`h-11 px-2.5 rounded-l-lg border border-[#232328] flex flex-col items-center justify-center transition-all cursor-pointer shadow-xs ${
+            className={`h-11 px-2.5 rounded-l-lg flex flex-col items-center justify-center transition-all cursor-pointer ${
               !isCameraEnabled
-                ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/15"
-                : "bg-[#161619] text-slate-300 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
+                ? "text-red-400 hover:bg-white/5"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
           >
             {isCamLoading ? (
@@ -268,11 +271,11 @@ export default function CustomToolbar({
               setIsMicMenuOpen(false);
             }}
             title={t("select_camera")}
-            className={`h-11 px-1.5 rounded-r-lg border-y border-r border-[#232328] -ml-px flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+            className={`h-11 px-1.5 rounded-r-lg flex items-center justify-center transition-all cursor-pointer ${
               !isCameraEnabled
-                ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
-                : "bg-[#161619] text-slate-400 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
-            } ${isCamMenuOpen ? "border-blue-500/50 text-white bg-[#1e1e22]" : ""}`}
+                ? "text-red-400 hover:bg-white/5"
+                : "text-slate-400 hover:bg-white/5 hover:text-white"
+            } ${isCamMenuOpen ? "text-white bg-white/10" : ""}`}
           >
             <ChevronUp
               size={13}
@@ -337,10 +340,10 @@ export default function CustomToolbar({
             onClick={toggleMic}
             disabled={isMicLoading}
             title={isMicrophoneEnabled ? t("mic") : `${t("mic")} (Muted)`}
-            className={`h-11 px-2.5 rounded-l-lg border border-[#232328] flex flex-col items-center justify-center transition-all cursor-pointer shadow-xs ${
+            className={`h-11 px-2.5 rounded-l-lg flex flex-col items-center justify-center transition-all cursor-pointer ${
               !isMicrophoneEnabled
-                ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/15"
-                : "bg-[#161619] text-slate-300 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
+                ? "text-red-400 hover:bg-white/5"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
             }`}
           >
             {isMicLoading ? (
@@ -360,11 +363,11 @@ export default function CustomToolbar({
               setIsCamMenuOpen(false);
             }}
             title={t("select_microphone")}
-            className={`h-11 px-1.5 rounded-r-lg border-y border-r border-[#232328] -ml-px flex items-center justify-center transition-all cursor-pointer shadow-xs ${
+            className={`h-11 px-1.5 rounded-r-lg flex items-center justify-center transition-all cursor-pointer ${
               !isMicrophoneEnabled
-                ? "bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20"
-                : "bg-[#161619] text-slate-400 hover:bg-[#1e1e22] hover:border-[#333338] hover:text-white"
-            } ${isMicMenuOpen ? "border-blue-500/50 text-white bg-[#1e1e22]" : ""}`}
+                ? "text-red-400 hover:bg-white/5"
+                : "text-slate-400 hover:bg-white/5 hover:text-white"
+            } ${isMicMenuOpen ? "text-white bg-white/10" : ""}`}
           >
             <ChevronUp
               size={13}
@@ -466,11 +469,27 @@ export default function CustomToolbar({
         </button>
 
         <button
+          onClick={() => onToggleSidebar("polls")}
+          className={getBtnStyle(activeTab === "polls")}
+          title={t("polls")}
+        >
+          <div className="relative flex items-center justify-center">
+            <BarChart2
+              size={21}
+              className={activeTab === "polls" ? "text-brand-400" : ""}
+            />
+          </div>
+          <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
+            {t("polls")}
+          </span>
+        </button>
+
+        <button
           onClick={toggleScreenShare}
           disabled={isSomeoneElseSharing || isScreenShareLoading}
           className={`hidden md:flex ${getBtnStyle(
             isScreenShareEnabled,
-            "border-emerald-500/40 bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/20",
+            "text-emerald-400",
           )} ${isSomeoneElseSharing || isScreenShareLoading ? "opacity-40 cursor-not-allowed" : ""}`}
         >
           {isScreenShareLoading ? (
@@ -498,10 +517,10 @@ export default function CustomToolbar({
             className={getBtnStyle(
               isRecordMenuOpen || isEffectiveCloudRecording || isLocalRecording,
               isEffectiveCloudRecording
-                ? "border-red-500/40 bg-red-500/15 text-red-400 hover:bg-red-500/20"
+                ? "text-red-400"
                 : isLocalRecording
-                  ? "border-amber-500/40 bg-amber-500/15 text-amber-400 hover:bg-amber-500/20"
-                  : "border-blue-500/40 bg-blue-500/15 text-blue-400",
+                  ? "text-amber-400"
+                  : "text-blue-400",
             )}
             title={t("record")}
           >
@@ -747,7 +766,7 @@ export default function CustomToolbar({
           onClick={toggleHandRaise}
           className={getBtnStyle(
             isLocalHandRaised,
-            "border-amber-500/40 bg-amber-500/15 text-amber-400 hover:bg-amber-500/20",
+            "text-amber-400",
           )}
         >
           <Hand
@@ -765,7 +784,7 @@ export default function CustomToolbar({
             onClick={() => setIsJoinBreakoutModalOpen(true)}
             className={getBtnStyle(
               false,
-              "border-blue-500/40 bg-blue-500/15 text-blue-400",
+              "text-blue-400",
             )}
           >
             <Network
@@ -820,6 +839,18 @@ export default function CustomToolbar({
                 >
                   <UserPlus size={16} />
                   <span>{t("invite_participants")}</span>
+                </button>
+
+                {/* MỞ BÌNH CHỌN CHO TẤT CẢ MỌI NGƯỜI */}
+                <button
+                  onClick={() => {
+                    setIsMoreMenuOpen(false);
+                    onToggleSidebar("polls");
+                  }}
+                  className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center gap-2.5 transition-colors cursor-pointer"
+                >
+                  <BarChart2 size={16} />
+                  <span>{t("open_polls")}</span>
                 </button>
 
                 {/* THAM GIA HOẶC ĐÓNG WHITEBOARD */}
@@ -894,6 +925,21 @@ export default function CustomToolbar({
                   <>
                     <div className="px-3 py-1.5 mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-y border-[#232328] bg-[#232328]/50">
                       {t("admin_tools")}
+                    </div>
+
+                    {/* TẠO BÌNH CHỌN TRONG CUỘC HỌP */}
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsMoreMenuOpen(false);
+                        onCreatePoll?.();
+                      }}
+                      className="w-full text-left px-3 py-2.5 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <BarChart2 size={16} className="text-blue-400" />
+                        <span>{t("create_poll")}</span>
+                      </div>
                     </div>
 
                     {/* MENU CHIA NHÓM THẢO LUẬN TỰ ĐỘNG CHUYỂN ĐỔI */}
@@ -1098,17 +1144,17 @@ export default function CustomToolbar({
           }}
           disabled={isLeavingBreakout}
           title={isInBreakoutRoom ? t("leave_short") : t("leave_meeting")}
-          className="group h-11 px-3 sm:px-3.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed"
+          className="group h-10 px-3 sm:px-4 rounded-xl bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-medium transition-colors duration-150 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLeavingBreakout ? (
-            <Loader2 size={19} className="animate-spin text-red-500" />
+            <Loader2 size={18} className="animate-spin text-white" />
           ) : (
             <LogOut
-              size={19}
-              className="transition-transform duration-200 group-hover:translate-x-0.5"
+              size={18}
+              className="inline-block sm:hidden transition-transform duration-200 group-hover:translate-x-0.5 text-white"
             />
           )}
-          <span className="hidden lg:inline text-xs font-semibold">
+          <span className="hidden sm:inline text-xs font-semibold text-white">
             {isInBreakoutRoom ? t("leave_short") : t("leave_meeting")}
           </span>
         </button>

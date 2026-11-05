@@ -124,6 +124,21 @@ export const ErrorCode: Record<string, ErrorDetail> = {
     message: "Phòng đã đạt số lượng tối đa (500 người)",
     statusCode: 400,
   },
+  POLL_NOT_FOUND: {
+    code: 4043,
+    message: "Cuộc bình chọn không tồn tại",
+    statusCode: 404,
+  },
+  POLL_CLOSED: {
+    code: 40025,
+    message: "Cuộc bình chọn đã kết thúc",
+    statusCode: 400,
+  },
+  POLL_INVALID_OPTIONS: {
+    code: 40026,
+    message: "Lựa chọn không hợp lệ hoặc vượt quá giới hạn cho phép",
+    statusCode: 400,
+  },
   // Lỗi hệ thống (50x), không public lỗi chi tiết cho người dùng
   SERVER_ERROR: {
     code: 5011,
@@ -793,3 +808,41 @@ export interface DirectMessageResponse {
   updatedAt: string;
 }
 
+
+export interface PollVoter {
+  userId: string;
+  name: string;
+  avatar?: string;
+  votedAt?: string | Date;
+}
+
+export interface PollOption {
+  id: string;
+  text: string;
+  voters: PollVoter[];
+}
+
+export interface PollResponse {
+  _id: string;
+  sessionId: string;
+  meetingCode: string;
+  question: string;
+  options: PollOption[];
+  allowMultiple: boolean;
+  creatorId: string;
+  creatorName: string;
+  creatorAvatar?: string;
+  status: "active" | "closed";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreatePollRequest {
+  question: string;
+  options: string[];
+  allowMultiple?: boolean;
+}
+
+export interface VotePollRequest {
+  optionIds: string[];
+}

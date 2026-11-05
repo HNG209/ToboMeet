@@ -23,6 +23,7 @@ export const baseApi = createApi({
     "Submissions",
     "DirectConversation",
     "DirectMessage",
+    "Polls",
   ],
   endpoints: () => ({}),
 });

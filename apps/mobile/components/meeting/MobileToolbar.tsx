@@ -29,6 +29,8 @@ export default function MobileToolbar({
   onOpenWhiteboard,
   isLiveCaptionEnabled,
   onToggleLiveCaption,
+  onOpenPolls,
+  onOpenCreatePoll,
 }: {
   initialFacingMode?: "user" | "environment";
   meetingCode: string;
@@ -37,6 +39,8 @@ export default function MobileToolbar({
   onOpenWhiteboard?: () => void;
   isLiveCaptionEnabled?: boolean;
   onToggleLiveCaption?: () => void;
+  onOpenPolls?: () => void;
+  onOpenCreatePoll?: () => void;
 }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -328,6 +332,17 @@ export default function MobileToolbar({
             </Text>
           </TouchableOpacity>
 
+          {/* Nút Bình chọn (Polls) */}
+          <TouchableOpacity
+            onPress={onOpenPolls}
+            className="min-w-[60px] h-14 justify-center items-center"
+          >
+            <Feather name="bar-chart-2" size={20} color="#60a5fa" />
+            <Text className="text-blue-400 text-[10px] mt-1 font-medium">
+              {t("meeting.toolbar.polls", { defaultValue: "Bình chọn" })}
+            </Text>
+          </TouchableOpacity>
+
           {/* Nút Quản lý/Tùy chọn */}
           <TouchableOpacity
             onPress={() => setShowAdminMenu(true)}
@@ -459,6 +474,25 @@ export default function MobileToolbar({
               <Feather name="external-link" size={16} color="#64748b" />
             </TouchableOpacity>
 
+            {/* Tùy chọn Bình chọn (Polls) */}
+            <TouchableOpacity
+              onPress={() => {
+                setShowAdminMenu(false);
+                setTimeout(() => onOpenPolls?.(), 200);
+              }}
+              className="flex-row items-center justify-between py-3.5 px-3 bg-[#111113] rounded-lg border border-[#232328] mb-2"
+            >
+              <View className="flex-row items-center">
+                <Feather name="bar-chart-2" size={20} color="#60a5fa" />
+                <Text className="ml-3 text-sm font-medium text-gray-200">
+                  {t("meeting.toolbar.polls", {
+                    defaultValue: "Bình chọn",
+                  })}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={16} color="#64748b" />
+            </TouchableOpacity>
+
             {/* CÔNG CỤ QUẢN TRỊ (CHỈ HOST MỚI THẤY) */}
             {isHost && (
               <>
@@ -505,6 +539,25 @@ export default function MobileToolbar({
                     </View>
                   </TouchableOpacity>
                 )}
+
+                {/* Tạo cuộc bình chọn */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowAdminMenu(false);
+                    setTimeout(() => onOpenCreatePoll?.(), 200);
+                  }}
+                  className="flex-row items-center justify-between py-3.5 px-3 bg-[#111] rounded-lg border border-[#333] mb-2"
+                >
+                  <View className="flex-row items-center">
+                    <Feather name="bar-chart-2" size={20} color="#60a5fa" />
+                    <Text className="text-gray-300 ml-3 text-sm font-medium">
+                      {t("meeting.toolbar.create_poll", {
+                        defaultValue: "Tạo bình chọn",
+                      })}
+                    </Text>
+                  </View>
+                  <Feather name="plus" size={18} color="#60a5fa" />
+                </TouchableOpacity>
 
                 {/* Switch Bật/Tắt Chat */}
                 <TouchableOpacity
