@@ -438,7 +438,16 @@
     "channel_created_success": "Channel created successfully",
     "toast_add_member_to_channel_success": "Successfully added member to the channel.",
     "toast_remove_from_private_channel_success": "Successfully removed member from the private channel.",
-    "toast_remove_from_private_channel_warning": "You no longer have access to this private channel."
+    "toast_remove_from_private_channel_warning": "You no longer have access to this private channel.",
+    "session_polls_title": "Polls",
+    "session_polls_count": "{{count}} polls",
+    "session_polls_empty": "No polls recorded in this meeting session.",
+    "session_polls_single_choice": "Single Choice",
+    "session_polls_multiple_choice": "Multiple Choice",
+    "session_polls_view_details": "View Details",
+    "session_polls_votes_count": "{{count}} votes",
+    "session_polls_created_by": "Created by",
+    "session_polls_loading": "Loading polls..."
   },
   "news_feed": {
     "new_post_title": "Create Announcement",
@@ -812,7 +821,9 @@
       "confirm_delete_title": "Delete this poll?",
       "confirm_delete_desc": "This will permanently remove the poll from the meeting.",
       "delete_confirm_action": "Delete",
-      "close": "Close"
+      "close": "Close",
+      "retract_vote": "Retract vote",
+      "retract_vote_success": "Vote retracted successfully!"
     }
   },
   "notification": {

@@ -180,16 +180,14 @@ export class PollsService {
       throw new AppException(ErrorCode.MEETING_NOT_STARTED_OR_ENDED);
     }
 
-    if (!dto.optionIds || dto.optionIds.length === 0) {
-      throw new AppException(ErrorCode.POLL_INVALID_OPTIONS);
-    }
+    const optionIds = dto.optionIds || [];
 
-    if (!poll.allowMultiple && dto.optionIds.length > 1) {
+    if (!poll.allowMultiple && optionIds.length > 1) {
       throw new AppException(ErrorCode.POLL_INVALID_OPTIONS);
     }
 
     const validOptionIds = new Set(poll.options.map((o) => o.id));
-    for (const optId of dto.optionIds) {
+    for (const optId of optionIds) {
       if (!validOptionIds.has(optId)) {
         throw new AppException(ErrorCode.POLL_INVALID_OPTIONS);
       }
@@ -209,7 +207,7 @@ export class PollsService {
     }
 
     // Thêm người dùng vào các lựa chọn đã chọn
-    for (const optId of dto.optionIds) {
+    for (const optId of optionIds) {
       const targetOption = poll.options.find((o) => o.id === optId);
       if (targetOption) {
         targetOption.voters.push({

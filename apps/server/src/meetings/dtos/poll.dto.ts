@@ -26,7 +26,6 @@ export class CreatePollDto {
 
 export class VotePollDto {
   @IsArray({ message: "Danh sách phương án bình chọn phải là một mảng" })
-  @ArrayMinSize(1, { message: "Phải chọn ít nhất 1 phương án" })
   @IsString({ each: true })
   optionIds: string[];
 }

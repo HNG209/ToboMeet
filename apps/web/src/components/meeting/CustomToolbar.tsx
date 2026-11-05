@@ -487,25 +487,32 @@ export default function CustomToolbar({
         <button
           onClick={toggleScreenShare}
           disabled={isSomeoneElseSharing || isScreenShareLoading}
-          className={`hidden md:flex ${getBtnStyle(
-            isScreenShareEnabled,
-            "text-emerald-400",
-          )} ${isSomeoneElseSharing || isScreenShareLoading ? "opacity-40 cursor-not-allowed" : ""}`}
+          title={
+            isScreenShareEnabled
+              ? t("stop_share")
+              : isSomeoneElseSharing
+              ? t("screen_share_busy")
+              : t("share_screen")
+          }
+          className={`hidden md:flex relative flex-col items-center justify-center min-w-[50px] sm:min-w-[58px] h-11 px-2 rounded-lg transition-all cursor-pointer ${
+            isScreenShareEnabled
+              ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+              : "bg-transparent text-slate-300 hover:bg-white/5 hover:text-white"
+          } ${isSomeoneElseSharing || isScreenShareLoading ? "opacity-40 cursor-not-allowed" : ""}`}
         >
           {isScreenShareLoading ? (
-            <Loader2 size={21} className="animate-spin text-emerald-400" />
+            <Loader2
+              size={21}
+              className={`animate-spin ${isScreenShareEnabled ? "text-white" : "text-emerald-400"}`}
+            />
           ) : (
             <MonitorUp
               size={21}
-              className={
-                !isScreenShareEnabled && !isSomeoneElseSharing
-                  ? "text-emerald-400"
-                  : ""
-              }
+              className={isScreenShareEnabled ? "text-white" : "text-slate-300"}
             />
           )}
           <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
-            {t("share_screen")}
+            {isScreenShareEnabled ? t("stop_share") : t("share_screen")}
           </span>
         </button>
 

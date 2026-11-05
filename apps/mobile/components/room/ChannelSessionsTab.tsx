@@ -18,9 +18,12 @@ import {
 import { useFetchMeetingSession } from "../../hooks/useFetchMeetingSession";
 import {
   MeetingSessionResponse,
+  PollResponse,
   SessionAttendanceItem,
   SessionRecording,
 } from "@tobomeet/shared/types";
+import { useGetPollsQuery } from "../../lib/redux/api/pollsApi";
+import MobilePollDetailsModal from "../meeting/MobilePollDetailsModal";
 import { toast } from "../../lib/toast";
 import HlsRecordingPlayer from "./HlsRecordingPlayer";
 
@@ -261,22 +264,7 @@ export default function ChannelSessionsTab({
                   </View>
                 </View>
 
-                {/* Status Badge */}
-                {isOngoing ? (
-                  <View className="px-2 py-0.5 bg-emerald-100 rounded-full border border-emerald-300 flex-row items-center gap-1">
-                    <View className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                    <Text className="text-[10px] font-bold text-emerald-800">
-                      {t("room.session_live")}
-                    </Text>
-                  </View>
-                ) : (
-                  <View className="px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200 flex-row items-center gap-1">
-                    <Feather name="check" size={10} color="#64748B" />
-                    <Text className="text-[10px] font-semibold text-slate-600">
-                      {t("room.session_ended")}
-                    </Text>
-                  </View>
-                )}
+                
               </View>
 
               {/* Timestamp and info details */}
@@ -399,6 +387,20 @@ function SessionDetailView({
 }: SessionDetailViewProps) {
   const isOngoing = session.status === "ongoing";
   const [activeRecording, setActiveRecording] = useState<SessionRecording | null>(null);
+  const [selectedDetailPoll, setSelectedDetailPoll] = useState<PollResponse | null>(null);
+
+  const {
+    data: sessionPolls = [],
+    isLoading: isPollsLoading,
+    refetch: refetchPolls,
+    isFetching: isPollsFetching,
+  } = useGetPollsQuery(
+    {
+      meetingCode: session.meetingCode,
+      sessionId: session._id,
+    },
+    { skip: !session.meetingCode || !session._id },
+  );
 
   const recordings = session.recordings || [];
 
@@ -458,19 +460,6 @@ function SessionDetailView({
               <Text className="text-base font-bold text-slate-900">
                 {t("room.session_detail_title")}
               </Text>
-              {isOngoing ? (
-                <View className="px-2 py-0.5 bg-emerald-100 rounded-full border border-emerald-300">
-                  <Text className="text-[10px] font-bold text-emerald-800">
-                    {t("room.session_live")}
-                  </Text>
-                </View>
-              ) : (
-                <View className="px-2 py-0.5 bg-slate-100 rounded-full border border-slate-200">
-                  <Text className="text-[10px] font-semibold text-slate-600">
-                    {t("room.session_ended")}
-                  </Text>
-                </View>
-              )}
             </View>
             <Text className="text-[11px] text-slate-400 font-mono mt-0.5">
               ID: {session._id.slice(-8).toUpperCase()} • {session.meetingCode}
@@ -478,17 +467,7 @@ function SessionDetailView({
           </View>
         </View>
 
-        {isOngoing && (
-          <TouchableOpacity
-            onPress={() => onJoinMeeting(session.meetingCode)}
-            className="px-4.5 py-2.5 bg-emerald-600 active:bg-emerald-700 rounded-full flex-row items-center gap-2 shadow-sm shadow-emerald-600/30 active:scale-95"
-          >
-            <Feather name="play-circle" size={15} color="#ffffff" />
-            <Text className="text-white font-bold text-[13px]">
-              {t("room.session_join_now")}
-            </Text>
-          </TouchableOpacity>
-        )}
+
       </View>
 
       <ScrollView contentContainerStyle={{ padding: 16 }}>
@@ -682,6 +661,119 @@ function SessionDetailView({
           </View>
         </View>
 
+        {/* Cuộc bình chọn trong phiên (Polls Section) */}
+        <View className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden mb-4">
+          <View className="px-4 py-3 border-b border-slate-100 flex-row items-center justify-between">
+            <View className="flex-row items-center gap-2">
+              <Feather name="bar-chart-2" size={16} color="#0052FF" />
+              <Text className="text-xs font-bold text-slate-900">
+                {t("room.session_polls_title")}
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-2.5">
+              <Text className="text-[11px] text-slate-500 font-semibold">
+                {t("room.session_polls_count", { count: sessionPolls.length })}
+              </Text>
+              <TouchableOpacity
+                onPress={() => refetchPolls()}
+                disabled={isPollsFetching}
+                className="p-1 rounded-lg bg-slate-100 active:bg-slate-200"
+              >
+                {isPollsFetching ? (
+                  <ActivityIndicator size={12} color="#0052FF" />
+                ) : (
+                  <Feather name="rotate-cw" size={12} color="#475569" />
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View className="p-3">
+            {isPollsLoading ? (
+              <View className="py-6 items-center justify-center">
+                <ActivityIndicator size="small" color="#0052FF" />
+                <Text className="text-xs text-slate-400 mt-2">
+                  {t("room.session_polls_loading", { defaultValue: "Đang tải bình chọn..." })}
+                </Text>
+              </View>
+            ) : sessionPolls.length === 0 ? (
+              <View className="py-6 items-center justify-center">
+                <Feather name="bar-chart" size={28} color="#CBD5E1" />
+                <Text className="text-xs font-medium text-slate-400 mt-2 text-center">
+                  {t("room.session_polls_empty")}
+                </Text>
+              </View>
+            ) : (
+              <View className="space-y-3">
+                {sessionPolls.map((poll: PollResponse) => {
+                  const totalVotes = poll.options.reduce(
+                    (sum, opt) => sum + (opt.voters?.length || 0),
+                    0,
+                  );
+
+                  return (
+                    <View
+                      key={poll._id}
+                      className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70"
+                    >
+                      <View className="mb-2">
+                        <Text className="text-xs font-bold text-slate-900 leading-snug">
+                          {poll.question}
+                        </Text>
+                        <Text className="text-[10px] text-slate-500 mt-1">
+                          {t("room.session_polls_created_by")}: <Text className="font-semibold text-slate-700">{poll.creatorName}</Text>
+                        </Text>
+                      </View>
+
+                      {/* Options Progress List */}
+                      <View className="space-y-2 pt-2 border-t border-slate-200/70">
+                        {poll.options.map((opt) => {
+                          const count = opt.voters?.length || 0;
+                          const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+                          return (
+                            <View key={opt.id} className="space-y-1">
+                              <View className="flex-row items-center justify-between">
+                                <Text className="text-[11px] text-slate-700 flex-1 pr-2" numberOfLines={1}>
+                                  {opt.text}
+                                </Text>
+                                <Text className="text-[10px] text-slate-500 font-mono">
+                                  {pct}% ({count})
+                                </Text>
+                              </View>
+                              <View className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                <View
+                                  className="h-full bg-blue-600 rounded-full"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+
+                      {/* Footer */}
+                      <View className="pt-2.5 mt-2.5 border-t border-slate-200/60 flex-row items-center justify-between">
+                        <Text className="text-[10px] text-slate-500 font-medium">
+                          {t("room.session_polls_votes_count", { count: totalVotes })}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() => setSelectedDetailPoll(poll)}
+                          className="flex-row items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 active:bg-blue-50"
+                        >
+                          <Feather name="eye" size={12} color="#0052FF" />
+                          <Text className="text-[11px] font-semibold text-blue-600">
+                            {t("room.session_polls_view_details")}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        </View>
+
         {/* Danh sách người tham gia / Điểm danh */}
         <View className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden mb-6">
           <View className="px-4 py-3 border-b border-slate-100 flex-row items-center justify-between">
@@ -774,6 +866,14 @@ function SessionDetailView({
           )}
         </View>
       </ScrollView>
+
+      {/* Modal xem chi tiết bình chọn */}
+      <MobilePollDetailsModal
+        visible={!!selectedDetailPoll}
+        onClose={() => setSelectedDetailPoll(null)}
+        poll={selectedDetailPoll}
+        theme="light"
+      />
     </View>
   );
 }

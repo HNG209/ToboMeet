@@ -514,7 +514,7 @@ export default function RoomDetailScreen() {
                 <TouchableOpacity
                   onPress={handleStartOrJoinMeeting}
                   disabled={isJoining}
-                  className="bg-emerald-600 px-4 py-2.5 rounded-full flex-row items-center gap-1.5 shadow-md shadow-emerald-600/30 active:scale-95 active:bg-emerald-700"
+                  className="bg-[#0052FF] px-4 py-2.5 rounded-full flex-row items-center gap-1.5 shadow-md shadow-blue-600/30 active:scale-95 active:bg-blue-700"
                 >
                   {isJoining ? (
                     <ActivityIndicator size="small" color="#ffffff" />
@@ -530,14 +530,14 @@ export default function RoomDetailScreen() {
               <TouchableOpacity
                 onPress={handleStartOrJoinMeeting}
                 disabled={isJoining}
-                className="bg-[#0052FF] px-4 py-2.5 rounded-full flex-row items-center gap-1.5 shadow-md shadow-blue-600/30 active:scale-95 active:bg-blue-700"
+                className="border-2 border-[#0052FF] bg-transparent px-4 py-2 rounded-full flex-row items-center gap-1.5 active:scale-95 active:bg-blue-50"
               >
                 {isJoining ? (
-                  <ActivityIndicator size="small" color="#ffffff" />
+                  <ActivityIndicator size="small" color="#0052FF" />
                 ) : (
-                  <Feather name="video" size={14} color="#ffffff" />
+                  <Feather name="video" size={14} color="#0052FF" />
                 )}
-                <Text className="text-white font-bold text-xs tracking-wide">
+                <Text className="text-[#0052FF] font-bold text-xs tracking-wide">
                   {t("room.start_meeting")}
                 </Text>
               </TouchableOpacity>

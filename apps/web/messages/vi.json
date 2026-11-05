@@ -1785,7 +1785,8 @@
       "live_caption_desc": "Đang lắng nghe âm thanh cuộc họp...",
       "polls": "Bình chọn",
       "open_polls": "Xem bình chọn",
-      "create_poll": "Tạo bình chọn"
+      "create_poll": "Tạo bình chọn",
+      "stop_share": "Dừng"
     },
     "poll": {
       "title": "Bình chọn",
@@ -1840,7 +1841,9 @@
       "confirm_delete_title": "Xác nhận xóa cuộc bình chọn?",
       "confirm_delete_desc": "Thao tác này sẽ xóa vĩnh viễn cuộc bình chọn khỏi phòng họp.",
       "delete_confirm_action": "Xóa",
-      "close": "Đóng"
+      "close": "Đóng",
+      "retract_vote": "Hủy bình chọn",
+      "retract_vote_success": "Đã hủy lựa chọn bình chọn!"
     },
     "whiteboard": {
       "title": "Bảng vẽ cuộc họp",

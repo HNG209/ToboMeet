@@ -90,10 +90,7 @@ export default function ChannelMeetingButton({
             {ensuringTarget ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
-              <div className="relative flex items-center justify-center">
-                <span className="absolute w-2.5 h-2.5 rounded-full bg-white/40 animate-ping" />
-                <Video size={16} className="relative transition-transform group-hover:scale-110" />
-              </div>
+              <Video size={16} className="transition-transform group-hover:scale-110" />
             )}
             <span>{t("btn_join")}</span>
             <ChevronDown
@@ -249,10 +246,7 @@ export default function ChannelMeetingButton({
             {ensuringTarget ? (
               <Loader2 size={16} className="animate-spin" />
             ) : (
-              <div className="relative flex items-center justify-center">
-                <span className="absolute w-2.5 h-2.5 rounded-full bg-white/40 animate-ping" />
-                <Video size={16} className="relative transition-transform group-hover:scale-110" />
-              </div>
+              <Video size={16} className="transition-transform group-hover:scale-110" />
             )}
             <span>{t("btn_join")}</span>
             <ChevronDown size={14} className={`transition-transform duration-200 ${isJoinTooltipOpen ? "rotate-180" : ""}`} />

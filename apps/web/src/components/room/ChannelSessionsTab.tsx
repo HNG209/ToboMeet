@@ -292,18 +292,6 @@ export default function ChannelSessionsTab({
                           {t("session_item_title", { index: sessionIndex })}
                         </span>
 
-                        {isOngoing ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300 animate-pulse">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                            {t("session_live")}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-600 rounded-full border border-slate-200">
-                            <CheckCircle2 size={12} className="text-slate-500" />
-                            {t("session_ended")}
-                          </span>
-                        )}
-
                         <span className="text-[11px] text-slate-400 font-mono">
                           ID: {session._id.slice(-6).toUpperCase()}
                         </span>
@@ -571,17 +559,6 @@ function SessionDetailView({
               <h2 className="text-base font-bold text-slate-900">
                 {t("session_detail_title")}
               </h2>
-              {isOngoing ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300 animate-pulse">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
-                  {t("session_live")}
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-600 rounded-full border border-slate-200">
-                  <CheckCircle2 size={12} className="text-slate-500" />
-                  {t("session_ended")}
-                </span>
-              )}
             </div>
             <p className="text-xs text-slate-500 mt-0.5 font-mono">
               Session ID: {session._id} • Meeting Code: {session.meetingCode}

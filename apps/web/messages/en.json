@@ -1800,7 +1800,8 @@
       "live_caption_desc": "Listening to meeting audio...",
       "polls": "Polls",
       "open_polls": "View Polls",
-      "create_poll": "Create Poll"
+      "create_poll": "Create Poll",
+      "stop_share": "Stop"
     },
     "poll": {
       "title": "Polls",
@@ -1855,7 +1856,9 @@
       "confirm_delete_title": "Delete this poll?",
       "confirm_delete_desc": "This will permanently remove the poll from the meeting.",
       "delete_confirm_action": "Delete",
-      "close": "Close"
+      "close": "Close",
+      "retract_vote": "Retract vote",
+      "retract_vote_success": "Vote retracted successfully!"
     },
     "whiteboard": {
       "title": "Meeting Whiteboard",

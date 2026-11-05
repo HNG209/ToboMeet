@@ -92,8 +92,10 @@ export default function MobilePollsModal({
   };
 
   const handleConfirmVote = async (poll: PollResponse) => {
-    const selected = selectedOptionsMap[poll._id] ?? getUserVotedOptionIds(poll);
-    if (!selected || selected.length === 0) {
+    const userVotedIds = getUserVotedOptionIds(poll);
+    const hasUserVoted = userVotedIds.length > 0;
+    const selected = selectedOptionsMap[poll._id] ?? userVotedIds;
+    if (!hasUserVoted && (!selected || selected.length === 0)) {
       toast.error(
         t("meeting.poll.select_at_least_one", {
           defaultValue: "Vui lòng chọn ít nhất 1 phương án trước khi xác nhận",
@@ -111,9 +113,13 @@ export default function MobilePollsModal({
       }).unwrap();
 
       toast.success(
-        t("meeting.poll.vote_success", {
-          defaultValue: "Đã ghi nhận bình chọn của bạn!",
-        }),
+        selected.length === 0
+          ? t("meeting.poll.retract_vote_success", {
+              defaultValue: "Đã hủy lựa chọn bình chọn!",
+            })
+          : t("meeting.poll.vote_success", {
+              defaultValue: "Đã ghi nhận bình chọn của bạn!",
+            }),
       );
     } catch (err: any) {
       console.error("Vote poll failed:", err);
@@ -206,7 +212,7 @@ export default function MobilePollsModal({
           <View
             style={{
               height: "85%",
-              paddingBottom: Math.max(insets.bottom, 16),
+              paddingBottom: Math.max(insets.bottom, 20) + 12,
             }}
             className="bg-[#121215] rounded-t-3xl border-t border-[#232328] overflow-hidden flex-col"
           >
@@ -319,7 +325,7 @@ export default function MobilePollsModal({
             {/* List Polls */}
             <ScrollView
               className="flex-1 p-4"
-              contentContainerStyle={{ paddingBottom: 24 }}
+              contentContainerStyle={{ paddingBottom: 36 }}
               showsVerticalScrollIndicator={false}
             >
               {isLoading ? (
@@ -544,7 +550,9 @@ export default function MobilePollsModal({
                               <Feather name="check-circle" size={15} color="#ffffff" />
                             )}
                             <Text className="text-white text-xs font-bold">
-                              {hasUserVoted
+                              {selectedIds.length === 0 && hasUserVoted
+                                ? t("meeting.poll.retract_vote", { defaultValue: "Hủy bình chọn" })
+                                : hasUserVoted
                                 ? t("meeting.poll.update_vote", { defaultValue: "Cập nhật bình chọn" })
                                 : t("meeting.poll.confirm_vote", { defaultValue: "Xác nhận bình chọn" })}
                             </Text>

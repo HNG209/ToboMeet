@@ -436,7 +436,16 @@
     "channel_created_success": "Tạo kênh thành công",
     "toast_add_member_to_channel_success": "Đã thêm thành viên vào kênh thành công.",
     "toast_remove_from_private_channel_success": "Đã xóa khỏi Kênh riêng tư thành công.",
-    "toast_remove_from_private_channel_warning": "Bạn không còn quyền truy cập kênh riêng tư này."
+    "toast_remove_from_private_channel_warning": "Bạn không còn quyền truy cập kênh riêng tư này.",
+    "session_polls_title": "Cuộc bình chọn",
+    "session_polls_count": "{{count}} bình chọn",
+    "session_polls_empty": "Chưa có cuộc bình chọn nào trong phiên họp này.",
+    "session_polls_single_choice": "Chọn 1",
+    "session_polls_multiple_choice": "Chọn nhiều",
+    "session_polls_view_details": "Xem chi tiết",
+    "session_polls_votes_count": "{{count}} lượt bình chọn",
+    "session_polls_created_by": "Tạo bởi",
+    "session_polls_loading": "Đang tải bình chọn..."
   },
   "news_feed": {
     "new_post_title": "Tạo thông báo mới",
@@ -813,7 +822,9 @@
       "confirm_delete_title": "Xác nhận xóa cuộc bình chọn?",
       "confirm_delete_desc": "Thao tác này sẽ xóa vĩnh viễn cuộc bình chọn khỏi phòng họp.",
       "delete_confirm_action": "Xóa",
-      "close": "Đóng"
+      "close": "Đóng",
+      "retract_vote": "Hủy bình chọn",
+      "retract_vote_success": "Đã hủy lựa chọn bình chọn!"
     }
   },
   "notification": {

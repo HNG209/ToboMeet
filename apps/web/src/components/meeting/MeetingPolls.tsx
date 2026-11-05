@@ -91,7 +91,7 @@ export default function MeetingPolls({
         nextSelection = [...currentSelection, optionId];
       }
     } else {
-      nextSelection = [optionId];
+      nextSelection = currentSelection.includes(optionId) ? [] : [optionId];
     }
 
     setSelectedOptionsMap((prev) => ({
@@ -102,13 +102,15 @@ export default function MeetingPolls({
 
   // Submit confirmation vote
   const handleConfirmVote = async (poll: PollResponse) => {
-    const selected =
-      selectedOptionsMap[poll._id] ??
-      poll.options
-        .filter((o) => o.voters.some((v) => v.userId === currentUserId))
-        .map((o) => o.id);
+    const userVotedOptions = poll.options
+      .filter((o) => o.voters.some((v) => v.userId === currentUserId))
+      .map((o) => o.id);
+    const hasUserVoted = userVotedOptions.length > 0;
 
-    if (selected.length === 0) {
+    const selected =
+      selectedOptionsMap[poll._id] ?? userVotedOptions;
+
+    if (!hasUserVoted && selected.length === 0) {
       toast.error(t("select_at_least_one"));
       return;
     }
@@ -120,7 +122,11 @@ export default function MeetingPolls({
         pollId: poll._id,
         optionIds: selected,
       }).unwrap();
-      toast.success(t("vote_success"));
+      if (selected.length === 0) {
+        toast.success(t("retract_vote_success"));
+      } else {
+        toast.success(t("vote_success"));
+      }
     } catch (err: any) {
       console.error("Vote failed:", err);
       toast.error(err?.data?.message || t("create_failed"));
@@ -495,8 +501,9 @@ export default function MeetingPolls({
                       type="button"
                       onClick={() => handleConfirmVote(poll)}
                       disabled={
-                        selectedForThisPoll.length === 0 ||
+                        (!hasUserVoted && selectedForThisPoll.length === 0) ||
                         (!isSelectionChanged && hasUserVoted) ||
+                        (!isSelectionChanged && !hasUserVoted) ||
                         votingPollId === poll._id
                       }
                       className="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:bg-[#232328] disabled:text-slate-500 disabled:border-transparent text-white text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer disabled:cursor-not-allowed shrink-0"
@@ -510,7 +517,9 @@ export default function MeetingPolls({
                         <>
                           <Check size={13} />
                           <span>
-                            {hasUserVoted
+                            {selectedForThisPoll.length === 0 && hasUserVoted
+                              ? t("retract_vote")
+                              : hasUserVoted
                               ? t("update_vote")
                               : t("confirm_vote")}
                           </span>

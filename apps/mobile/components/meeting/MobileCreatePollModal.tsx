@@ -145,7 +145,7 @@ export default function MobileCreatePollModal({
         <View
           style={{
             height: "85%",
-            paddingBottom: Math.max(insets.bottom, 16),
+            paddingBottom: Math.max(insets.bottom, 20) + 12,
           }}
           className="bg-[#161619] rounded-t-3xl border-t border-[#232328] overflow-hidden flex-col"
         >
