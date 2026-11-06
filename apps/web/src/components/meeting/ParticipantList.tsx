@@ -414,9 +414,7 @@ export default function ParticipantList({
               {/* Header */}
               <div className="px-5 py-3.5 border-b border-[#232328] flex items-center justify-between bg-[#161619]">
                 <div className="flex items-center gap-2 text-white">
-                  <div className="p-1.5 rounded-lg bg-blue-600/10 text-blue-400 border border-blue-500/20">
-                    <Edit2 size={15} />
-                  </div>
+                  <Edit2 size={16} className="text-blue-500 shrink-0" />
                   <h3 className="text-sm font-bold tracking-tight text-white">
                     {t("rename_display_name")}
                   </h3>

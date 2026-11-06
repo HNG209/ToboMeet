@@ -6,6 +6,7 @@ import {
   Body,
 } from "@nestjs/common";
 import * as path from "path";
+import { ThrottlerGuard, Throttle } from "nestjs-advanced-rate-limiter";
 import { SupabaseGuard } from "../core/guards/supabase.guard";
 import { UploadsService } from "./uploads.service";
 
@@ -15,6 +16,8 @@ export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
   @Post("report-evidence/signed-url")
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ algorithm: "token-bucket", capacity: 20, refillRate: 2 })
   async createSignedUploadUrl(
     @Body() body: { fileName: string; mimeType?: string }
   ) {

@@ -12,6 +12,7 @@ import {
   BadRequestException,
 } from "@nestjs/common";
 import { UsersService } from "./users.service";
+import { ThrottlerGuard, Throttle } from "nestjs-advanced-rate-limiter";
 import { SupabaseGuard } from "../core/guards/supabase.guard";
 
 @Controller("users")
@@ -207,7 +208,8 @@ export class UsersController {
    * POST /api/users/me/avatar/presigned-url
    * Lấy presigned URL để upload avatar trực tiếp lên Cloudflare R2
    */
-  @UseGuards(SupabaseGuard)
+  @UseGuards(SupabaseGuard, ThrottlerGuard)
+  @Throttle({ algorithm: "token-bucket", capacity: 10, refillRate: 1 })
   @Post("me/avatar/presigned-url")
   async getAvatarUploadPresignedUrl(
     @Request() req,

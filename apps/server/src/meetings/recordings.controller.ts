@@ -8,6 +8,7 @@ import {
     HttpStatus,
 } from "@nestjs/common";
 import { RecordingsService } from "./recordings.service";
+import { ThrottlerGuard, Throttle } from "nestjs-advanced-rate-limiter";
 import { SupabaseGuard } from "../core/guards/supabase.guard";
 import { Roles } from "../core/decorators/roles.decorator";
 import { MeetingRoleGuard } from "../core/guards/meeting-role.guard";
@@ -23,7 +24,8 @@ export class RecordingsController {
     @Post("start")
     @Roles("owner", "admin")
     @HttpCode(HttpStatus.NO_CONTENT)
-    @UseGuards(SupabaseGuard, MeetingRoleGuard)
+    @UseGuards(SupabaseGuard, MeetingRoleGuard, ThrottlerGuard)
+    @Throttle({ algorithm: "token-bucket", capacity: 5, refillRate: 0.2 })
     async startRecording(
         @Param("code") meetingCode: string,
         @Req() req: any,

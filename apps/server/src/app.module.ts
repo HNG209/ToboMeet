@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { MongooseModule } from "@nestjs/mongoose";
 import { ConfigModule, ConfigService } from "@nestjs/config";
+import { ThrottlerModule, RedisStore, ResilientStore } from "nestjs-advanced-rate-limiter";
+import Redis from "ioredis";
 import { UsersModule } from "./users/users.module";
 import { RoomsModule } from "./rooms/rooms.module";
 import { MeetingsModule } from "./meetings/meetings.module";
@@ -24,6 +26,53 @@ import { VectorDbModule } from "./vector-db/vector-db.module";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const redisHost = configService.get<string>("REDIS_HOST", "localhost");
+        const redisPort = parseInt(configService.get<string>("REDIS_PORT", "6379"), 10);
+        const redis = new Redis({
+          host: redisHost,
+          port: redisPort,
+          maxRetriesPerRequest: 2,
+          lazyConnect: false,
+        });
+
+        const store = new ResilientStore(new RedisStore(redis as any, "tobomeet:rl:"), {
+          failMode: "open",
+          onError: (err: any) => {
+            console.warn("[RateLimiter] Redis error, falling back to allow traffic:", err?.message || err);
+          },
+        });
+
+        return {
+          store,
+          algorithm: {
+            algorithm: "token-bucket",
+            capacity: 100,
+            refillRate: 10,
+          },
+          errorMessage: "Yêu cầu quá nhiều lần. Vui lòng đợi trong giây lát rồi thử lại.",
+          getTracker: (req) => {
+            const userId = req.user?.id || req.user?.sub;
+            const ip =
+              req.headers?.["cf-connecting-ip"] ||
+              (typeof req.headers?.["x-forwarded-for"] === "string"
+                ? req.headers["x-forwarded-for"].split(",")[0]?.trim()
+                : req.headers?.["x-forwarded-for"]?.[0]) ||
+              req.ip ||
+              req.socket?.remoteAddress ||
+              "unknown";
+            const identity = userId ? `user:${userId}` : `ip:${ip}`;
+            const route = req.baseUrl
+              ? `${req.baseUrl}${req.route?.path || ""}`
+              : (req.originalUrl ? req.originalUrl.split("?")[0] : req.path || "general");
+            return `${identity}:${route}`;
+          },
+        };
+      },
     }),
     EventEmitterModule.forRoot(),
     SchedulerClientModule,

@@ -14,6 +14,7 @@ import {
 } from "@nestjs/common";
 import { Request, Response } from "express";
 import type * as archiver from "archiver";
+import { ThrottlerGuard, Throttle } from "nestjs-advanced-rate-limiter";
 import { SupabaseGuard } from "../core/guards/supabase.guard";
 import { ChannelFilesService } from "./channel-files.service";
 import {
@@ -34,6 +35,8 @@ export class ChannelFilesController {
   constructor(private readonly filesService: ChannelFilesService) {}
 
   @Post("signed-url")
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ algorithm: "token-bucket", capacity: 20, refillRate: 2 })
   async createSignedUploadUrl(
     @Body() dto: SignedUrlRequestDto,
     @Req() req: AuthenticatedRequest,

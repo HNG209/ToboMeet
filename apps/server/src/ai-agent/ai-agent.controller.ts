@@ -7,6 +7,7 @@ import {
   UsePipes,
   ValidationPipe,
 } from "@nestjs/common";
+import { ThrottlerGuard, Throttle } from "nestjs-advanced-rate-limiter";
 import { AiAgentService } from "./ai-agent.service";
 import { SupabaseGuard } from "../core/guards/supabase.guard";
 import { ChatAgentDto } from "./dto/chat-agent.dto";
@@ -26,6 +27,8 @@ export class AiAgentController {
   constructor(private readonly aiAgentService: AiAgentService) {}
 
   @Post("chat")
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ algorithm: "token-bucket", capacity: 10, refillRate: 1 })
   async chat(
     @Req() req: AuthenticatedRequest,
     @Body() body: ChatAgentDto,

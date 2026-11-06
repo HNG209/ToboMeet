@@ -15,6 +15,7 @@ import {
   Query,
 } from "@nestjs/common";
 import { Response } from "express";
+import { ThrottlerGuard, Throttle } from "nestjs-advanced-rate-limiter";
 import { MeetingsService } from "./meetings.service";
 import { SupabaseGuard } from "../core/guards/supabase.guard";
 import { Roles } from "../core/decorators/roles.decorator";
@@ -111,7 +112,8 @@ export class MeetingsController {
    * Hàm join duy nhất (hỗ trợ cả channel + personal)
    */
   @Post("join")
-  @UseGuards(SupabaseGuard)
+  @UseGuards(SupabaseGuard, ThrottlerGuard)
+  @Throttle({ algorithm: "token-bucket", capacity: 15, refillRate: 1 })
   async joinMeeting(
     @Body()
     body: {
