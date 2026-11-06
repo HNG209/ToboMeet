@@ -209,7 +209,7 @@ export default function ParticipantList({
               return (
                 <div
                   key={p.identity}
-                  className="flex items-center gap-2.5 py-1.5 px-2 hover:bg-[#222] rounded-xl transition-all group border border-transparent hover:border-[#333]"
+                  className="flex items-center gap-2.5 py-1.5 px-2 hover:bg-white/5 rounded-lg transition-colors group"
                 >
                   <div className="relative shrink-0">
                     {avatarUrl ? (
@@ -223,7 +223,6 @@ export default function ParticipantList({
                         {p.name?.charAt(0) || "?"}
                       </div>
                     )}
-                    <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-[#111] rounded-full"></div>
                   </div>
 
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -251,15 +250,11 @@ export default function ParticipantList({
                       />
                     )}
 
-                    <div className="text-slate-400">
+                    <div className="flex items-center justify-center px-1">
                       {p.isMicrophoneEnabled ? (
-                        <div className="p-1 bg-[#222] border border-[#333] rounded-md">
-                          <Mic size={13} className="text-slate-300" />
-                        </div>
+                        <Mic size={15} className="text-slate-300" />
                       ) : (
-                        <div className="p-1 bg-red-500/10 border border-red-500/20 rounded-md">
-                          <MicOff size={13} className="text-red-400" />
-                        </div>
+                        <MicOff size={15} className="text-red-400" />
                       )}
                     </div>
 

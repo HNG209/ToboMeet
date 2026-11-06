@@ -113,9 +113,7 @@ export default function CreatePollModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#232328] bg-[#161619]">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <BarChart2 size={18} />
-            </div>
+            <BarChart2 size={20} className="text-blue-500 shrink-0" />
             <div>
               <h2 className="text-base font-bold text-slate-100">
                 {t("create_modal_title")}

@@ -86,19 +86,11 @@ export default function MobilePollDetailsModal({
             }`}
           >
             <View className="flex-row items-center gap-2.5 flex-1 pr-2">
-              <View
-                className={`p-2 rounded-xl ${
-                  isLight
-                    ? "bg-blue-50 border border-blue-200"
-                    : "bg-blue-500/10 border border-blue-500/20"
-                }`}
-              >
-                <Feather
-                  name="bar-chart-2"
-                  size={18}
-                  color={isLight ? "#0052FF" : "#60a5fa"}
-                />
-              </View>
+              <Feather
+                name="bar-chart-2"
+                size={20}
+                color={isLight ? "#0052FF" : "#3b82f6"}
+              />
               <View className="flex-1">
                 <Text
                   className={`${

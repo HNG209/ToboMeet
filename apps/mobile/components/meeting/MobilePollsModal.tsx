@@ -222,9 +222,7 @@ export default function MobilePollsModal({
             {/* Header */}
             <View className="flex-row items-center justify-between px-5 py-4 border-b border-[#232328]">
               <View className="flex-row items-center gap-2.5">
-                <View className="p-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                  <Feather name="bar-chart-2" size={18} color="#60a5fa" />
-                </View>
+                <Feather name="bar-chart-2" size={20} color="#3b82f6" />
                 <View>
                   <Text className="text-white text-base font-bold">
                     {t("meeting.poll.title", { defaultValue: "Bình chọn" })}

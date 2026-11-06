@@ -5,7 +5,7 @@ import {
   Plus,
   Trash2,
   Loader2,
-  Network,
+  Grid2X2,
   Users,
   Wand2,
   Hand,
@@ -450,10 +450,8 @@ export default function CreateBreakoutModal({
       >
         {/* MODAL HEADER */}
         <div className="px-5 py-3.5 border-b border-[#232328] flex items-center justify-between bg-[#111113] shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600/10 border border-blue-500/30 rounded-xl text-blue-400">
-              <Network size={18} />
-            </div>
+          <div className="flex items-center gap-2.5">
+            <Grid2X2 size={20} className="text-blue-500 shrink-0" />
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-sm font-bold text-white">

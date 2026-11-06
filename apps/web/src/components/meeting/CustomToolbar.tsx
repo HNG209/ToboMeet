@@ -22,7 +22,7 @@ import {
   Play,
   Pause,
   Square,
-  Network,
+  Grid2X2,
   Cloud,
   Laptop,
   Info,
@@ -248,7 +248,7 @@ export default function CustomToolbar({
             onClick={toggleCam}
             disabled={isCamLoading}
             title={isCameraEnabled ? t("camera") : `${t("camera")} (Off)`}
-            className={`h-11 px-2.5 rounded-l-lg flex flex-col items-center justify-center transition-all cursor-pointer ${
+            className={`h-11 min-w-[50px] sm:min-w-[56px] px-2 rounded-l-lg flex flex-col items-center justify-center transition-all cursor-pointer ${
               !isCameraEnabled
                 ? "text-red-400 hover:bg-white/5"
                 : "text-slate-300 hover:bg-white/5 hover:text-white"
@@ -340,7 +340,7 @@ export default function CustomToolbar({
             onClick={toggleMic}
             disabled={isMicLoading}
             title={isMicrophoneEnabled ? t("mic") : `${t("mic")} (Muted)`}
-            className={`h-11 px-2.5 rounded-l-lg flex flex-col items-center justify-center transition-all cursor-pointer ${
+            className={`h-11 min-w-[50px] sm:min-w-[56px] px-2 rounded-l-lg flex flex-col items-center justify-center transition-all cursor-pointer ${
               !isMicrophoneEnabled
                 ? "text-red-400 hover:bg-white/5"
                 : "text-slate-300 hover:bg-white/5 hover:text-white"
@@ -551,7 +551,10 @@ export default function CustomToolbar({
                   </span>
                 </div>
               ) : (
-                <Disc size={21} className="text-slate-300" />
+                <Disc
+                  size={21}
+                  className={isRecordMenuOpen ? "text-blue-400" : "text-slate-300"}
+                />
               )}
               <ChevronUp
                 size={11}
@@ -564,7 +567,9 @@ export default function CustomToolbar({
                 ? "text-red-500 font-semibold"
                 : isLocalRecording
                   ? "text-amber-500 font-semibold"
-                  : ""
+                  : isRecordMenuOpen
+                    ? "text-blue-400 font-medium"
+                    : ""
                 }`}
             >
               {t("record")}
@@ -794,7 +799,7 @@ export default function CustomToolbar({
               "text-blue-400",
             )}
           >
-            <Network
+            <Grid2X2
               size={21}
               className="text-blue-400 animate-pulse drop-shadow-md"
             />
@@ -960,7 +965,7 @@ export default function CustomToolbar({
                         className="w-full text-left px-3 py-2.5 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer"
                       >
                         <div className="flex items-center gap-2.5">
-                          <Network size={16} className="text-blue-400" />
+                          <Grid2X2 size={16} className="text-blue-400" />
                           <span>{t("create_breakout")}</span>
                         </div>
                       </div>

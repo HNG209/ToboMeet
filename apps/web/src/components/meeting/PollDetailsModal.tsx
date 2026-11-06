@@ -71,15 +71,10 @@ export default function PollDetailsModal({
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <div
-              className={`p-2 rounded-lg border ${
-                isLight
-                  ? "bg-blue-50 text-blue-600 border-blue-200"
-                  : "bg-blue-500/10 text-blue-400 border-blue-500/20"
-              }`}
-            >
-              <BarChart2 size={18} />
-            </div>
+            <BarChart2
+              size={20}
+              className={`${isLight ? "text-blue-600" : "text-blue-500"} shrink-0`}
+            />
             <div>
               <h2
                 className={`text-base font-bold ${

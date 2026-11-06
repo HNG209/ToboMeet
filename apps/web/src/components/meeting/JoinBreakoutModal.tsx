@@ -5,7 +5,7 @@ import {
   Users,
   Clock,
   LogIn,
-  Network,
+  Grid2X2,
   Loader2,
   Lock,
   UserPlus,
@@ -170,10 +170,8 @@ export default function JoinBreakoutModal({
       <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[10000] w-[94vw] max-w-lg bg-[#161619] border border-[#232328] rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 backdrop-blur-xl">
         {/* HEADER */}
         <div className="px-5 py-4 border-b border-[#232328] flex items-center justify-between bg-[#111113]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-blue-400">
-              <Network size={18} />
-            </div>
+          <div className="flex items-center gap-2.5">
+            <Grid2X2 size={20} className="text-blue-500 shrink-0" />
             <div>
               <h2 className="text-[15px] font-bold text-white tracking-wide">
                 {t("modal_title")}
@@ -471,7 +469,7 @@ export default function JoinBreakoutModal({
           ) : (
             <div className="text-center py-10 flex flex-col items-center justify-center gap-3">
               <div className="w-12 h-12 rounded-full bg-[#161619] flex items-center justify-center border border-[#232328]">
-                <Network className="text-slate-500" size={22} />
+                <Grid2X2 className="text-slate-500" size={22} />
               </div>
               <p className="text-slate-400 text-sm font-medium">
                 {t("no_rooms_created")}

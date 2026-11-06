@@ -3,7 +3,7 @@
 
 import { useIsRecording, useRoomContext } from "@livekit/components-react";
 import { RoomEvent } from "livekit-client";
-import { Network, X } from "lucide-react";
+import { Grid2X2, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import localforage from "localforage";
 import "@livekit/components-styles";
@@ -178,7 +178,7 @@ export default function MeetingRoomContent({
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden transition-all duration-300">
         <header className="h-14 shrink-0 px-5 flex items-center justify-between bg-[#111113] border-b border-[#232328] z-10">
           <div className="flex items-center gap-3">
-            {isBreakoutRoom && <Network size={16} className="text-blue-400" />}
+            {isBreakoutRoom && <Grid2X2 size={16} className="text-blue-400" />}
 
             <span className="text-sm font-semibold tracking-wide flex items-center gap-2">
               {roomName || ""}
