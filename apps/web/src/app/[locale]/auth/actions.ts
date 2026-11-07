@@ -3,7 +3,19 @@ import { createClient } from "@/lib/supabase/server";
 import { Provider } from "@supabase/supabase-js";
 import { getLocale } from "next-intl/server";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
+
+async function getOrigin() {
+  const headerList = await headers();
+  const origin = headerList.get("origin");
+  if (origin) return origin.replace(/\/$/, "");
+
+  const host = headerList.get("x-forwarded-host") || headerList.get("host");
+  const proto =
+    headerList.get("x-forwarded-proto") ||
+    (host && !host.includes("localhost") ? "https" : "http");
+  return `${proto}://${host}`.replace(/\/$/, "");
+}
 
 export type FormState = {
   error: string | null;
@@ -88,9 +100,14 @@ export async function signup(prevState: FormState, formData: FormData) {
     };
   }
 
+  const origin = (process.env.SITE_URL || (await getOrigin())).replace(/\/$/, "");
+
   const { error } = await supabase.auth.signUp({
     email,
     password,
+    options: {
+      emailRedirectTo: `${origin}/auth/callback`,
+    },
   });
 
   if (error) {
@@ -123,7 +140,7 @@ export async function loginWithOAuth(
   formData: FormData,
 ) {
   const supabase = await createClient();
-  const siteUrl = process.env.SITE_URL || "http://localhost:3000";
+  const siteUrl = (process.env.SITE_URL || (await getOrigin())).replace(/\/$/, "");
   const locale = await getLocale();
   const redirectUrl = formData.get("redirect") as string;
   // Xác định đường dẫn tiếp theo sau khi OAuth thành công
