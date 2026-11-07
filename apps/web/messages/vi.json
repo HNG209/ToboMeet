@@ -1783,6 +1783,9 @@
       "end_breakout_error": "Không thể kết thúc thảo luận lúc này.",
       "live_caption": "Phụ đề trực tiếp",
       "live_caption_desc": "Đang lắng nghe âm thanh cuộc họp...",
+      "transcribe_language": "Ngôn ngữ phiên âm",
+      "search_language": "Tìm ngôn ngữ...",
+      "transcribe_language_updated": "Đã đổi ngôn ngữ phiên âm",
       "polls": "Bình chọn",
       "open_polls": "Xem bình chọn",
       "create_poll": "Tạo bình chọn",
@@ -2241,7 +2244,8 @@
       "40021": "Bạn chỉ được phép tham gia và tạo tối đa 100 phòng họp",
       "40022": "Phòng chỉ có thể có tối đa 50 kênh",
       "40023": "Kênh riêng tư chỉ có thể có tối đa 100 người",
-      "40024": "Phòng đã đạt số lượng tối đa (500 người)"
+      "40024": "Phòng đã đạt số lượng tối đa (500 người)",
+      "40029": "Cuộc họp đang đóng phiên và lưu dữ liệu. Vui lòng đợi trong giây lát rồi thử lại."
     }
   },
   "calendar": {

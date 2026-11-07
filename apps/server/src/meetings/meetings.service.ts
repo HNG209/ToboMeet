@@ -105,8 +105,16 @@ export class MeetingsService {
 
     if (livekitRoom && this.livekitRoomService) {
       humanParticipantsCount = await this.getHumanParticipantsCount(meeting.meetingCode);
-      // Nếu phòng LiveKit vẫn còn nhưng thực tế không còn ai, kết thúc session cũ và dọn phòng
-      if (humanParticipantsCount === 0) {
+      const hasAgent = await this.hasAgentInRoom(meeting.meetingCode);
+
+      // Nếu tất cả người dùng đều đã thoát nhưng Agent vẫn còn trong phòng (đang đếm ngược 10s hoặc lưu dữ liệu):
+      // Chặn người dùng không cho xin token vào phòng tới khi Agent đã thoát hoàn toàn (chống spam)
+      if (humanParticipantsCount === 0 && hasAgent) {
+        throw new AppException(ErrorCode.MEETING_CLOSING);
+      }
+
+      // Nếu phòng LiveKit không còn ai (cả người lẫn agent đều đã thoát), kết thúc session cũ và dọn phòng
+      if (humanParticipantsCount === 0 && !hasAgent) {
         await this.endMeetingByCode(meeting.meetingCode);
         await this.forceDeleteLiveKitRoom(meeting.meetingCode);
         livekitRoom = null;
@@ -141,8 +149,10 @@ export class MeetingsService {
         // Lọc người tham gia thực tế (loại trừ STT agent bot)
         const humanParticipants = participants.filter(
           (p) =>
+            !p.identity?.startsWith("agent-") &&
             !p.identity?.includes(this.STT_AGENT_NAME) &&
-            !p.name?.includes(this.STT_AGENT_NAME),
+            !p.name?.includes(this.STT_AGENT_NAME) &&
+            p.kind !== 2,
         );
 
         // Giới hạn tối đa 100 người trong 1 meeting, nếu lớn hơn thì báo lỗi đã đầy
@@ -212,6 +222,11 @@ export class MeetingsService {
       } catch (e) {
         console.error("Lỗi tạo phòng LiveKit:", e);
       }
+    } else if (livekitRoom) {
+      // Đảm bảo STT agent luôn có mặt trong phòng khi có người tham gia
+      this.dispatchSttAgent(meeting.meetingCode, currentSessionId).catch((err) => {
+        console.warn("Lỗi ensure STT agent khi join:", err?.message);
+      });
     }
 
     // Thông báo status (chỉ khi start mới + là channel meeting)
@@ -294,51 +309,62 @@ export class MeetingsService {
     }
 
     try {
-      // Kiểm tra danh sách dispatch hiện tại của room
+      // 1. Kiểm tra xem agent có thực sự đang trong phòng không
+      let agentIsLive = false;
+      if (this.livekitRoomService) {
+        try {
+          const participants = await this.livekitRoomService.listParticipants(roomName);
+          agentIsLive = participants.some(
+            (p) =>
+              p.identity?.startsWith("agent-") ||
+              p.identity?.includes(this.STT_AGENT_NAME) ||
+              p.name?.includes(this.STT_AGENT_NAME) ||
+              p.kind === 2 ||
+              (p.kind as any) === "agent",
+          );
+        } catch { }
+      }
+
+      if (agentIsLive) {
+        return { dispatched: true, message: "Agent already active in room" };
+      }
+
+      // 2. Lấy danh sách tất cả các dispatch hiện tại của room
       const dispatches = await this.agentDispatchClient.listDispatch(roomName);
-      const existingDispatch = dispatches.find(
-        (d) => d.agentName === this.STT_AGENT_NAME
-          && !(d.state?.deletedAt && d.state.deletedAt > 0n), // bỏ qua dispatch đã bị xóa
+      const activeDispatches = dispatches.filter(
+        (d) =>
+          d.agentName === this.STT_AGENT_NAME &&
+          !(d.state?.deletedAt && d.state.deletedAt > 0n),
       );
 
-      if (existingDispatch) {
-        // Kiểm tra agent có thực sự đang trong phòng không
-        let agentIsLive = false;
-        if (this.livekitRoomService) {
-          try {
-            const participants = await this.livekitRoomService.listParticipants(roomName);
-            agentIsLive = participants.some(
-              (p) =>
-                p.identity?.includes(this.STT_AGENT_NAME) ||
-                p.name?.includes(this.STT_AGENT_NAME),
-            );
-          } catch { }
-        }
+      // 3. Nếu agent chưa vào phòng, dọn dẹp các dispatch cũ quá hạn (>5s) hoặc kiểm tra cold-start (<5s)
+      let isColdStarting = false;
+      if (activeDispatches.length > 0) {
+        for (const d of activeDispatches) {
+          const createdAtRaw = d.state?.createdAt;
+          let createdAtSeconds = 0;
+          if (createdAtRaw) {
+            const num = Number(createdAtRaw);
+            createdAtSeconds = num > 1e14 ? num / 1e9 : (num > 1e11 ? num / 1e3 : num);
+          }
+          const ageSeconds = createdAtSeconds > 0 ? (Date.now() / 1000 - createdAtSeconds) : Infinity;
 
-        if (agentIsLive) {
-          return { dispatched: true, message: "Agent already active in room" };
-        }
-
-        // Dispatch tồn tại nhưng agent chưa vào — kiểm tra tuổi của dispatch.
-        // Nếu dispatch mới (<90s): agent đang cold-start (~13s) → ĐỢI, không xóa.
-        // Nếu dispatch cũ (>=90s): agent đã fail hoàn toàn → xóa và tạo lại.
-        const createdAt = existingDispatch.state?.createdAt
-          ? Number(existingDispatch.state.createdAt) // bigint seconds
-          : 0;
-        const ageSeconds = createdAt > 0 ? (Date.now() / 1000 - createdAt) : Infinity;
-
-        if (ageSeconds < 90) {
-          // Dispatch còn mới → agent đang khởi động, đợi thêm
-          return { dispatched: true, message: "Agent dispatch pending (cold-start)" };
-        }
-
-        // Dispatch quá cũ → agent fail → xóa và tạo lại
-        try {
-          await this.agentDispatchClient.deleteDispatch(existingDispatch.id, roomName);
-        } catch (e) {
+          if (ageSeconds < 5) {
+            isColdStarting = true;
+          } else {
+            // Xóa dispatch cũ đã quá hạn hoặc không còn hiệu lực
+            try {
+              await this.agentDispatchClient.deleteDispatch(d.id, roomName);
+            } catch { }
+          }
         }
       }
 
+      if (isColdStarting) {
+        return { dispatched: true, message: "Agent dispatch pending (cold-start)" };
+      }
+
+      // 4. Tạo dispatch mới để LiveKit điều phối agent vào phòng
       await this.agentDispatchClient.createDispatch(
         roomName,
         this.STT_AGENT_NAME,
@@ -376,7 +402,11 @@ export class MeetingsService {
       if (humanCount > 0) {
         return { canStart: false, reason: "ALREADY_ONGOING" };
       }
-      // Không có người: dọn dẹp phòng cũ và đóng session cũ để cho phép start mới
+      const hasAgent = await this.hasAgentInRoom(meeting.meetingCode);
+      if (hasAgent) {
+        return { canStart: false, reason: "MEETING_CLOSING" };
+      }
+      // Không có người & agent đã thoát: dọn dẹp phòng cũ và đóng session cũ để cho phép start mới
       await this.endMeetingByCode(meeting.meetingCode);
       await this.forceDeleteLiveKitRoom(meeting.meetingCode);
     } else {
@@ -1303,6 +1333,29 @@ export class MeetingsService {
       return humanParticipants.length;
     } catch {
       return 0;
+    }
+  }
+
+  /**
+   * Kiểm tra xem trong phòng có còn Bot / Agent nào đang hoạt động không
+   */
+  async hasAgentInRoom(meetingCode: string): Promise<boolean> {
+    if (!this.livekitRoomService) return false;
+    try {
+      const participants = await this.livekitRoomService.listParticipants(meetingCode);
+      return participants.some((p) => {
+        const id = p.identity || '';
+        const name = p.name || '';
+        return (
+          id.startsWith('agent-') ||
+          id.includes(this.STT_AGENT_NAME) ||
+          name.includes(this.STT_AGENT_NAME) ||
+          (p as any).kind === 2 ||
+          (p as any).isAgent
+        );
+      });
+    } catch {
+      return false;
     }
   }
 

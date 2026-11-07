@@ -1798,6 +1798,9 @@
       "end_breakout_error": "Cannot end breakout session at this time.",
       "live_caption": "Live captions",
       "live_caption_desc": "Listening to meeting audio...",
+      "transcribe_language": "Transcription language",
+      "search_language": "Search language...",
+      "transcribe_language_updated": "Transcription language updated",
       "polls": "Polls",
       "open_polls": "View Polls",
       "create_poll": "Create Poll",
@@ -2256,7 +2259,8 @@
       "40021": "You can only join and create up to 100 rooms",
       "40022": "A room can have a maximum of 50 channels",
       "40023": "A private channel can have a maximum of 100 members",
-      "40024": "The room has reached the maximum number of participants (500 members)"
+      "40024": "The room has reached the maximum number of participants (500 members)",
+      "40029": "The meeting is concluding and saving session data. Please wait a moment and try again."
     }
   },
   "calendar": {

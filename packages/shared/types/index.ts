@@ -104,6 +104,11 @@ export const ErrorCode: Record<string, ErrorDetail> = {
     message: "Cuộc họp đã đầy người tham gia (tối đa 100 người)",
     statusCode: 400,
   },
+  MEETING_CLOSING: {
+    code: 40029,
+    message: "Cuộc họp đang đóng phiên và lưu dữ liệu. Vui lòng đợi trong giây lát rồi thử lại.",
+    statusCode: 400,
+  },
   MAX_ROOMS_REACHED: {
     code: 40021,
     message: "Bạn chỉ được phép tham gia và tạo tối đa 100 phòng họp",

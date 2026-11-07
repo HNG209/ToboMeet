@@ -102,12 +102,21 @@ export default function LiveCaptionOverlay({
     for (const caption of recentCaptions) {
       const lines = wrapTextToLines(caption.text, 52);
       lines.forEach((lineText, index) => {
-        allLines.push({
-          id: `${caption.id}_${index}`,
-          speakerId: caption.speakerId,
-          speakerName: caption.speakerName,
-          text: lineText,
-        });
+        const lastLine = allLines[allLines.length - 1];
+        const isDuplicate =
+          lastLine &&
+          lastLine.text.trim().toLowerCase() === lineText.trim().toLowerCase() &&
+          ((lastLine.speakerId && caption.speakerId && lastLine.speakerId === caption.speakerId) ||
+            (lastLine.speakerName && caption.speakerName && lastLine.speakerName === caption.speakerName));
+
+        if (!isDuplicate) {
+          allLines.push({
+            id: `${caption.id}_${index}`,
+            speakerId: caption.speakerId,
+            speakerName: caption.speakerName,
+            text: lineText,
+          });
+        }
       });
     }
 

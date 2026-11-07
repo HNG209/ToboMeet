@@ -32,8 +32,9 @@ import {
   Settings,
   Captions,
   BarChart2,
+  Languages,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import InviteMemberModal from "./InviteMemberModal";
 import { useTranslations } from "next-intl";
@@ -44,7 +45,52 @@ import { useToolbarActions } from "@/hooks/useToolbarActions";
 import CreateBreakoutModal from "./CreateBreakoutModal";
 import JoinBreakoutModal from "./JoinBreakoutModal";
 import { useSafeMeetingWhiteboard } from "./contexts/MeetingWhiteboardContext";
-import { useMediaDeviceSelect } from "@livekit/components-react";
+import { useMediaDeviceSelect, useRoomContext } from "@livekit/components-react";
+
+const DEEPGRAM_LANGUAGES = [
+  { code: "vi", label: "Tiếng Việt", native: "Vietnamese" },
+  { code: "en", label: "Tiếng Anh", native: "English" },
+  { code: "en-US", label: "English (US)", native: "United States" },
+  { code: "en-GB", label: "English (UK)", native: "United Kingdom" },
+  { code: "en-AU", label: "English (Australia)", native: "Australia" },
+  { code: "en-IN", label: "English (India)", native: "India" },
+  { code: "zh", label: "Tiếng Trung (Phổ thông)", native: "中文 (Mandarin)" },
+  { code: "zh-CN", label: "Tiếng Trung (Giản thể)", native: "简体中文" },
+  { code: "zh-TW", label: "Tiếng Trung (Phồn thể)", native: "繁體中文" },
+  { code: "ja", label: "Tiếng Nhật", native: "日本語 (Japanese)" },
+  { code: "ko", label: "Tiếng Hàn", native: "한국어 (Korean)" },
+  { code: "fr", label: "Tiếng Pháp", native: "Français" },
+  { code: "fr-CA", label: "French (Canada)", native: "Français (Canada)" },
+  { code: "de", label: "Tiếng Đức", native: "Deutsch" },
+  { code: "es", label: "Tiếng Tây Ban Nha", native: "Español" },
+  { code: "es-419", label: "Spanish (Latin America)", native: "Español (Latinoamérica)" },
+  { code: "pt", label: "Tiếng Bồ Đào Nha", native: "Português" },
+  { code: "pt-BR", label: "Portuguese (Brazil)", native: "Português (Brasil)" },
+  { code: "ru", label: "Tiếng Nga", native: "Русский" },
+  { code: "it", label: "Tiếng Ý", native: "Italiano" },
+  { code: "id", label: "Tiếng Indonesia", native: "Bahasa Indonesia" },
+  { code: "th", label: "Tiếng Thái", native: "ไทย (Thai)" },
+  { code: "hi", label: "Tiếng Hindi", native: "हिन्दी" },
+  { code: "tr", label: "Tiếng Thổ Nhĩ Kỳ", native: "Türkçe" },
+  { code: "nl", label: "Tiếng Hà Lan", native: "Nederlands" },
+  { code: "pl", label: "Tiếng Ba Lan", native: "Polski" },
+  { code: "sv", label: "Tiếng Thụy Điển", native: "Svenska" },
+  { code: "da", label: "Tiếng Đan Mạch", native: "Dansk" },
+  { code: "no", label: "Tiếng Na Uy", native: "Norsk" },
+  { code: "uk", label: "Tiếng Ukraina", native: "Українська" },
+  { code: "ta", label: "Tiếng Tamil", native: "தமிழ்" },
+  { code: "cs", label: "Tiếng Séc", native: "Čeština" },
+  { code: "el", label: "Tiếng Hy Lạp", native: "Ελληνικά" },
+  { code: "fi", label: "Tiếng Phần Lan", native: "Suomi" },
+  { code: "hu", label: "Tiếng Hungary", native: "Magyar" },
+  { code: "ms", label: "Tiếng Mã Lai", native: "Bahasa Melayu" },
+  { code: "ro", label: "Tiếng Romania", native: "Română" },
+  { code: "sk", label: "Tiếng Slovakia", native: "Slovenčina" },
+  { code: "bg", label: "Tiếng Bulgaria", native: "Български" },
+  { code: "hr", label: "Tiếng Croatia", native: "Hrvatski" },
+  { code: "ar", label: "Tiếng Ả Rập", native: "العربية" },
+  { code: "multi", label: "Đa ngôn ngữ", native: "Multilingual" },
+];
 
 /**
  * COMPONENT: Thanh điều khiển (Toolbar)
@@ -79,6 +125,54 @@ export default function CustomToolbar({
   const [isLeaveMenuOpen, setIsLeaveMenuOpen] = useState(false);
   const [isCamMenuOpen, setIsCamMenuOpen] = useState(false);
   const [isMicMenuOpen, setIsMicMenuOpen] = useState(false);
+  const [isLangSubmenuOpen, setIsLangSubmenuOpen] = useState(false);
+  const [transcribeLanguage, setTranscribeLanguage] = useState<string>("vi");
+  const [langSearch, setLangSearch] = useState<string>("");
+
+  const room = useRoomContext();
+
+  useEffect(() => {
+    const saved = localStorage.getItem("tobomeet_transcribe_language") || "vi";
+    setTranscribeLanguage(saved);
+    if (room?.localParticipant) {
+      room.localParticipant.setAttributes({
+        transcribe_language: saved,
+      });
+    }
+  }, [room]);
+
+  const handleSelectLanguage = (langCode: string) => {
+    setTranscribeLanguage(langCode);
+    localStorage.setItem("tobomeet_transcribe_language", langCode);
+    if (room?.localParticipant) {
+      room.localParticipant.setAttributes({
+        transcribe_language: langCode,
+      });
+      try {
+        room.localParticipant.sendText(
+          JSON.stringify({ type: "SET_LANGUAGE", language: langCode }),
+          { topic: "lk.transcription.config" }
+        );
+      } catch (e) {
+        // ignore
+      }
+    }
+    const langObj = DEEPGRAM_LANGUAGES.find((l) => l.code === langCode);
+    toast.success(
+      `${t("transcribe_language_updated")}: ${langObj ? langObj.label : langCode}`
+    );
+  };
+
+  const filteredLanguages = useMemo(() => {
+    const query = langSearch.trim().toLowerCase();
+    if (!query) return DEEPGRAM_LANGUAGES;
+    return DEEPGRAM_LANGUAGES.filter(
+      (l) =>
+        l.label.toLowerCase().includes(query) ||
+        l.native.toLowerCase().includes(query) ||
+        l.code.toLowerCase().includes(query)
+    );
+  }, [langSearch]);
 
   const {
     devices: videoDevices,
@@ -932,6 +1026,80 @@ export default function CustomToolbar({
                     />
                   </div>
                 </div>
+
+                {isLiveCaptionEnabled && (
+                  <div
+                    className="relative"
+                    onMouseEnter={() => setIsLangSubmenuOpen(true)}
+                    onMouseLeave={() => {
+                      setIsLangSubmenuOpen(false);
+                      setLangSearch("");
+                    }}
+                  >
+                    <div className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer rounded">
+                      <div className="flex items-center gap-2.5">
+                        <Languages size={16} className="text-slate-400" />
+                        <span>{t("transcribe_language")}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-slate-400">
+                        <span className="truncate max-w-[80px]">
+                          {DEEPGRAM_LANGUAGES.find((l) => l.code === transcribeLanguage)?.label || transcribeLanguage}
+                        </span>
+                        <ChevronRight size={14} className="text-slate-500" />
+                      </div>
+                    </div>
+
+                    {isLangSubmenuOpen && (
+                      <div className="absolute left-full bottom-0 ml-1 w-64 max-h-72 flex flex-col bg-[#161619] border border-[#232328] rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 z-50">
+                        <div className="p-2 border-b border-[#232328] sticky top-0 bg-[#161619] z-10">
+                          <input
+                            type="text"
+                            placeholder={t("search_language")}
+                            value={langSearch}
+                            onChange={(e) => setLangSearch(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full bg-[#232328] text-xs text-slate-200 placeholder-slate-500 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                          />
+                        </div>
+                        <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
+                          {filteredLanguages.map((lang) => (
+                            <button
+                              key={lang.code}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSelectLanguage(lang.code);
+                              }}
+                              className="w-full text-left px-3 py-1.5 text-xs text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer"
+                            >
+                              <div className="flex flex-col">
+                                <span
+                                  className={
+                                    transcribeLanguage === lang.code
+                                      ? "text-emerald-400 font-medium"
+                                      : "text-slate-200"
+                                  }
+                                >
+                                  {lang.label}
+                                </span>
+                                <span className="text-[10px] text-slate-500">
+                                  {lang.native}
+                                </span>
+                              </div>
+                              <Check
+                                size={14}
+                                className={
+                                  transcribeLanguage === lang.code
+                                    ? "opacity-100 text-emerald-400 shrink-0"
+                                    : "opacity-0 shrink-0"
+                                }
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {isHost && (
                   <>

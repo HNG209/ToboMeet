@@ -12,6 +12,14 @@ export interface LiveCaptionItem {
   timestamp: number;
 }
 
+function normalizeCaptionText(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[.,!?;:…"'“”()[\]{}]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function useLiveCaptions(room: Room | undefined, enabled: boolean) {
   const [captions, setCaptions] = useState<LiveCaptionItem[]>([]);
   const roomRef = useRef<Room | undefined>(room);
@@ -50,25 +58,68 @@ export function useLiveCaptions(room: Room | undefined, enabled: boolean) {
       if (!cleanText) return;
 
       const speakerName = resolveSpeakerName(speakerId, rawSpeakerName);
+      const now = timestamp || Date.now();
 
       setCaptions((prev) => {
-        const existingIndex = prev.findIndex((item) => item.id === id);
         const item: LiveCaptionItem = {
           id,
           text: cleanText,
           speakerId,
           speakerName,
           isFinal,
-          timestamp: timestamp || Date.now(),
+          timestamp: now,
         };
 
+        // 1. Nếu trùng ID chính xác -> cập nhật
+        const existingIndex = prev.findIndex((c) => c.id === id);
         if (existingIndex >= 0) {
           const next = [...prev];
           next[existingIndex] = item;
           return next;
         }
 
-        // Giữ tối đa 50 câu gần nhất
+        // 2. Tìm câu gần nhất của cùng một người nói để chống trùng lặp
+        let lastSpeakerIdx = -1;
+        for (let i = prev.length - 1; i >= 0; i--) {
+          const p = prev[i];
+          if (
+            (speakerId && p.speakerId && p.speakerId === speakerId) ||
+            (speakerName && p.speakerName && p.speakerName === speakerName)
+          ) {
+            lastSpeakerIdx = i;
+            break;
+          }
+        }
+
+        if (lastSpeakerIdx >= 0) {
+          const lastItem = prev[lastSpeakerIdx];
+          const normPrev = normalizeCaptionText(lastItem.text);
+          const normCurr = normalizeCaptionText(cleanText);
+
+          // a. Nếu câu trước là interim (chưa chốt) -> thay thế luôn bằng câu mới (kể cả khác ID)
+          if (!lastItem.isFinal) {
+            const next = [...prev];
+            next[lastSpeakerIdx] = item;
+            return next;
+          }
+
+          // b. Nếu nội dung giống hệt câu trước của cùng người nói -> cập nhật chứ không thêm mới
+          if (normPrev === normCurr) {
+            const next = [...prev];
+            next[lastSpeakerIdx] = item;
+            return next;
+          }
+
+          // c. Nếu câu mới là phần mở rộng trực tiếp của câu trước trong thời gian ngắn (< 3.5s)
+          const isRecent = Math.abs(now - lastItem.timestamp) < 3500;
+          if (isRecent && normCurr.startsWith(normPrev)) {
+            const next = [...prev];
+            next[lastSpeakerIdx] = item;
+            return next;
+          }
+        }
+
+        // 3. Câu mới hoàn toàn -> giữ tối đa 50 câu gần nhất
         return [...prev.slice(-49), item];
       });
     },
