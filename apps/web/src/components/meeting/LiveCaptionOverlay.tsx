@@ -59,6 +59,22 @@ export default function LiveCaptionOverlay({
   // Thông báo ban đầu khi vừa bật phụ đề (tự ẩn sau 3.5s)
   const [showNotice, setShowNotice] = useState(true);
 
+  // Ngôn ngữ dịch phụ đề được chọn
+  const [translateTargetLang, setTranslateTargetLang] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("tobomeet_translate_target_language") || "off";
+    }
+    return "off";
+  });
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      setTranslateTargetLang(e.detail || "off");
+    };
+    window.addEventListener("tobomeet_translate_target_changed", handler);
+    return () => window.removeEventListener("tobomeet_translate_target_changed", handler);
+  }, []);
+
   useEffect(() => {
     if (!enabled) return;
     const timer = setTimeout(() => setShowNotice(false), 3500);
@@ -83,7 +99,10 @@ export default function LiveCaptionOverlay({
     return () => {
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     };
-  }, [latestCaption?.id, latestCaption?.text]);
+  }, [latestCaption?.id, latestCaption?.text, latestCaption?.translations]);
+
+  const targetCode = (translateTargetLang || "off").split("-")[0].toLowerCase();
+  const isTranslateActive = targetCode !== "off" && targetCode !== "none";
 
   // Xử lý các dòng hiển thị:
   // - Giới hạn ký tự mỗi hàng (~52 ký tự)
@@ -162,7 +181,7 @@ export default function LiveCaptionOverlay({
   if (!enabled) return null;
 
   // Chưa có câu nói nào: hiện thông báo đang lắng nghe trong 3.5s đầu
-  if (displayLines.length === 0) {
+  if (recentCaptions.length === 0) {
     if (!showNotice) return null;
     return (
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 pointer-events-auto transition-opacity duration-300 animate-fade-in select-none">
@@ -196,22 +215,72 @@ export default function LiveCaptionOverlay({
           <X size={12} />
         </button>
 
-        {/* Nội dung phụ đề tối đa 2 dòng */}
-        <div className="flex flex-col gap-0.5 justify-center">
-          {displayLines.map((line) => (
-            <p
-              key={line.id}
-              className="text-xs sm:text-sm font-medium text-white leading-relaxed tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] truncate max-w-full"
-            >
-              {line.showSpeaker && line.speakerName && (
-                <span className="text-emerald-400 font-semibold mr-1.5 text-[11px] sm:text-xs select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
-                  {line.speakerName}:
-                </span>
-              )}
-              <span className="select-text">{line.text}</span>
-            </p>
-          ))}
-        </div>
+        {/* Chỉ báo ngôn ngữ dịch nếu đang bật dịch */}
+        {isTranslateActive && (
+          <div className="flex items-center gap-1.5 mb-1 text-[10px] text-emerald-400 font-medium select-none">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>
+              {t("translated_tag")} ({targetCode.toUpperCase()})
+            </span>
+          </div>
+        )}
+
+        {/* Nội dung: Khi bật dịch -> hiện 2 dòng cho bản dịch và bản phụ đề; Khi tắt -> tối đa 2 dòng câu nói gốc */}
+        {isTranslateActive ? (
+          <div className="flex flex-col gap-1.5 justify-center">
+            {recentCaptions.slice(-1).map((caption) => {
+              const translatedText =
+                caption.translations?.[targetCode] ||
+                caption.translations?.[translateTargetLang];
+
+              return (
+                <div key={caption.id} className="flex flex-col gap-1 max-w-full">
+                  {/* Dòng 1: Bản phụ đề gốc */}
+                  <p className="text-xs sm:text-sm font-medium text-white leading-relaxed tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] max-w-full">
+                    {caption.speakerName && (
+                      <span className="text-emerald-400 font-semibold mr-1.5 text-[11px] sm:text-xs select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+                        {caption.speakerName}:
+                      </span>
+                    )}
+                    <span className="select-text">{caption.text}</span>
+                  </p>
+
+                  {/* Dòng 2: Bản dịch */}
+                  {translatedText ? (
+                    <p className="text-[11px] sm:text-xs font-semibold text-emerald-300 leading-snug pl-2 border-l-2 border-emerald-400 select-text drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)] max-w-full">
+                      <span className="text-[9px] uppercase font-bold text-emerald-400/90 mr-1.5 select-none bg-emerald-950/70 px-1 py-0.5 rounded border border-emerald-500/30">
+                        {targetCode.toUpperCase()}
+                      </span>
+                      <span>{translatedText}</span>
+                    </p>
+                  ) : (
+                    !caption.isFinal && (
+                      <p className="text-[10px] text-slate-400/70 italic pl-2 border-l-2 border-slate-600 select-none animate-pulse">
+                        Đang nói... (sẽ dịch sau khi nói xong)
+                      </p>
+                    )
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-0.5 justify-center">
+            {displayLines.map((line) => (
+              <p
+                key={line.id}
+                className="text-xs sm:text-sm font-medium text-white leading-relaxed tracking-wide drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)] truncate max-w-full"
+              >
+                {line.showSpeaker && line.speakerName && (
+                  <span className="text-emerald-400 font-semibold mr-1.5 text-[11px] sm:text-xs select-none drop-shadow-[0_2px_4px_rgba(0,0,0,0.95)]">
+                    {line.speakerName}:
+                  </span>
+                )}
+                <span className="select-text">{line.text}</span>
+              </p>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

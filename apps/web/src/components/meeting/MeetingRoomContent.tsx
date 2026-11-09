@@ -13,7 +13,7 @@ import CustomVideoGrid from "@/components/meeting/CustomVideoGrid";
 import MeetingChat from "@/components/meeting/MeetingChat";
 import MeetingPolls from "@/components/meeting/MeetingPolls";
 import CreatePollModal from "@/components/meeting/CreatePollModal";
-import LiveCaptionOverlay from "@/components/meeting/LiveCaptionOverlay";
+import MeetingCaptions from "@/components/meeting/MeetingCaptions";
 import { axiosInstance } from "@/lib/axios";
 import { ChatMessage } from "@tobomeet/shared/types";
 import { useTranslations } from "next-intl";
@@ -45,7 +45,7 @@ export default function MeetingRoomContent({
   });
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarTab, setSidebarTab] = useState<"chat" | "people" | "polls">("chat");
+  const [sidebarTab, setSidebarTab] = useState<"chat" | "people" | "polls" | "captions">("chat");
   const [isCreatePollOpen, setIsCreatePollOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
@@ -55,8 +55,12 @@ export default function MeetingRoomContent({
   const handleToggleLiveCaption = () => {
     setIsLiveCaptionEnabled((prev) => {
       const nextState = !prev;
-      if (nextState && meetingCode) {
-        axiosInstance.post(`/meetings/${meetingCode}/captions/ensure`).catch(() => {});
+      if (nextState) {
+        if (meetingCode) {
+          axiosInstance.post(`/meetings/${meetingCode}/captions/ensure`).catch(() => {});
+        }
+        setSidebarTab("captions");
+        setIsSidebarOpen(true);
       }
       return nextState;
     });
@@ -207,11 +211,6 @@ export default function MeetingRoomContent({
 
         <main className="flex-1 flex overflow-hidden relative min-h-0 w-full bg-[#0a0a0c]">
           <CustomVideoGrid />
-          <LiveCaptionOverlay
-            room={room}
-            enabled={isLiveCaptionEnabled}
-            onClose={() => setIsLiveCaptionEnabled(false)}
-          />
         </main>
 
         <div className="shrink-0 w-full relative z-[500]">
@@ -294,7 +293,9 @@ export default function MeetingRoomContent({
                 ? t("chat_header")
                 : sidebarTab === "people"
                   ? t("participant_header")
-                  : t("polls_header")}
+                  : sidebarTab === "polls"
+                    ? t("polls_header")
+                    : (t("captions_header") || "Phụ đề & Dịch thuật")}
             </h2>
 
             <button
@@ -316,11 +317,17 @@ export default function MeetingRoomContent({
               />
             ) : sidebarTab === "people" ? (
               <ParticipantList meetingCode={meetingCode} />
-            ) : (
+            ) : sidebarTab === "polls" ? (
               <MeetingPolls
                 meetingCode={meetingCode}
                 isHost={isHost}
                 onCreatePoll={() => setIsCreatePollOpen(true)}
+              />
+            ) : (
+              <MeetingCaptions
+                meetingCode={meetingCode}
+                isLiveCaptionEnabled={isLiveCaptionEnabled}
+                onToggleLiveCaption={handleToggleLiveCaption}
               />
             )}
           </div>

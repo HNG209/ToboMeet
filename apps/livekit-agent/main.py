@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import ssl
 import time
 from collections import deque
@@ -8,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import aiohttp
+import deepl
 import numpy as np
 from dotenv import load_dotenv
 from livekit.agents import JobContext, cli, AgentServer
@@ -15,7 +17,93 @@ from livekit.agents.stt import SpeechEventType
 from livekit import rtc
 from livekit.plugins import deepgram
 
+ENV_PATH = Path(__file__).resolve().parent / ".env"
+load_dotenv(ENV_PATH)
 load_dotenv()
+
+# Cấu hình DeepL client cho dịch thuật trực tiếp
+DEEPL_API_KEY = os.getenv("DEEPL_API_KEY", "")
+deepl_client = deepl.DeepLClient(DEEPL_API_KEY) if DEEPL_API_KEY else None
+
+# Bộ đệm Cache cho bản dịch: (source_lang, target_lang, text) -> translated_text
+TRANSLATION_CACHE: dict[tuple[str, str, str], str] = {}
+MAX_TRANSLATION_CACHE_SIZE = 1000
+
+
+def map_deepl_source_lang(lang_code: str) -> str | None:
+    """Chuyển mã ngôn ngữ nguồn sang mã DeepL hợp lệ."""
+    if not lang_code:
+        return None
+    return lang_code.strip().upper().split("-")[0]
+
+
+def map_deepl_target_lang(lang_code: str) -> str:
+    """Chuyển mã ngôn ngữ đích sang mã DeepL Target hợp lệ (EN-US, PT-BR, VI, JA...)."""
+    c = (lang_code or "vi").strip().upper()
+    base = c.split("-")[0]
+    if base == "EN":
+        return "EN-GB" if "GB" in c else "EN-US"
+    if base == "PT":
+        return "PT-PT" if "PT" in c and "BR" not in c else "PT-BR"
+    return base
+
+
+async def translate_text(text: str, source_lang: str, target_lang: str) -> str:
+    """Hàm dịch đa ngôn ngữ qua DeepL API (chạy qua thread pool để không block asyncio loop)."""
+    clean = text.strip()
+    if not clean or not deepl_client:
+        return clean
+
+    src = map_deepl_source_lang(source_lang)
+    tgt = map_deepl_target_lang(target_lang)
+
+    # Nếu cùng ngôn ngữ thì không cần dịch
+    if src and src == tgt.split("-")[0]:
+        return clean
+
+    # Bỏ qua từ quá ngắn hoặc filler words
+    if len(clean) <= 1 or clean.lower() in ("ừm", "ờ", "à", "uhm", "uh", "um", "..."):
+        return clean
+
+    cache_key = (src or "auto", tgt, clean.lower())
+    if cache_key in TRANSLATION_CACHE:
+        return TRANSLATION_CACHE[cache_key]
+
+    try:
+        kwargs = {"target_lang": tgt}
+        if src:
+            kwargs["source_lang"] = src
+
+        res = await asyncio.to_thread(
+            deepl_client.translate_text,
+            clean,
+            **kwargs,
+        )
+        translated = res.text.strip()
+        if translated:
+            if len(TRANSLATION_CACHE) > MAX_TRANSLATION_CACHE_SIZE:
+                TRANSLATION_CACHE.clear()
+            TRANSLATION_CACHE[cache_key] = translated
+            return translated
+    except Exception as e:
+        # Nếu truyền source_lang bị lỗi, thử lại tự động nhận diện (source_lang=None)
+        if src:
+            try:
+                res = await asyncio.to_thread(
+                    deepl_client.translate_text,
+                    clean,
+                    target_lang=tgt,
+                )
+                translated = res.text.strip()
+                if translated:
+                    TRANSLATION_CACHE[cache_key] = translated
+                    logger.info("[DeepL Auto] [%s -> %s] '%s' => '%s'", "AUTO", tgt, clean, translated)
+                    return translated
+            except Exception:
+                pass
+        logger.error("[DeepL Error] Dịch thất bại [%s -> %s] cho '%s': %s", src, tgt, clean, e)
+
+    return clean
 
 logger = logging.getLogger("stt-agent")
 logger.setLevel(logging.INFO)
@@ -56,7 +144,7 @@ class ParticipantAudioTracker:
         self.is_transcribing = False
         self._current_stt_stream = None
         self.stt_task: asyncio.Task | None = None
-        self.last_speech_time: float = 0.0
+        self.last_speech_time: float = time.monotonic()  # Khởi tạo = hiện tại để allocate_available_slots có thể cấp slot ngay
         self._last_speech_trigger: float = 0.0
         self.last_final_text: str = ""
         self.last_final_time: float = 0.0
@@ -347,6 +435,28 @@ async def entrypoint(ctx: JobContext):
         with path.open("a", encoding="utf-8") as f:
             f.write(json.dumps(data, ensure_ascii=False) + "\n")
 
+    # Quản lý ngôn ngữ dịch đích của từng participant trong phòng: identity -> target_lang
+    participant_target_languages: dict[str, str] = {}
+
+    def update_participant_target_lang(identity: str, target_lang: str | None):
+        target = (target_lang or "").strip().lower()
+        if not target or target in ("off", "none"):
+            participant_target_languages.pop(identity, None)
+        else:
+            participant_target_languages[identity] = target
+        logger.info(
+            "[Translate Target] %s -> %s | Active room targets: %s",
+            identity,
+            target or "off",
+            list(set(participant_target_languages.values())),
+        )
+
+    # Đọc cấu hình dịch từ các participant đã có mặt trước trong phòng
+    for p in ctx.room.remote_participants.values():
+        if p.kind != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
+            t_lang = p.attributes.get("translate_target_language")
+            update_participant_target_lang(p.identity, t_lang)
+
     async def broadcast(
         text: str,
         is_final: bool,
@@ -355,9 +465,32 @@ async def entrypoint(ctx: JobContext):
         segment_id: str | None = None,
         language: str = "vi",
     ):
-        """Phát transcript qua LiveKit Data Channel đến các client trong phòng"""
+        """Phát transcript qua LiveKit Data Channel đến các client trong phòng (kèm bản dịch gom lại cho các người xem)."""
         if segment_id is None:
             segment_id = f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+
+        translations: dict[str, str] = {}
+        src_code = (language or "vi").split("-")[0].lower()
+
+        # CHỈ DỊCH BẢN FINAL CỦA DEEPGRAM:
+        # Gom lại các ngôn ngữ dịch: nếu nhiều người cùng chọn 1 ngôn ngữ thì DeepL chỉ dịch 1 lần
+        if is_final and deepl_client:
+            needed_targets = {
+                tgt.split("-")[0].lower()
+                for tgt in participant_target_languages.values()
+                if tgt and tgt not in ("off", "none") and tgt.split("-")[0].lower() != src_code
+            }
+
+            if needed_targets:
+                async def _do_translate(tgt):
+                    trans = await translate_text(text, src_code, tgt)
+                    if trans and trans.strip():
+                        translations[tgt] = trans.strip()
+
+                await asyncio.gather(
+                    *(_do_translate(tgt) for tgt in needed_targets),
+                    return_exceptions=True,
+                )
 
         attributes = {
             "lk.transcription_final": "true" if is_final else "false",
@@ -365,6 +498,7 @@ async def entrypoint(ctx: JobContext):
             "speaker_id": speaker_id or "",
             "speaker_name": speaker_name or "",
             "speaker_language": language or "vi",
+            "translations": json.dumps(translations, ensure_ascii=False) if translations else "{}",
         }
 
         try:
@@ -383,6 +517,7 @@ async def entrypoint(ctx: JobContext):
                 "speaker_id": speaker_id,
                 "speaker_name": speaker_name,
                 "language": language or "vi",
+                "translations": translations,
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
             # Tránh ghi trùng lặp dòng transcript liên tiếp của cùng người nói
@@ -458,23 +593,32 @@ async def entrypoint(ctx: JobContext):
         changed_attributes: dict,
         participant: rtc.Participant,
     ):
-        """Lắng nghe khi participant thay đổi ngôn ngữ transcribe qua setAttributes."""
+        """Lắng nghe khi participant thay đổi ngôn ngữ transcribe hoặc dịch qua setAttributes."""
         if "transcribe_language" in changed_attributes:
             new_lang = changed_attributes["transcribe_language"]
             tracker = trackers.get(participant.identity)
             if tracker:
                 tracker.set_language(new_lang)
+        if "translate_target_language" in changed_attributes:
+            new_target = changed_attributes["translate_target_language"]
+            update_participant_target_lang(participant.identity, new_target)
 
     def on_data_received(data_packet: rtc.DataPacket):
         """Lắng nghe cấu hình đổi ngôn ngữ gửi qua LiveKit Data Channel."""
         if data_packet.topic == "lk.transcription.config":
             try:
                 payload = json.loads(data_packet.data.decode("utf-8"))
-                new_lang = payload.get("language")
+                msg_type = payload.get("type")
                 sender = data_packet.participant
                 spk_id = sender.identity if sender else None
-                if new_lang and spk_id and spk_id in trackers:
-                    trackers[spk_id].set_language(new_lang)
+                if spk_id:
+                    if msg_type == "SET_LANGUAGE":
+                        new_lang = payload.get("language")
+                        if new_lang and spk_id in trackers:
+                            trackers[spk_id].set_language(new_lang)
+                    elif msg_type == "SET_TRANSLATE_TARGET":
+                        new_target = payload.get("language")
+                        update_participant_target_lang(spk_id, new_target)
             except Exception as e:
                 logger.debug("Failed to handle transcription config: %s", e)
 
@@ -570,6 +714,7 @@ async def entrypoint(ctx: JobContext):
 
     def on_participant_disconnected(participant: rtc.RemoteParticipant):
         if participant.kind != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
+            participant_target_languages.pop(participant.identity, None)
             tracker = trackers.pop(participant.identity, None)
             if tracker:
                 asyncio.create_task(tracker.cleanup())

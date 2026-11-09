@@ -33,6 +33,7 @@ import {
   Captions,
   BarChart2,
   Languages,
+  Globe,
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { toast } from "sonner";
@@ -92,6 +93,28 @@ const DEEPGRAM_LANGUAGES = [
   { code: "multi", label: "Đa ngôn ngữ", native: "Multilingual" },
 ];
 
+const TRANSLATE_LANGUAGES = [
+  { code: "off", label: "Tắt dịch", native: "Off" },
+  { code: "vi", label: "Tiếng Việt", native: "Vietnamese" },
+  { code: "en", label: "Tiếng Anh", native: "English" },
+  { code: "zh", label: "Tiếng Trung", native: "Chinese" },
+  { code: "ja", label: "Tiếng Nhật", native: "Japanese" },
+  { code: "ko", label: "Tiếng Hàn", native: "Korean" },
+  { code: "fr", label: "Tiếng Pháp", native: "French" },
+  { code: "de", label: "Tiếng Đức", native: "German" },
+  { code: "es", label: "Tiếng Tây Ban Nha", native: "Spanish" },
+  { code: "pt", label: "Tiếng Bồ Đào Nha", native: "Portuguese" },
+  { code: "ru", label: "Tiếng Nga", native: "Russian" },
+  { code: "it", label: "Tiếng Ý", native: "Italian" },
+  { code: "id", label: "Tiếng Indonesia", native: "Indonesian" },
+  { code: "nl", label: "Tiếng Hà Lan", native: "Dutch" },
+  { code: "pl", label: "Tiếng Ba Lan", native: "Polish" },
+  { code: "sv", label: "Tiếng Thụy Điển", native: "Swedish" },
+  { code: "tr", label: "Tiếng Thổ Nhĩ Kỳ", native: "Turkish" },
+  { code: "uk", label: "Tiếng Ukraina", native: "Ukrainian" },
+  { code: "ar", label: "Tiếng Ả Rập", native: "Arabic" },
+];
+
 /**
  * COMPONENT: Thanh điều khiển (Toolbar)
  * Bố cục chuẩn Zoom: Các nút vuông vức, tràn viền chiều cao, không khoảng trống.
@@ -107,8 +130,8 @@ export default function CustomToolbar({
   onToggleLiveCaption,
 }: {
   meetingCode: string;
-  activeTab: "chat" | "people" | "polls" | null;
-  onToggleSidebar: (tab: "chat" | "people" | "polls") => void;
+  activeTab: "chat" | "people" | "polls" | "captions" | null;
+  onToggleSidebar: (tab: "chat" | "people" | "polls" | "captions") => void;
   onCreatePoll?: () => void;
   hasUnreadChat: boolean;
   isLiveCaptionEnabled?: boolean;
@@ -129,6 +152,10 @@ export default function CustomToolbar({
   const [transcribeLanguage, setTranscribeLanguage] = useState<string>("vi");
   const [langSearch, setLangSearch] = useState<string>("");
 
+  const [isTranslateSubmenuOpen, setIsTranslateSubmenuOpen] = useState(false);
+  const [translateTargetLanguage, setTranslateTargetLanguage] = useState<string>("off");
+  const [translateLangSearch, setTranslateLangSearch] = useState<string>("");
+
   const room = useRoomContext();
 
   useEffect(() => {
@@ -137,6 +164,14 @@ export default function CustomToolbar({
     if (room?.localParticipant) {
       room.localParticipant.setAttributes({
         transcribe_language: saved,
+      });
+    }
+
+    const savedTranslate = localStorage.getItem("tobomeet_translate_target_language") || "off";
+    setTranslateTargetLanguage(savedTranslate);
+    if (room?.localParticipant) {
+      room.localParticipant.setAttributes({
+        translate_target_language: savedTranslate,
       });
     }
   }, [room]);
@@ -163,6 +198,35 @@ export default function CustomToolbar({
     );
   };
 
+  const handleSelectTranslateLanguage = (langCode: string) => {
+    setTranslateTargetLanguage(langCode);
+    localStorage.setItem("tobomeet_translate_target_language", langCode);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("tobomeet_translate_target_changed", { detail: langCode })
+      );
+    }
+    if (room?.localParticipant) {
+      room.localParticipant.setAttributes({
+        translate_target_language: langCode,
+      });
+      try {
+        room.localParticipant.sendText(
+          JSON.stringify({ type: "SET_TRANSLATE_TARGET", language: langCode }),
+          { topic: "lk.transcription.config" }
+        );
+      } catch (e) {
+        // ignore
+      }
+    }
+    const langObj = TRANSLATE_LANGUAGES.find((l) => l.code === langCode);
+    toast.success(
+      langCode === "off"
+        ? t("translate_off")
+        : `${t("translate_language_updated")}: ${langObj ? langObj.label : langCode}`
+    );
+  };
+
   const filteredLanguages = useMemo(() => {
     const query = langSearch.trim().toLowerCase();
     if (!query) return DEEPGRAM_LANGUAGES;
@@ -173,6 +237,17 @@ export default function CustomToolbar({
         l.code.toLowerCase().includes(query)
     );
   }, [langSearch]);
+
+  const filteredTranslateLanguages = useMemo(() => {
+    const query = translateLangSearch.trim().toLowerCase();
+    if (!query) return TRANSLATE_LANGUAGES;
+    return TRANSLATE_LANGUAGES.filter(
+      (l) =>
+        l.label.toLowerCase().includes(query) ||
+        l.native.toLowerCase().includes(query) ||
+        l.code.toLowerCase().includes(query)
+    );
+  }, [translateLangSearch]);
 
   const {
     devices: videoDevices,
@@ -575,6 +650,39 @@ export default function CustomToolbar({
           </div>
           <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
             {t("polls")}
+          </span>
+        </button>
+
+        <button
+          onClick={() => {
+            if (!isLiveCaptionEnabled) {
+              onToggleLiveCaption?.();
+            } else {
+              onToggleSidebar("captions");
+            }
+          }}
+          className={getBtnStyle(activeTab === "captions")}
+          title={t("live_caption")}
+        >
+          <div className="relative flex items-center justify-center">
+            <Captions
+              size={21}
+              className={
+                activeTab === "captions"
+                  ? "text-brand-400"
+                  : isLiveCaptionEnabled
+                    ? "text-emerald-400"
+                    : ""
+              }
+            />
+            {isLiveCaptionEnabled && (
+              <span className="absolute -top-1 -right-1 flex h-2 w-2">
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+            )}
+          </div>
+          <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
+            {t("live_caption")}
           </span>
         </button>
 
@@ -1028,77 +1136,152 @@ export default function CustomToolbar({
                 </div>
 
                 {isLiveCaptionEnabled && (
-                  <div
-                    className="relative"
-                    onMouseEnter={() => setIsLangSubmenuOpen(true)}
-                    onMouseLeave={() => {
-                      setIsLangSubmenuOpen(false);
-                      setLangSearch("");
-                    }}
-                  >
-                    <div className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer rounded">
-                      <div className="flex items-center gap-2.5">
-                        <Languages size={16} className="text-slate-400" />
-                        <span>{t("transcribe_language")}</span>
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-slate-400">
-                        <span className="truncate max-w-[80px]">
-                          {DEEPGRAM_LANGUAGES.find((l) => l.code === transcribeLanguage)?.label || transcribeLanguage}
-                        </span>
-                        <ChevronRight size={14} className="text-slate-500" />
-                      </div>
-                    </div>
-
-                    {isLangSubmenuOpen && (
-                      <div className="absolute left-full bottom-0 ml-1 w-64 max-h-72 flex flex-col bg-[#161619] border border-[#232328] rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 z-50">
-                        <div className="p-2 border-b border-[#232328] sticky top-0 bg-[#161619] z-10">
-                          <input
-                            type="text"
-                            placeholder={t("search_language")}
-                            value={langSearch}
-                            onChange={(e) => setLangSearch(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="w-full bg-[#232328] text-xs text-slate-200 placeholder-slate-500 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-                          />
+                  <>
+                    <div
+                      className="relative"
+                      onMouseEnter={() => setIsLangSubmenuOpen(true)}
+                      onMouseLeave={() => {
+                        setIsLangSubmenuOpen(false);
+                        setLangSearch("");
+                      }}
+                    >
+                      <div className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer rounded">
+                        <div className="flex items-center gap-2.5">
+                          <Languages size={16} className="text-slate-400" />
+                          <span>{t("transcribe_language")}</span>
                         </div>
-                        <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
-                          {filteredLanguages.map((lang) => (
-                            <button
-                              key={lang.code}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleSelectLanguage(lang.code);
-                              }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer"
-                            >
-                              <div className="flex flex-col">
-                                <span
+                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                          <span className="truncate max-w-[80px]">
+                            {DEEPGRAM_LANGUAGES.find((l) => l.code === transcribeLanguage)?.label || transcribeLanguage}
+                          </span>
+                          <ChevronRight size={14} className="text-slate-500" />
+                        </div>
+                      </div>
+
+                      {isLangSubmenuOpen && (
+                        <div className="absolute left-full bottom-0 ml-1 w-64 max-h-72 flex flex-col bg-[#161619] border border-[#232328] rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 z-50">
+                          <div className="p-2 border-b border-[#232328] sticky top-0 bg-[#161619] z-10">
+                            <input
+                              type="text"
+                              placeholder={t("search_language")}
+                              value={langSearch}
+                              onChange={(e) => setLangSearch(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full bg-[#232328] text-xs text-slate-200 placeholder-slate-500 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                            />
+                          </div>
+                          <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
+                            {filteredLanguages.map((lang) => (
+                              <button
+                                key={lang.code}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectLanguage(lang.code);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer"
+                              >
+                                <div className="flex flex-col">
+                                  <span
+                                    className={
+                                      transcribeLanguage === lang.code
+                                        ? "text-emerald-400 font-medium"
+                                        : "text-slate-200"
+                                    }
+                                  >
+                                    {lang.label}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500">
+                                    {lang.native}
+                                  </span>
+                                </div>
+                                <Check
+                                  size={14}
                                   className={
                                     transcribeLanguage === lang.code
-                                      ? "text-emerald-400 font-medium"
-                                      : "text-slate-200"
+                                      ? "opacity-100 text-emerald-400 shrink-0"
+                                      : "opacity-0 shrink-0"
                                   }
-                                >
-                                  {lang.label}
-                                </span>
-                                <span className="text-[10px] text-slate-500">
-                                  {lang.native}
-                                </span>
-                              </div>
-                              <Check
-                                size={14}
-                                className={
-                                  transcribeLanguage === lang.code
-                                    ? "opacity-100 text-emerald-400 shrink-0"
-                                    : "opacity-0 shrink-0"
-                                }
-                              />
-                            </button>
-                          ))}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* LỰA CHỌN NGÔN NGỮ DỊCH TRỰC TIẾP */}
+                    <div
+                      className="relative"
+                      onMouseEnter={() => setIsTranslateSubmenuOpen(true)}
+                      onMouseLeave={() => {
+                        setIsTranslateSubmenuOpen(false);
+                        setTranslateLangSearch("");
+                      }}
+                    >
+                      <div className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer rounded">
+                        <div className="flex items-center gap-2.5">
+                          <Globe size={16} className="text-slate-400" />
+                          <span>{t("translate_caption")}</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                          <span className="truncate max-w-[80px]">
+                            {TRANSLATE_LANGUAGES.find((l) => l.code === translateTargetLanguage)?.label || translateTargetLanguage}
+                          </span>
+                          <ChevronRight size={14} className="text-slate-500" />
                         </div>
                       </div>
-                    )}
-                  </div>
+
+                      {isTranslateSubmenuOpen && (
+                        <div className="absolute left-full bottom-0 ml-1 w-64 max-h-72 flex flex-col bg-[#161619] border border-[#232328] rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 z-50">
+                          <div className="p-2 border-b border-[#232328] sticky top-0 bg-[#161619] z-10">
+                            <input
+                              type="text"
+                              placeholder={t("search_translate_language")}
+                              value={translateLangSearch}
+                              onChange={(e) => setTranslateLangSearch(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-full bg-[#232328] text-xs text-slate-200 placeholder-slate-500 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
+                            />
+                          </div>
+                          <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
+                            {filteredTranslateLanguages.map((lang) => (
+                              <button
+                                key={lang.code}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleSelectTranslateLanguage(lang.code);
+                                }}
+                                className="w-full text-left px-3 py-1.5 text-xs text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer"
+                              >
+                                <div className="flex flex-col">
+                                  <span
+                                    className={
+                                      translateTargetLanguage === lang.code
+                                        ? "text-emerald-400 font-medium"
+                                        : "text-slate-200"
+                                    }
+                                  >
+                                    {lang.label}
+                                  </span>
+                                  <span className="text-[10px] text-slate-500">
+                                    {lang.native}
+                                  </span>
+                                </div>
+                                <Check
+                                  size={14}
+                                  className={
+                                    translateTargetLanguage === lang.code
+                                      ? "opacity-100 text-emerald-400 shrink-0"
+                                      : "opacity-0 shrink-0"
+                                  }
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 {isHost && (
