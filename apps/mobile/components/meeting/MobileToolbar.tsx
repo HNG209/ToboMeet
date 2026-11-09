@@ -321,11 +321,11 @@ export default function MobileToolbar({
             <MaterialCommunityIcons
               name={isLiveCaptionEnabled ? "subtitles" : "subtitles-outline"}
               size={20}
-              color={isLiveCaptionEnabled ? "#10b981" : "#d1d5db"}
+              color={isLiveCaptionEnabled ? "#60a5fa" : "#d1d5db"}
             />
             <Text
               className={`text-[10px] mt-1 font-medium ${
-                isLiveCaptionEnabled ? "text-emerald-400 font-bold" : "text-gray-300"
+                isLiveCaptionEnabled ? "text-blue-400 font-bold" : "text-gray-300"
               }`}
             >
               {t("meeting.toolbar.captions", { defaultValue: "Phụ đề" })}
@@ -434,11 +434,11 @@ export default function MobileToolbar({
                 <MaterialCommunityIcons
                   name="subtitles-outline"
                   size={20}
-                  color={isLiveCaptionEnabled ? "#10b981" : "#94a3b8"}
+                  color={isLiveCaptionEnabled ? "#60a5fa" : "#94a3b8"}
                 />
                 <Text className="ml-3 text-sm font-medium text-gray-200">
                   {t("meeting.toolbar.live_captions", {
-                    defaultValue: "Phụ đề trực tiếp",
+                    defaultValue: "Phụ đề",
                   })}
                 </Text>
               </View>
