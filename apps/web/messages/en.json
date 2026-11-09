@@ -1710,7 +1710,7 @@
     "chat_header": "Chat",
     "participant_header": "Participants",
     "polls_header": "Polls",
-    "captions_header": "Captions & Translation",
+    "captions_header": "Captions",
     "meeting_page": {
       "loading_wait": "Please wait for a moment",
       "loading_prepare_room": "Preparing meeting room",

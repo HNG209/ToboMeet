@@ -662,27 +662,16 @@ export default function CustomToolbar({
             }
           }}
           className={getBtnStyle(activeTab === "captions")}
-          title={t("live_caption")}
+          title="Phụ đề"
         >
           <div className="relative flex items-center justify-center">
             <Captions
               size={21}
-              className={
-                activeTab === "captions"
-                  ? "text-brand-400"
-                  : isLiveCaptionEnabled
-                    ? "text-emerald-400"
-                    : ""
-              }
+              className={activeTab === "captions" ? "text-brand-400" : ""}
             />
-            {isLiveCaptionEnabled && (
-              <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-            )}
           </div>
           <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
-            {t("live_caption")}
+            Phụ đề
           </span>
         </button>
 
@@ -1095,194 +1084,23 @@ export default function CustomToolbar({
                   </button>
                 </div>
 
-                {/* BẬT / TẮT PHỤ ĐỀ TRỰC TIẾP (LIVE CAPTION) */}
-                <div
+                {/* PHỤ ĐỀ (CLICK ĐỂ MỞ TAB VÀ KÍCH HOẠT AGENT) */}
+                <button
+                  type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onToggleLiveCaption?.();
+                    setIsMoreMenuOpen(false);
+                    if (!isLiveCaptionEnabled) {
+                      onToggleLiveCaption?.();
+                    } else {
+                      onToggleSidebar("captions");
+                    }
                   }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer rounded"
+                  className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center gap-2.5 transition-colors cursor-pointer rounded"
                 >
-                  <div className="flex items-center gap-2.5">
-                    <Captions
-                      size={16}
-                      className={
-                        isLiveCaptionEnabled
-                          ? "text-emerald-400"
-                          : "text-slate-300"
-                      }
-                    />
-                    <span
-                      className={
-                        isLiveCaptionEnabled
-                          ? "text-emerald-400 font-medium"
-                          : ""
-                      }
-                    >
-                      {t("live_caption")}
-                    </span>
-                  </div>
-                  <div
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${isLiveCaptionEnabled ? "bg-emerald-500" : "bg-slate-600"
-                      }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isLiveCaptionEnabled
-                        ? "translate-x-4"
-                        : "translate-x-0"
-                        }`}
-                    />
-                  </div>
-                </div>
-
-                {isLiveCaptionEnabled && (
-                  <>
-                    <div
-                      className="relative"
-                      onMouseEnter={() => setIsLangSubmenuOpen(true)}
-                      onMouseLeave={() => {
-                        setIsLangSubmenuOpen(false);
-                        setLangSearch("");
-                      }}
-                    >
-                      <div className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer rounded">
-                        <div className="flex items-center gap-2.5">
-                          <Languages size={16} className="text-slate-400" />
-                          <span>{t("transcribe_language")}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
-                          <span className="truncate max-w-[80px]">
-                            {DEEPGRAM_LANGUAGES.find((l) => l.code === transcribeLanguage)?.label || transcribeLanguage}
-                          </span>
-                          <ChevronRight size={14} className="text-slate-500" />
-                        </div>
-                      </div>
-
-                      {isLangSubmenuOpen && (
-                        <div className="absolute left-full bottom-0 ml-1 w-64 max-h-72 flex flex-col bg-[#161619] border border-[#232328] rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 z-50">
-                          <div className="p-2 border-b border-[#232328] sticky top-0 bg-[#161619] z-10">
-                            <input
-                              type="text"
-                              placeholder={t("search_language")}
-                              value={langSearch}
-                              onChange={(e) => setLangSearch(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full bg-[#232328] text-xs text-slate-200 placeholder-slate-500 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-                            />
-                          </div>
-                          <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
-                            {filteredLanguages.map((lang) => (
-                              <button
-                                key={lang.code}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectLanguage(lang.code);
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer"
-                              >
-                                <div className="flex flex-col">
-                                  <span
-                                    className={
-                                      transcribeLanguage === lang.code
-                                        ? "text-emerald-400 font-medium"
-                                        : "text-slate-200"
-                                    }
-                                  >
-                                    {lang.label}
-                                  </span>
-                                  <span className="text-[10px] text-slate-500">
-                                    {lang.native}
-                                  </span>
-                                </div>
-                                <Check
-                                  size={14}
-                                  className={
-                                    transcribeLanguage === lang.code
-                                      ? "opacity-100 text-emerald-400 shrink-0"
-                                      : "opacity-0 shrink-0"
-                                  }
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* LỰA CHỌN NGÔN NGỮ DỊCH TRỰC TIẾP */}
-                    <div
-                      className="relative"
-                      onMouseEnter={() => setIsTranslateSubmenuOpen(true)}
-                      onMouseLeave={() => {
-                        setIsTranslateSubmenuOpen(false);
-                        setTranslateLangSearch("");
-                      }}
-                    >
-                      <div className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer rounded">
-                        <div className="flex items-center gap-2.5">
-                          <Globe size={16} className="text-slate-400" />
-                          <span>{t("translate_caption")}</span>
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-slate-400">
-                          <span className="truncate max-w-[80px]">
-                            {TRANSLATE_LANGUAGES.find((l) => l.code === translateTargetLanguage)?.label || translateTargetLanguage}
-                          </span>
-                          <ChevronRight size={14} className="text-slate-500" />
-                        </div>
-                      </div>
-
-                      {isTranslateSubmenuOpen && (
-                        <div className="absolute left-full bottom-0 ml-1 w-64 max-h-72 flex flex-col bg-[#161619] border border-[#232328] rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150 z-50">
-                          <div className="p-2 border-b border-[#232328] sticky top-0 bg-[#161619] z-10">
-                            <input
-                              type="text"
-                              placeholder={t("search_translate_language")}
-                              value={translateLangSearch}
-                              onChange={(e) => setTranslateLangSearch(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-full bg-[#232328] text-xs text-slate-200 placeholder-slate-500 rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-                            />
-                          </div>
-                          <div className="overflow-y-auto flex-1 py-1 custom-scrollbar">
-                            {filteredTranslateLanguages.map((lang) => (
-                              <button
-                                key={lang.code}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleSelectTranslateLanguage(lang.code);
-                                }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-slate-200 hover:bg-[#232328] flex items-center justify-between transition-colors cursor-pointer"
-                              >
-                                <div className="flex flex-col">
-                                  <span
-                                    className={
-                                      translateTargetLanguage === lang.code
-                                        ? "text-emerald-400 font-medium"
-                                        : "text-slate-200"
-                                    }
-                                  >
-                                    {lang.label}
-                                  </span>
-                                  <span className="text-[10px] text-slate-500">
-                                    {lang.native}
-                                  </span>
-                                </div>
-                                <Check
-                                  size={14}
-                                  className={
-                                    translateTargetLanguage === lang.code
-                                      ? "opacity-100 text-emerald-400 shrink-0"
-                                      : "opacity-0 shrink-0"
-                                  }
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
+                  <Captions size={16} className="text-slate-300" />
+                  <span>Phụ đề</span>
+                </button>
 
                 {isHost && (
                   <>

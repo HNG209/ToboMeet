@@ -3,7 +3,7 @@
 
 import { useIsRecording, useRoomContext } from "@livekit/components-react";
 import { RoomEvent } from "livekit-client";
-import { Grid2X2, X } from "lucide-react";
+import { Grid2X2, X, Users, MessageSquare, BarChart2, Captions } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import localforage from "localforage";
 import "@livekit/components-styles";
@@ -288,15 +288,26 @@ export default function MeetingRoomContent({
         <aside className="fixed inset-0 z-50 flex flex-col bg-[#111113] lg:static lg:w-[360px] xl:w-[380px] lg:z-auto lg:border-l lg:border-[#232328] shadow-2xl transition-all duration-300 ease-in-out shrink-0 h-full">
           {/* Header với Tiêu đề & Nút đóng */}
           <div className="h-14 px-5 flex items-center justify-between border-b border-[#232328] bg-[#111113] shrink-0">
-            <h2 className="text-sm font-semibold text-slate-100 tracking-wide">
-              {sidebarTab === "chat"
-                ? t("chat_header")
-                : sidebarTab === "people"
-                  ? t("participant_header")
-                  : sidebarTab === "polls"
-                    ? t("polls_header")
-                    : (t("captions_header") || "Phụ đề & Dịch thuật")}
-            </h2>
+            <div className="flex items-center gap-2.5 text-slate-100">
+              {sidebarTab === "chat" ? (
+                <MessageSquare size={17} className="text-slate-100" />
+              ) : sidebarTab === "people" ? (
+                <Users size={17} className="text-slate-100" />
+              ) : sidebarTab === "polls" ? (
+                <BarChart2 size={17} className="text-slate-100" />
+              ) : (
+                <Captions size={17} className="text-slate-100" />
+              )}
+              <h2 className="text-sm font-semibold text-slate-100 tracking-wide">
+                {sidebarTab === "chat"
+                  ? t("chat_header")
+                  : sidebarTab === "people"
+                    ? t("participant_header")
+                    : sidebarTab === "polls"
+                      ? t("polls_header")
+                      : (t("captions_header") || "Phụ đề")}
+              </h2>
+            </div>
 
             <button
               onClick={() => setIsSidebarOpen(false)}
