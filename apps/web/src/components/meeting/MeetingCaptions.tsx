@@ -106,6 +106,7 @@ interface DisplayCaptionItem {
   text: string;
   isFinal: boolean;
   timestamp: number;
+  speakerLanguage?: string;
   appliedTargetLang: string;
   appliedTranslation?: string;
 }
@@ -142,16 +143,20 @@ export default function MeetingCaptions({
   const [searchTranscribeLang, setSearchTranscribeLang] = useState("");
   const transcribeDropdownRef = useRef<HTMLDivElement>(null);
 
-  // 2. Ngôn ngữ dịch đích (Dịch)
-  const [translateTargetLang, setTranslateTargetLang] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("tobomeet_translate_target_language") || "off";
-    }
-    return "off";
-  });
+  // 2. Ngôn ngữ dịch đích (Dịch) - Mặc định khi vào meeting mới luôn là "off" (không lưu localStorage)
+  const [translateTargetLang, setTranslateTargetLang] = useState<string>("off");
   const [isLangDropdownOpen, setIsLangDropdownOpen] = useState(false);
   const [searchLang, setSearchLang] = useState("");
   const translateDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Xoá key cũ trong localStorage nếu còn sót lại từ các phiên trước
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("tobomeet_translate_target_language");
+      } catch {}
+    }
+  }, []);
 
   // Lắng nghe sự kiện thay đổi ngôn ngữ dịch từ các nguồn khác
   useEffect(() => {
@@ -232,7 +237,6 @@ export default function MeetingCaptions({
     setSearchLang("");
 
     if (typeof window !== "undefined") {
-      localStorage.setItem("tobomeet_translate_target_language", code);
       window.dispatchEvent(
         new CustomEvent("tobomeet_translate_target_changed", { detail: code }),
       );
@@ -295,6 +299,7 @@ export default function MeetingCaptions({
         text: caption.text,
         isFinal: caption.isFinal,
         timestamp: caption.timestamp,
+        speakerLanguage: caption.speakerLanguage,
         appliedTargetLang: snap.appliedTargetLang,
         appliedTranslation: snap.appliedTranslation,
       };
@@ -644,6 +649,11 @@ export default function MeetingCaptions({
                         item.appliedTargetLang !== "off" &&
                         item.appliedTargetLang !== "none";
 
+                      const srcCode = (item.speakerLanguage || "vi").split("-")[0].toLowerCase();
+                      const tgtCode = (item.appliedTargetLang || "").split("-")[0].toLowerCase();
+                      const isSameLanguage = isTranslateActive && srcCode === tgtCode;
+                      const shouldShowTranslation = item.isFinal && isTranslateActive && !isSameLanguage;
+
                       const translatedText = item.appliedTranslation;
                       const langBadge = getLangBadge(item.appliedTargetLang);
                       const langLabel = getLangLabel(item.appliedTargetLang);
@@ -666,8 +676,8 @@ export default function MeetingCaptions({
                             {item.text}
                           </div>
 
-                          {/* Dòng bản dịch bên dưới chân (chỉ hiện khi có target translation) */}
-                          {isTranslateActive && (
+                          {/* Dòng bản dịch bên dưới chân: chỉ hiện khi là bản final, đã bật dịch và ngôn ngữ không trùng với ngôn ngữ nói */}
+                          {shouldShowTranslation && (
                             <div className="mt-1.5 pt-1.5 border-t border-white/10 flex flex-col gap-0.5">
                               <div className="flex items-center gap-1.5 text-[9px] font-mono text-emerald-400">
                                 <span className="px-1 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/20 font-semibold">
@@ -680,9 +690,7 @@ export default function MeetingCaptions({
                               <div className="text-emerald-300 leading-relaxed break-words font-sans text-xs">
                                 {translatedText || (
                                   <span className="text-slate-500 italic text-[11px]">
-                                    {item.isFinal
-                                      ? "Đang dịch..."
-                                      : "Chờ kết thúc câu..."}
+                                    Đang dịch...
                                   </span>
                                 )}
                               </div>

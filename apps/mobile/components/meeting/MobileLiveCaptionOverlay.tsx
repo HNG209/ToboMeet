@@ -101,6 +101,7 @@ interface DisplayCaptionItem {
   text: string;
   isFinal: boolean;
   timestamp: number;
+  speakerLanguage?: string;
   appliedTargetLang: string;
   appliedTranslation?: string;
 }
@@ -135,14 +136,13 @@ export default function MobileLiveCaptionOverlay({
   const [showTranslateModal, setShowTranslateModal] = useState(false);
   const [searchTranslateText, setSearchTranslateText] = useState("");
 
-  // Tải cấu hình đã lưu khi mount
+  // Tải cấu hình đã lưu khi mount - Mặc định vào phòng mới luôn là "off" (không dịch)
   useEffect(() => {
     AsyncStorage.getItem("tobomeet_transcribe_language").then((val) => {
       if (val) setTranscribeLanguage(val);
     });
-    AsyncStorage.getItem("tobomeet_translate_target_language").then((val) => {
-      if (val) setTranslateTargetLang(val);
-    });
+    // Bỏ lưu ngôn ngữ dịch cũ, reset về mặc định
+    AsyncStorage.removeItem("tobomeet_translate_target_language").catch(() => {});
   }, []);
 
   // Đổi ngôn ngữ phiên âm (Nói)
@@ -172,7 +172,6 @@ export default function MobileLiveCaptionOverlay({
     setTranslateTargetLang(code);
     setShowTranslateModal(false);
     setSearchTranslateText("");
-    await AsyncStorage.setItem("tobomeet_translate_target_language", code);
 
     if (room?.localParticipant) {
       room.localParticipant.setAttributes({ translate_target_language: code }).catch(() => {});
@@ -228,6 +227,7 @@ export default function MobileLiveCaptionOverlay({
         text: caption.text,
         isFinal: caption.isFinal,
         timestamp: caption.timestamp,
+        speakerLanguage: caption.speakerLanguage,
         appliedTargetLang: snap.appliedTargetLang,
         appliedTranslation: snap.appliedTranslation,
       };
@@ -502,6 +502,11 @@ export default function MobileLiveCaptionOverlay({
                         item.appliedTargetLang !== "off" &&
                         item.appliedTargetLang !== "none";
 
+                      const srcCode = (item.speakerLanguage || "vi").split("-")[0].toLowerCase();
+                      const tgtCode = (item.appliedTargetLang || "").split("-")[0].toLowerCase();
+                      const isSameLanguage = isTranslateActive && srcCode === tgtCode;
+                      const shouldShowTranslation = item.isFinal && isTranslateActive && !isSameLanguage;
+
                       const translatedText = item.appliedTranslation;
                       const langBadge = getLangBadge(item.appliedTargetLang);
 
@@ -535,8 +540,8 @@ export default function MobileLiveCaptionOverlay({
                             )}
                           </Text>
 
-                          {/* Dòng bản dịch bên dưới chân */}
-                          {isTranslateActive && (
+                          {/* Dòng bản dịch bên dưới chân: chỉ hiện khi là bản final, đã bật dịch và ngôn ngữ không trùng */}
+                          {shouldShowTranslation && (
                             <View className="mt-1 pt-1 border-t border-white/10 flex-col gap-0.5">
                               <View className="flex-row items-center gap-1">
                                 <View className="px-1 py-0.2 rounded bg-emerald-500/15 border border-emerald-500/20">
@@ -548,7 +553,7 @@ export default function MobileLiveCaptionOverlay({
                               <Text className="text-[11px] text-emerald-300 leading-4 font-normal">
                                 {translatedText || (
                                   <Text className="text-slate-500 italic text-[10px]">
-                                    {item.isFinal ? "Đang dịch..." : "Chờ dứt câu..."}
+                                    Đang dịch...
                                   </Text>
                                 )}
                               </Text>

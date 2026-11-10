@@ -167,11 +167,16 @@ export default function CustomToolbar({
       });
     }
 
-    const savedTranslate = localStorage.getItem("tobomeet_translate_target_language") || "off";
-    setTranslateTargetLanguage(savedTranslate);
+    // Khi vào meeting mới: mặc định luôn là không dịch ("off")
+    setTranslateTargetLanguage("off");
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("tobomeet_translate_target_language");
+      } catch {}
+    }
     if (room?.localParticipant) {
       room.localParticipant.setAttributes({
-        translate_target_language: savedTranslate,
+        translate_target_language: "off",
       });
     }
   }, [room]);
@@ -200,7 +205,6 @@ export default function CustomToolbar({
 
   const handleSelectTranslateLanguage = (langCode: string) => {
     setTranslateTargetLanguage(langCode);
-    localStorage.setItem("tobomeet_translate_target_language", langCode);
     if (typeof window !== "undefined") {
       window.dispatchEvent(
         new CustomEvent("tobomeet_translate_target_changed", { detail: langCode })

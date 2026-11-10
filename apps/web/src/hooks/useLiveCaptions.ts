@@ -8,6 +8,7 @@ export interface LiveCaptionItem {
   text: string;
   speakerId?: string;
   speakerName?: string;
+  speakerLanguage?: string;
   isFinal: boolean;
   timestamp: number;
   translations?: Record<string, string>;
@@ -55,6 +56,7 @@ export function useLiveCaptions(room: Room | undefined, enabled: boolean) {
       rawSpeakerName?: string,
       timestamp?: number,
       translations?: Record<string, string>,
+      speakerLanguage?: string,
     ) => {
       const cleanText = text.trim();
       if (!cleanText) return;
@@ -69,6 +71,7 @@ export function useLiveCaptions(room: Room | undefined, enabled: boolean) {
           text: cleanText,
           speakerId,
           speakerName,
+          speakerLanguage: speakerLanguage || (existingIndex >= 0 ? prev[existingIndex].speakerLanguage : undefined),
           isFinal,
           timestamp: now,
           translations: translations || (existingIndex >= 0 ? prev[existingIndex].translations : undefined),
@@ -149,6 +152,7 @@ export function useLiveCaptions(room: Room | undefined, enabled: boolean) {
         const isFinal = attributes["lk.transcription_final"] === "true";
         const speakerId = attributes["speaker_id"] || participantInfo?.identity;
         const speakerName = attributes["speaker_name"];
+        const speakerLanguage = attributes["speaker_language"];
         const translationsRaw = attributes["translations"];
         let translations: Record<string, string> | undefined;
         if (translationsRaw) {
@@ -168,6 +172,7 @@ export function useLiveCaptions(room: Room | undefined, enabled: boolean) {
           speakerName,
           undefined,
           translations,
+          speakerLanguage,
         );
       } catch (err) {
         console.error("[useLiveCaptions] Error reading text stream:", err);
