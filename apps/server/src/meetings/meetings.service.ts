@@ -1454,6 +1454,9 @@ export class MeetingsService {
         status: doc.status as "ongoing" | "ended",
         sessionFolder: doc.sessionFolder,
         recordings: doc.recordings || [],
+        summary: doc.summary,
+        summaryStatus: doc.summaryStatus || "none",
+        summaryReason: doc.summaryReason,
         startedAt: doc.startedAt || doc.createdAt,
         endedAt: doc.endedAt,
         createdAt: doc.createdAt,
@@ -1471,6 +1474,73 @@ export class MeetingsService {
       nextCursor,
       hasNext,
       limit,
+    };
+  }
+
+  /**
+   * Lấy chi tiết của một phiên họp cụ thể
+   */
+  async getMeetingSessionDetails(
+    meetingCode: string,
+    sessionId: string,
+  ): Promise<MeetingSessionResponse> {
+    if (!meetingCode || !sessionId) {
+      throw new AppException(ErrorCode.MEETING_NOT_FOUND);
+    }
+
+    const doc: any = await this.sessionModel
+      .findOne({ _id: sessionId, meetingCode: meetingCode.trim() })
+      .lean()
+      .exec();
+
+    if (!doc) {
+      throw new AppException(ErrorCode.MEETING_INVITE_SESSION_NOT_FOUND);
+    }
+
+    let participantCount = 0;
+    try {
+      participantCount = await this.attendanceModel.countDocuments({
+        sessionId: doc._id.toString(),
+      });
+    } catch (e) {
+      console.error("Lỗi khi đếm người tham gia session:", e);
+    }
+
+    const started = doc.startedAt
+      ? new Date(doc.startedAt)
+      : doc.createdAt
+        ? new Date(doc.createdAt)
+        : new Date();
+    let durationSeconds = 0;
+    if (doc.endedAt) {
+      durationSeconds = Math.max(
+        0,
+        Math.floor(
+          (new Date(doc.endedAt).getTime() - started.getTime()) / 1000,
+        ),
+      );
+    } else if (doc.status === "ongoing") {
+      durationSeconds = Math.max(
+        0,
+        Math.floor((Date.now() - started.getTime()) / 1000),
+      );
+    }
+
+    return {
+      _id: doc._id.toString(),
+      meetingCode: doc.meetingCode,
+      status: doc.status as "ongoing" | "ended",
+      sessionFolder: doc.sessionFolder,
+      recordings: doc.recordings || [],
+      summary: doc.summary,
+      summaryStatus: doc.summaryStatus || "none",
+      summaryReason: doc.summaryReason,
+      startedAt: doc.startedAt || doc.createdAt,
+      endedAt: doc.endedAt,
+      createdAt: doc.createdAt,
+      updatedAt: doc.updatedAt,
+      durationSeconds,
+      totalParticipants: participantCount,
     };
   }
 }

@@ -14,7 +14,7 @@ import { TrackSource, WebhookReceiver } from "livekit-server-sdk";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import { RecordingsService } from "../meetings/recordings.service";
-import { RecordingWebhookDto } from "@tobomeet/shared/types";
+import { RecordingWebhookDto, TranscriptReadyWebhookDto } from "@tobomeet/shared/types";
 
 @Controller("webhooks")
 export class WebhooksController {
@@ -48,6 +48,32 @@ export class WebhooksController {
     return {
       received: true,
       message: "Recording webhook queued for post-processing",
+      room_name: payload.room_name,
+      session_id: payload.session_id,
+    };
+  }
+
+  @Post("transcripts/ready")
+  @HttpCode(HttpStatus.OK)
+  async handleTranscriptReady(@Body() payload: TranscriptReadyWebhookDto) {
+    this.logger.log(
+      `Received transcript ready webhook for room: ${payload.room_name}, session: ${payload.session_id} (${payload.segment_count} segments, ${payload.word_count} words)`,
+    );
+
+    await this.meetingQueue.add(
+      "generate-meeting-summary",
+      payload,
+      {
+        attempts: 3,
+        backoff: { type: "exponential", delay: 5000 },
+        removeOnComplete: 100,
+        removeOnFail: 50,
+      },
+    );
+
+    return {
+      received: true,
+      message: "Transcript webhook queued for summary generation",
       room_name: payload.room_name,
       session_id: payload.session_id,
     };

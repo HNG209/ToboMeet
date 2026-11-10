@@ -636,12 +636,46 @@ export interface SessionRecording {
   createdAt: Date | string;
 }
 
+export interface MeetingActionItem {
+  task: string;
+  assignee?: string;
+  dueDate?: string;
+  status?: "pending" | "in_progress" | "completed";
+}
+
+export interface MeetingSummaryData {
+  title?: string;
+  overview?: string;
+  keyPoints?: string[];
+  actionItems?: MeetingActionItem[];
+  generatedAt?: string | Date;
+}
+
+export type MeetingSummaryStatus =
+  | "none"
+  | "processing"
+  | "completed"
+  | "skipped"
+  | "failed";
+
+export interface TranscriptReadyWebhookDto {
+  room_name: string;
+  session_id: string;
+  transcript_key: string;
+  metadata_key?: string;
+  segment_count: number;
+  word_count: number;
+}
+
 export interface MeetingSessionResponse {
   _id: string;
   meetingCode: string;
   status: "ongoing" | "ended";
   sessionFolder?: string;
   recordings?: SessionRecording[];
+  summary?: MeetingSummaryData;
+  summaryStatus?: MeetingSummaryStatus;
+  summaryReason?: string;
   startedAt: string | Date;
   endedAt?: string | Date;
   createdAt?: string | Date;

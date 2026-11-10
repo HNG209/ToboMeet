@@ -34,6 +34,7 @@ import { WhiteboardService } from "./whiteboard.service";
 import { Poll, PollSchema } from "./schemas/poll.schema";
 import { PollsController } from "./polls.controller";
 import { PollsService } from "./polls.service";
+import { MeetingSummaryService } from "./meeting-summary.service";
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { PollsService } from "./polls.service";
     MeetingsGateway,
     MeetingProcessor,
     PollsService,
+    MeetingSummaryService,
   ],
   exports: [
     AttendanceService,
@@ -80,6 +82,7 @@ import { PollsService } from "./polls.service";
     MeetingInviteService,
     MeetingsGateway,
     PollsService,
+    MeetingSummaryService,
   ],
 })
 export class MeetingsModule {}

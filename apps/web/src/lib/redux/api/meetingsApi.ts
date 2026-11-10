@@ -436,6 +436,19 @@ export const meetingsApi = baseApi.injectEndpoints({
       }),
     }),
 
+    // Lấy chi tiết phiên họp (bao gồm tóm tắt, action items, v.v.)
+    getSessionDetails: builder.query<
+      MeetingSessionResponse,
+      { meetingCode: string; sessionId: string }
+    >({
+      query: ({ meetingCode, sessionId }) => ({
+        url: `/meetings/${meetingCode}/sessions/${sessionId}`,
+      }),
+      providesTags: (result, error, { sessionId }) => [
+        { type: "MeetingSessions", id: sessionId },
+      ],
+    }),
+
     // Bắt đầu ghi hình cuộc họp trên Cloud (LiveKit Egress)
     startCloudRecording: builder.mutation<void, { meetingCode: string }>({
       query: ({ meetingCode }) => ({
@@ -494,6 +507,7 @@ export const {
   useLazyGetMeetingSessionsQuery,
   useGetSessionAttendanceQuery,
   useLazyGetSessionAttendanceQuery,
+  useGetSessionDetailsQuery,
 
   // Cloud Recording APIs
   useStartCloudRecordingMutation,

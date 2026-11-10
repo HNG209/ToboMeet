@@ -520,5 +520,18 @@ export class MeetingsController {
       parsedLimit,
     );
   }
+
+  /**
+   * GET /api/meetings/:code/sessions/:sessionId
+   * Lấy chi tiết một phiên họp
+   */
+  @Get(":code/sessions/:sessionId")
+  @UseGuards(SupabaseGuard)
+  async getMeetingSessionDetails(
+    @Param("code") meetingCode: string,
+    @Param("sessionId") sessionId: string,
+  ) {
+    return this.meetingsService.getMeetingSessionDetails(meetingCode, sessionId);
+  }
 }
 

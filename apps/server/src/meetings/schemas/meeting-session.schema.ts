@@ -30,6 +30,45 @@ export class SessionRecording {
 export const SessionRecordingSchema =
   SchemaFactory.createForClass(SessionRecording);
 
+@Schema({ _id: false })
+export class MeetingActionItem {
+  @Prop({ required: true })
+  task: string;
+
+  @Prop()
+  assignee?: string;
+
+  @Prop()
+  dueDate?: string;
+
+  @Prop({ default: "pending" })
+  status: string;
+}
+
+export const MeetingActionItemSchema =
+  SchemaFactory.createForClass(MeetingActionItem);
+
+@Schema({ _id: false })
+export class MeetingSummaryData {
+  @Prop()
+  title?: string;
+
+  @Prop()
+  overview?: string;
+
+  @Prop({ type: [String], default: [] })
+  keyPoints: string[];
+
+  @Prop({ type: [MeetingActionItemSchema], default: [] })
+  actionItems: MeetingActionItem[];
+
+  @Prop({ default: Date.now })
+  generatedAt: Date;
+}
+
+export const MeetingSummaryDataSchema =
+  SchemaFactory.createForClass(MeetingSummaryData);
+
 export type MeetingSessionDocument = MeetingSession & Document;
 
 @Schema({ timestamps: true })
@@ -45,6 +84,18 @@ export class MeetingSession {
 
   @Prop({ type: [SessionRecordingSchema], default: [] })
   recordings: SessionRecording[];
+
+  @Prop({ type: MeetingSummaryDataSchema })
+  summary?: MeetingSummaryData;
+
+  @Prop({
+    enum: ["none", "processing", "completed", "skipped", "failed"],
+    default: "none",
+  })
+  summaryStatus: string;
+
+  @Prop()
+  summaryReason?: string;
 
   @Prop({ default: Date.now })
   startedAt: Date;

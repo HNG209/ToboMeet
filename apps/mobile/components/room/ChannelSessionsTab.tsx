@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import {
   useEnsureChannelMeetingMutation,
   useGetSessionAttendanceQuery,
+  useGetSessionDetailsQuery,
 } from "../../lib/redux/features/meetings/meetingsApi";
 import { useFetchMeetingSession } from "../../hooks/useFetchMeetingSession";
 import {
@@ -26,6 +27,7 @@ import { useGetPollsQuery } from "../../lib/redux/api/pollsApi";
 import MobilePollDetailsModal from "../meeting/MobilePollDetailsModal";
 import { toast } from "../../lib/toast";
 import HlsRecordingPlayer from "./HlsRecordingPlayer";
+import MeetingSummaryCard from "./MeetingSummaryCard";
 
 interface ChannelSessionsTabProps {
   roomId: string;
@@ -390,19 +392,36 @@ function SessionDetailView({
   const [selectedDetailPoll, setSelectedDetailPoll] = useState<PollResponse | null>(null);
 
   const {
+    data: sessionDetails,
+    refetch: refetchSessionDetails,
+    isFetching: isSessionDetailsFetching,
+  } = useGetSessionDetailsQuery(
+    {
+      meetingCode: session.meetingCode,
+      sessionId: session._id,
+    },
+    {
+      skip: !session.meetingCode || !session._id,
+      pollingInterval: session.summaryStatus === "processing" ? 5000 : 0,
+    }
+  );
+
+  const currentSession = sessionDetails || session;
+
+  const {
     data: sessionPolls = [],
     isLoading: isPollsLoading,
     refetch: refetchPolls,
     isFetching: isPollsFetching,
   } = useGetPollsQuery(
     {
-      meetingCode: session.meetingCode,
-      sessionId: session._id,
+      meetingCode: currentSession.meetingCode,
+      sessionId: currentSession._id,
     },
-    { skip: !session.meetingCode || !session._id },
+    { skip: !currentSession.meetingCode || !currentSession._id },
   );
 
-  const recordings = session.recordings || [];
+  const recordings = currentSession.recordings || [];
 
   const resolveRecordingUrl = (recording: SessionRecording) => {
     if (
@@ -439,8 +458,8 @@ function SessionDetailView({
     refetch: refetchAttendance,
     isFetching: isAttendanceFetching,
   } = useGetSessionAttendanceQuery({
-    meetingCode: session.meetingCode,
-    sessionId: session._id,
+    meetingCode: currentSession.meetingCode,
+    sessionId: currentSession._id,
   });
 
   return (
@@ -521,12 +540,20 @@ function SessionDetailView({
             <Text className="text-xs font-bold text-slate-800">
               {attendanceList.length > 0
                 ? t("room.session_users_count", { count: attendanceList.length })
-                : session.totalParticipants !== undefined
-                ? t("room.session_users_count", { count: session.totalParticipants })
+                : currentSession.totalParticipants !== undefined
+                ? t("room.session_users_count", { count: currentSession.totalParticipants })
                 : "0"}
             </Text>
           </View>
         </View>
+
+        {/* Tóm tắt cuộc họp & Action Items */}
+        <MeetingSummaryCard
+          session={currentSession}
+          t={t}
+          onRefresh={refetchSessionDetails}
+          isRefreshing={isSessionDetailsFetching}
+        />
 
         {/* Bản ghi cuộc họp (Recordings Section) */}
         <View className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden mb-4">

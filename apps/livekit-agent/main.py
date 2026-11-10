@@ -116,6 +116,51 @@ SILENCE_TIMEOUT_SECONDS = 10.0    # Đóng stream Deepgram khi người dùng im
 PRE_ROLL_BUFFER_FRAMES = 20       # Giữ đệm ~400ms audio trước khi nói để không mất âm đầu
 
 
+def _sync_upload_to_r2(local_file: Path, s3_key: str) -> bool:
+    """Tải file cục bộ lên Cloudflare R2 bucket thông qua boto3."""
+    endpoint = os.getenv("R2_ENDPOINT_URL")
+    access_key = os.getenv("R2_ACCESS_KEY_ID")
+    secret_key = os.getenv("R2_SECRET_ACCESS_KEY")
+    bucket = os.getenv("R2_BUCKET_NAME", "tobomeet")
+
+    if not (endpoint and access_key and secret_key):
+        logger.warning("R2 credentials not fully set, skipping upload for %s", local_file)
+        return False
+
+    try:
+        import boto3
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=endpoint,
+            aws_access_key_id=access_key,
+            aws_secret_access_key=secret_key,
+            region_name="auto",
+        )
+        s3.upload_file(str(local_file), bucket, s3_key)
+        logger.info("Uploaded %s to R2 (%s/%s)", local_file.name, bucket, s3_key)
+        return True
+    except Exception as e:
+        logger.error("Error uploading %s to R2: %s", local_file, e)
+        return False
+
+
+async def _notify_server_transcript_ready(payload: dict):
+    """Gửi webhook HTTP POST sang NestJS server thông báo transcript đã sẵn sàng trên R2."""
+    server_url = os.getenv("SERVER_URL", "http://localhost:3001").rstrip("/")
+    webhook_url = f"{server_url}/api/webhooks/transcripts/ready"
+    try:
+        timeout = aiohttp.ClientTimeout(total=10)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(webhook_url, json=payload) as resp:
+                if resp.status in (200, 201):
+                    logger.info("Sent transcript webhook to server (%s)", webhook_url)
+                else:
+                    body = await resp.text()
+                    logger.warning("Webhook returned %d from %s: %s", resp.status, webhook_url, body)
+    except Exception as e:
+        logger.error("Failed to notify server transcript ready at %s: %s", webhook_url, e)
+
+
 class ParticipantAudioTracker:
     """Quản lý audio stream, pre-roll buffer, VAD dựa trên RMS và phiên Deepgram STT cho từng người tham gia."""
 
@@ -500,7 +545,18 @@ async def entrypoint(ctx: JobContext):
 
     segments: list[dict] = []
     started_at = datetime.now(timezone.utc)
-    session_id = started_at.strftime("%Y%m%d_%H%M%S")
+
+    session_id = None
+    if ctx.job and ctx.job.metadata:
+        try:
+            job_meta = json.loads(ctx.job.metadata)
+            if isinstance(job_meta, dict):
+                session_id = job_meta.get("sessionId")
+        except Exception:
+            session_id = ctx.job.metadata
+
+    if not session_id:
+        session_id = started_at.strftime("%Y%m%d_%H%M%S")
 
     session_dir = TRANSCRIPT_DIR / room_name / session_id
     await asyncio.to_thread(lambda: session_dir.mkdir(parents=True, exist_ok=True))
@@ -832,11 +888,14 @@ async def entrypoint(ctx: JobContext):
                 on_track_subscribed(pub.track, pub, p)
 
     async def save_transcript():
-        """Ghi metadata.json vào session_dir khi agent kết thúc."""
+        """Ghi metadata.json vào session_dir khi agent kết thúc, sau đó đẩy lên R2 & báo webhook."""
         if empty_room_timer is not None:
             empty_room_timer.cancel()
 
         ended_at = datetime.now(timezone.utc)
+        segment_count = len(segments)
+        total_words = sum(len((s.get("text") or "").split()) for s in segments)
+
         metadata = {
             "room": room_name,
             "session_id": session_id,
@@ -844,18 +903,44 @@ async def entrypoint(ctx: JobContext):
             "ended_at": ended_at.isoformat(),
             "duration_seconds": round((ended_at - started_at).total_seconds(), 1),
             "language": "multi",
-            "segment_count": len(segments),
+            "segment_count": segment_count,
+            "word_count": total_words,
             "transcript_file": "transcript.jsonl",
         }
         meta_path = session_dir / "metadata.json"
         content = json.dumps(metadata, ensure_ascii=False, indent=2)
         await asyncio.to_thread(meta_path.write_text, content, "utf-8")
         logger.info(
-            "Session metadata saved: %s (%d segments, %.0fs)",
+            "Session metadata saved: %s (%d segments, %d words, %.0fs)",
             meta_path,
-            len(segments),
+            segment_count,
+            total_words,
             metadata["duration_seconds"],
         )
+
+        transcript_key = f"transcripts/{room_name}/{session_id}/transcript.jsonl"
+        metadata_key = f"transcripts/{room_name}/{session_id}/metadata.json"
+
+        # Nếu có segments, upload bất đồng bộ lên Cloudflare R2 & bắn webhook
+        if jsonl_path.exists() and segment_count > 0:
+            logger.info("Uploading transcript and metadata to R2 in background...")
+            upload_t = asyncio.to_thread(_sync_upload_to_r2, jsonl_path, transcript_key)
+            upload_m = asyncio.to_thread(_sync_upload_to_r2, meta_path, metadata_key)
+            try:
+                results = await asyncio.gather(upload_t, upload_m, return_exceptions=True)
+                logger.info("R2 upload results: %s", results)
+            except Exception as e:
+                logger.error("Error during R2 upload gather: %s", e)
+
+            payload = {
+                "room_name": room_name,
+                "session_id": session_id,
+                "transcript_key": transcript_key,
+                "metadata_key": metadata_key,
+                "segment_count": segment_count,
+                "word_count": total_words,
+            }
+            await _notify_server_transcript_ready(payload)
 
     # Sự kiện để thoát entrypoint ngay lập tức khi shutdown
     shutdown_event = asyncio.Event()

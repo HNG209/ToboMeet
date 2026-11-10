@@ -360,6 +360,19 @@ export const meetingsApi = baseApi.injectEndpoints({
         params: sessionId ? { sessionId } : undefined,
       }),
     }),
+
+    // Lấy chi tiết phiên họp (bao gồm tóm tắt, action items)
+    getSessionDetails: builder.query<
+      MeetingSessionResponse,
+      { meetingCode: string; sessionId: string }
+    >({
+      query: ({ meetingCode, sessionId }) => ({
+        url: `/meetings/${meetingCode}/sessions/${sessionId}`,
+      }),
+      providesTags: (result, error, { sessionId }) => [
+        { type: "MeetingSessions", id: sessionId },
+      ],
+    }),
   }),
   overrideExisting: true,
 });
@@ -401,6 +414,7 @@ export const {
   useLazyGetMeetingSessionsQuery,
   useGetSessionAttendanceQuery,
   useLazyGetSessionAttendanceQuery,
+  useGetSessionDetailsQuery,
 } = meetingsApi;
 
 

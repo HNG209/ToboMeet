@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import {
   useEnsureChannelMeetingMutation,
   useGetSessionAttendanceQuery,
+  useGetSessionDetailsQuery,
 } from "@/lib/redux/api/meetingsApi";
 import { useFetchMeetingSession } from "@/hooks/useFetchMeetingSession";
 import { MeetingSessionResponse, SessionAttendanceItem, SessionRecording, PollResponse } from "@tobomeet/shared/types";
@@ -34,6 +35,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import ExportAttendanceModal, { ExportMode } from "./ExportAttendanceModal";
 import HlsRecordingPlayer from "./HlsRecordingPlayer";
+import MeetingSummaryCard from "./MeetingSummaryCard";
 import { useGetPollsQuery } from "@/lib/redux/api/pollsApi";
 import PollDetailsModal from "@/components/meeting/PollDetailsModal";
 
@@ -422,13 +424,31 @@ function SessionDetailView({
   const isOngoing = session.status === "ongoing";
 
   const {
+    data: sessionDetails,
+    refetch: refetchSessionDetails,
+    isFetching: isSessionDetailsFetching,
+  } = useGetSessionDetailsQuery(
+    {
+      meetingCode: session.meetingCode,
+      sessionId: session._id,
+    },
+    {
+      skip: !session.meetingCode || !session._id,
+      pollingInterval:
+        session.summaryStatus === "processing" ? 5000 : 0,
+    },
+  );
+
+  const currentSession = sessionDetails || session;
+
+  const {
     data: attendanceList = [],
     isLoading: isAttendanceLoading,
     refetch: refetchAttendance,
     isFetching: isAttendanceFetching,
   } = useGetSessionAttendanceQuery({
-    meetingCode: session.meetingCode,
-    sessionId: session._id,
+    meetingCode: currentSession.meetingCode,
+    sessionId: currentSession._id,
   });
 
   const locale = useLocale();
@@ -443,14 +463,14 @@ function SessionDetailView({
     isFetching: isPollsFetching,
   } = useGetPollsQuery(
     {
-      meetingCode: session.meetingCode,
-      sessionId: session._id,
+      meetingCode: currentSession.meetingCode,
+      sessionId: currentSession._id,
     },
-    { skip: !session.meetingCode || !session._id },
+    { skip: !currentSession.meetingCode || !currentSession._id },
   );
   const [activeRecording, setActiveRecording] = useState<SessionRecording | null>(null);
 
-  const recordings = session.recordings || [];
+  const recordings = currentSession.recordings || [];
 
   const resolveRecordingUrl = (recording: SessionRecording) => {
     if (
@@ -618,7 +638,15 @@ function SessionDetailView({
           </div>
         </div>
 
-        {/* Phần Bản ghi cuộc họp (Recordings Section) - Nằm giữa Thống kê và Danh sách điểm danh */}
+        {/* Tóm tắt cuộc họp & Action Items - Nằm giữa Thống kê và Bản ghi */}
+        <MeetingSummaryCard
+          session={currentSession}
+          t={t}
+          onRefresh={refetchSessionDetails}
+          isRefreshing={isSessionDetailsFetching}
+        />
+
+        {/* Phần Bản ghi cuộc họp (Recordings Section) - Nằm sau Tóm tắt */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
