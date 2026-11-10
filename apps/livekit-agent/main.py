@@ -251,17 +251,22 @@ class ParticipantAudioTracker:
                     self.speaker_name,
                     self.language,
                 )
+                connect_start = time.monotonic()
                 stt_stream = self.stt_instance.stream(language=self.language)
                 self._current_stt_stream = stt_stream
                 current_utterance_id = None
+                last_interim_text = ""
+                first_result_time = None
 
                 async def push_frames_to_stt():
                     try:
-                        while self.is_transcribing:
+                        while self.is_transcribing or not self.frame_queue.empty():
                             try:
                                 frame = await asyncio.wait_for(self.frame_queue.get(), timeout=0.25)
                                 stt_stream.push_frame(frame)
                             except asyncio.TimeoutError:
+                                if not self.is_transcribing:
+                                    break
                                 continue
                     except asyncio.CancelledError:
                         pass
@@ -272,13 +277,89 @@ class ParticipantAudioTracker:
 
                 try:
                     async for stt_event in stt_stream:
-                        if not stt_event.alternatives:
-                            continue
-                        text = stt_event.alternatives[0].text.strip()
-                        if not text:
+                        now = time.monotonic()
+
+                        # 1. Xử lý khi Deepgram báo ngắt câu / kết thúc tiếng nói (END_OF_SPEECH)
+                        if stt_event.type == SpeechEventType.END_OF_SPEECH:
+                            if last_interim_text:
+                                seg_id = current_utterance_id or f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+                                logger.info(
+                                    "[Deepgram END_OF_SPEECH] Chốt interim thành FINAL cho %s: '%s'",
+                                    self.speaker_name,
+                                    last_interim_text,
+                                )
+                                final_text = last_interim_text
+                                self.last_final_text = final_text
+                                self.last_final_time = now
+                                current_utterance_id = None
+                                last_interim_text = ""
+                                asyncio.create_task(
+                                    self.broadcast_cb(
+                                        final_text,
+                                        True,
+                                        self.speaker_id,
+                                        self.speaker_name,
+                                        seg_id,
+                                        self.language,
+                                    )
+                                )
                             continue
 
-                        if stt_event.type == SpeechEventType.INTERIM_TRANSCRIPT:
+                        # Lấy nội dung transcript nếu có
+                        has_alts = bool(stt_event.alternatives)
+                        text = stt_event.alternatives[0].text.strip() if has_alts else ""
+
+                        # 2. Xử lý FINAL_TRANSCRIPT:
+                        # Deepgram có thể trả text rỗng khi dứt câu, khi đó ta lấy last_interim_text để chốt
+                        if stt_event.type == SpeechEventType.FINAL_TRANSCRIPT:
+                            final_text = text if text else last_interim_text
+                            if not final_text:
+                                continue
+
+                            had_interim = bool(last_interim_text)
+                            # Tránh phát trùng lặp câu final hoàn toàn giống nhau nếu không có interim mới
+                            if not had_interim and final_text == self.last_final_text and (now - self.last_final_time) < 2.0:
+                                continue
+
+                            logger.info(
+                                "[Deepgram Event] %s | FINAL: '%s'",
+                                self.speaker_name,
+                                final_text[:70],
+                            )
+                            self.last_final_text = final_text
+                            self.last_final_time = now
+                            seg_id = current_utterance_id or f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+                            current_utterance_id = None
+                            last_interim_text = ""
+                            asyncio.create_task(
+                                self.broadcast_cb(
+                                    final_text,
+                                    True,
+                                    self.speaker_id,
+                                    self.speaker_name,
+                                    seg_id,
+                                    self.language,
+                                )
+                            )
+
+                        # 3. Xử lý INTERIM_TRANSCRIPT:
+                        elif stt_event.type == SpeechEventType.INTERIM_TRANSCRIPT:
+                            if not text:
+                                continue
+                            if first_result_time is None:
+                                first_result_time = now
+                                latency = first_result_time - connect_start
+                                logger.info(
+                                    "[Deepgram Latency] %s first interim after %.2fs | text='%s'",
+                                    self.speaker_name, latency, text[:60]
+                                )
+
+                            logger.info(
+                                "[Deepgram Event] %s | INTERIM: '%s'",
+                                self.speaker_name,
+                                text[:70],
+                            )
+                            last_interim_text = text
                             if current_utterance_id is None:
                                 current_utterance_id = f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
                             asyncio.create_task(
@@ -291,27 +372,30 @@ class ParticipantAudioTracker:
                                     self.language,
                                 )
                             )
-                        elif stt_event.type == SpeechEventType.FINAL_TRANSCRIPT:
-                            clean = text.strip()
-                            now = time.monotonic()
-                            # Tránh phát trùng lặp câu final giống hệt nhau trong vòng 2.5s
-                            if clean == self.last_final_text and (now - self.last_final_time) < 2.5:
-                                continue
-                            self.last_final_text = clean
-                            self.last_final_time = now
 
-                            seg_id = current_utterance_id or f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
-                            current_utterance_id = None
-                            asyncio.create_task(
-                                self.broadcast_cb(
-                                    clean,
-                                    True,
-                                    self.speaker_id,
-                                    self.speaker_name,
-                                    seg_id,
-                                    self.language,
-                                )
+                    # Khi kết thúc stream stt_stream: nếu còn interim chưa kịp chốt thì chốt nốt
+                    if last_interim_text:
+                        seg_id = current_utterance_id or f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
+                        logger.info(
+                            "[Deepgram Stream End] Chốt interim dở dang cho %s: '%s'",
+                            self.speaker_name,
+                            last_interim_text,
+                        )
+                        final_text = last_interim_text
+                        self.last_final_text = final_text
+                        self.last_final_time = time.monotonic()
+                        current_utterance_id = None
+                        last_interim_text = ""
+                        asyncio.create_task(
+                            self.broadcast_cb(
+                                final_text,
+                                True,
+                                self.speaker_id,
+                                self.speaker_name,
+                                seg_id,
+                                self.language,
                             )
+                        )
                 except asyncio.CancelledError:
                     pass
                 except Exception as e:
@@ -350,6 +434,7 @@ class ParticipantAudioTracker:
         stt_stream = self._current_stt_stream
         if stt_stream:
             try:
+                stt_stream.flush()
                 stt_stream.end_input()
             except Exception:
                 pass
@@ -427,7 +512,8 @@ async def entrypoint(ctx: JobContext):
         interim_results=True,
         punctuate=True,
         smart_format=True,
-        endpointing_ms=300,
+        endpointing_ms=150,
+        utterance_end_ms=1000,
         http_session=http_session,
     )
 
