@@ -7,6 +7,8 @@ import {
   FlatList,
   RefreshControl,
   ScrollView,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -489,7 +491,15 @@ function SessionDetailView({
 
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 16 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        className="flex-1"
+        keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
+      >
+        <ScrollView
+          contentContainerStyle={{ padding: 16 }}
+          keyboardShouldPersistTaps="handled"
+        >
         {/* Metric Cards Grid */}
         <View className="flex-row flex-wrap gap-2.5 mb-4">
           <View className="flex-1 min-w-[45%] bg-white p-3.5 rounded-2xl border border-slate-200 shadow-xs">
@@ -893,6 +903,7 @@ function SessionDetailView({
           )}
         </View>
       </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Modal xem chi tiết bình chọn */}
       <MobilePollDetailsModal

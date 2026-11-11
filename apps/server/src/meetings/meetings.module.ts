@@ -35,6 +35,8 @@ import { Poll, PollSchema } from "./schemas/poll.schema";
 import { PollsController } from "./polls.controller";
 import { PollsService } from "./polls.service";
 import { MeetingSummaryService } from "./meeting-summary.service";
+import { MeetingRagService } from "./meeting-rag.service";
+import { VectorDbModule } from "../vector-db/vector-db.module";
 
 @Module({
   imports: [
@@ -53,6 +55,7 @@ import { MeetingSummaryService } from "./meeting-summary.service";
     SupabaseModule,
     NotificationsModule,
     CoreModule,
+    VectorDbModule,
   ],
   controllers: [
     BreakoutRoomsController,
@@ -72,6 +75,7 @@ import { MeetingSummaryService } from "./meeting-summary.service";
     MeetingProcessor,
     PollsService,
     MeetingSummaryService,
+    MeetingRagService,
   ],
   exports: [
     AttendanceService,
@@ -83,6 +87,7 @@ import { MeetingSummaryService } from "./meeting-summary.service";
     MeetingsGateway,
     PollsService,
     MeetingSummaryService,
+    MeetingRagService,
   ],
 })
 export class MeetingsModule {}

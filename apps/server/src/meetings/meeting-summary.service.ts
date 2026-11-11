@@ -5,12 +5,10 @@ import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { generateText, Output } from "ai";
 import { z } from "zod";
-import {
-  MeetingSession,
-  MeetingSessionDocument,
-} from "./schemas/meeting-session.schema";
+import { MeetingSession, MeetingSessionDocument } from "./schemas/meeting-session.schema";
 import { TranscriptReadyWebhookDto } from "@tobomeet/shared/types";
 import { MeetingsGateway } from "./meetings.gateway";
+import { MeetingRagService } from "./meeting-rag.service";
 
 interface SummaryGeneratedOutput {
   title: string;
@@ -22,6 +20,7 @@ interface SummaryGeneratedOutput {
     dueDate?: string;
     status: "pending" | "in_progress" | "completed";
   }>;
+  suggestedQuestions?: string[];
 }
 
 const summaryZodSchema = z.object({
@@ -54,6 +53,11 @@ const summaryZodSchema = z.object({
       }),
     )
     .describe("Danh sách các việc cần làm (action items) trích xuất được"),
+  suggestedQuestions: z
+    .array(z.string())
+    .describe(
+      "Danh sách 3-4 câu hỏi gợi ý hay, thiết thực nhất được trích xuất trực tiếp từ các tình tiết, thảo luận hoặc phân công công việc cụ thể trong cuộc họp này để người dùng bấm hỏi trợ lý AI",
+    ),
 });
 
 @Injectable()
@@ -67,6 +71,7 @@ export class MeetingSummaryService {
     @InjectModel(MeetingSession.name)
     private readonly sessionModel: Model<MeetingSessionDocument>,
     private readonly meetingsGateway: MeetingsGateway,
+    private readonly meetingRagService: MeetingRagService,
   ) {
     this.bucketName = process.env.R2_BUCKET_NAME || "tobomeet";
     this.s3Client = new S3Client({
@@ -224,7 +229,8 @@ YÊU CẦU:
    - assignee: Tên người chịu trách nhiệm (nếu có nhắc trong cuộc họp).
    - dueDate: Hạn chót hoàn thành (nếu có nhắc đến, ví dụ: "Hôm nay", "Thứ 6 tuần này", "Trước 17h").
    - status: "pending".
-Nếu không có việc cần làm cụ thể nào được giao, trả về mảng actionItems rỗng.`;
+Nếu không có việc cần làm cụ thể nào được giao, trả về mảng actionItems rỗng.
+6. Câu hỏi gợi ý (suggestedQuestions): Tạo 3-4 câu hỏi ngắn gọn, tự nhiên xuất phát từ chính các nội dung, tình tiết hoặc công việc cụ thể được bàn trong cuộc họp (ví dụ: "Lý do hoãn deadline là gì?", "Ai nhận việc tích hợp R2?", "Kế hoạch tuần tới thống nhất ra sao?"). Tránh dùng câu hỏi khuôn mẫu chung chung.`;
 
       const result: any = await generateText({
         model: this.googleModel,
@@ -243,15 +249,26 @@ Nếu không có việc cần làm cụ thể nào được giao, trả về m�
         overview: summaryData.overview,
         keyPoints: summaryData.keyPoints,
         actionItems: summaryData.actionItems as any,
+        suggestedQuestions: summaryData.suggestedQuestions || [],
         generatedAt: new Date(),
       };
       session.summaryStatus = "completed";
       session.summaryReason = undefined;
+      session.transcriptKey = cleanKey;
       await session.save();
 
       this.logger.log(
         `[MeetingSummary] Tạo tóm tắt thành công cho session ${session._id} (Tiêu đề: "${summaryData.title}", ${summaryData.actionItems.length} action items).`,
       );
+
+      // 8. Tự động index kịch bản thoại lên Pinecone cho tính năng Meeting Q&A (RAG)
+      this.meetingRagService
+        .indexSessionTranscript(session._id.toString(), session.meetingCode, cleanKey)
+        .catch((ragErr) => {
+          this.logger.warn(
+            `[MeetingSummary] Lỗi chạy ngầm indexing RAG cho session ${session._id}: ${ragErr?.message}`,
+          );
+        });
     } catch (error: any) {
       this.logger.error(
         `[MeetingSummary] Lỗi khi tạo tóm tắt cho session ${session._id}:`,

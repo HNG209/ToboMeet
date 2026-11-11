@@ -13,6 +13,7 @@ import {
   MeetingActionItem,
 } from "@tobomeet/shared/types";
 import { toast } from "../../lib/toast";
+import MeetingQaSection from "./MeetingQaSection";
 
 interface MeetingSummaryCardProps {
   session: MeetingSessionResponse;
@@ -299,6 +300,16 @@ export default function MeetingSummaryCard({
               {t("room.session_summary_empty")}
             </Text>
           </View>
+        )}
+
+        {/* Meeting Q&A (Hỏi đáp về cuộc họp) */}
+        {!isOngoing && status !== "processing" && (
+          <MeetingQaSection
+            meetingCode={session.meetingCode}
+            sessionId={session._id}
+            isOngoing={isOngoing}
+            t={t}
+          />
         )}
       </View>
     </View>

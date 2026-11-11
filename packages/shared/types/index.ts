@@ -648,6 +648,7 @@ export interface MeetingSummaryData {
   overview?: string;
   keyPoints?: string[];
   actionItems?: MeetingActionItem[];
+  suggestedQuestions?: string[];
   generatedAt?: string | Date;
 }
 
@@ -667,6 +668,20 @@ export interface TranscriptReadyWebhookDto {
   word_count: number;
 }
 
+export interface MeetingCitation {
+  speakers?: string[];
+  startTime?: string;
+  endTime?: string;
+  text: string;
+  score?: number;
+}
+
+export interface MeetingQaResponse {
+  answer: string;
+  citations: MeetingCitation[];
+  suggestedFollowUps?: string[];
+}
+
 export interface MeetingSessionResponse {
   _id: string;
   meetingCode: string;
@@ -676,6 +691,8 @@ export interface MeetingSessionResponse {
   summary?: MeetingSummaryData;
   summaryStatus?: MeetingSummaryStatus;
   summaryReason?: string;
+  transcriptKey?: string;
+  ragStatus?: "none" | "indexing" | "indexed" | "failed";
   startedAt: string | Date;
   endedAt?: string | Date;
   createdAt?: string | Date;

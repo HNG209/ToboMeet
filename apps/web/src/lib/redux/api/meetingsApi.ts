@@ -4,6 +4,7 @@ import {
   GetMeetingSessionsArgs,
   MeetingDeviceStatus,
   MeetingJoinResponse,
+  MeetingQaResponse,
   MeetingSessionResponse,
   PageResponse,
   PresignedUploadResponse,
@@ -464,6 +465,28 @@ export const meetingsApi = baseApi.injectEndpoints({
         method: "POST",
       }),
     }),
+
+    // Hỏi đáp AI về cuộc họp (Meeting Q&A via RAG)
+    askSessionQa: builder.mutation<
+      MeetingQaResponse,
+      { meetingCode: string; sessionId: string; question: string }
+    >({
+      query: ({ meetingCode, sessionId, question }) => ({
+        url: `/meetings/${meetingCode}/sessions/${sessionId}/ask`,
+        method: "POST",
+        data: { question },
+      }),
+    }),
+
+    // Lấy câu hỏi gợi ý cho phiên họp
+    getSessionQaSuggestions: builder.query<
+      string[],
+      { meetingCode: string; sessionId: string }
+    >({
+      query: ({ meetingCode, sessionId }) => ({
+        url: `/meetings/${meetingCode}/sessions/${sessionId}/qa-suggestions`,
+      }),
+    }),
   }),
   overrideExisting: true,
 });
@@ -508,6 +531,9 @@ export const {
   useGetSessionAttendanceQuery,
   useLazyGetSessionAttendanceQuery,
   useGetSessionDetailsQuery,
+  useAskSessionQaMutation,
+  useGetSessionQaSuggestionsQuery,
+  useLazyGetSessionQaSuggestionsQuery,
 
   // Cloud Recording APIs
   useStartCloudRecordingMutation,

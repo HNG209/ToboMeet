@@ -41,6 +41,7 @@ interface AuthenticatedRequest extends Request {
 }
 
 import { WhiteboardService } from "./whiteboard.service";
+import { MeetingRagService } from "./meeting-rag.service";
 
 @Controller("rooms/:id/channels/:channelId/meetings")
 export class ChannelMeetingsController {
@@ -105,6 +106,7 @@ export class MeetingsController {
     private readonly attendanceService: AttendanceService,
     private readonly meetingInviteService: MeetingInviteService,
     private readonly whiteboardService: WhiteboardService,
+    private readonly meetingRagService: MeetingRagService,
   ) { }
 
   /**
@@ -532,6 +534,33 @@ export class MeetingsController {
     @Param("sessionId") sessionId: string,
   ) {
     return this.meetingsService.getMeetingSessionDetails(meetingCode, sessionId);
+  }
+
+  /**
+   * POST /api/meetings/:code/sessions/:sessionId/ask
+   * Hỏi đáp AI về nội dung cuộc họp (RAG + Gemini 2.5 Flash)
+   */
+  @Post(":code/sessions/:sessionId/ask")
+  @UseGuards(SupabaseGuard)
+  async askSessionQuestion(
+    @Param("code") meetingCode: string,
+    @Param("sessionId") sessionId: string,
+    @Body("question") question: string,
+  ) {
+    return this.meetingRagService.askQuestion(sessionId, meetingCode, question);
+  }
+
+  /**
+   * GET /api/meetings/:code/sessions/:sessionId/qa-suggestions
+   * Lấy danh sách câu hỏi gợi ý cho phiên họp
+   */
+  @Get(":code/sessions/:sessionId/qa-suggestions")
+  @UseGuards(SupabaseGuard)
+  async getSessionQaSuggestions(
+    @Param("code") meetingCode: string,
+    @Param("sessionId") sessionId: string,
+  ) {
+    return this.meetingRagService.getSuggestedQuestions(sessionId, meetingCode);
   }
 }
 

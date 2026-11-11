@@ -62,6 +62,9 @@ export class MeetingSummaryData {
   @Prop({ type: [MeetingActionItemSchema], default: [] })
   actionItems: MeetingActionItem[];
 
+  @Prop({ type: [String], default: [] })
+  suggestedQuestions?: string[];
+
   @Prop({ default: Date.now })
   generatedAt: Date;
 }
@@ -96,6 +99,15 @@ export class MeetingSession {
 
   @Prop()
   summaryReason?: string;
+
+  @Prop()
+  transcriptKey?: string;
+
+  @Prop({
+    enum: ["none", "indexing", "indexed", "failed"],
+    default: "none",
+  })
+  ragStatus: string;
 
   @Prop({ default: Date.now })
   startedAt: Date;

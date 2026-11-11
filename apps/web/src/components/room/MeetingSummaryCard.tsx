@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MeetingSessionResponse, MeetingSummaryData } from "@tobomeet/shared/types";
+import MeetingQaSection from "./MeetingQaSection";
 
 interface MeetingSummaryCardProps {
   session: MeetingSessionResponse;
@@ -286,6 +287,16 @@ export default function MeetingSummaryCard({
               {t("session_summary_empty")}
             </p>
           </div>
+        )}
+
+        {/* Meeting Q&A (Hỏi đáp về cuộc họp - RAG Powered) */}
+        {!isOngoing && status !== "processing" && (
+          <MeetingQaSection
+            meetingCode={session.meetingCode}
+            sessionId={session._id}
+            isOngoing={isOngoing}
+            t={t}
+          />
         )}
       </div>
     </div>

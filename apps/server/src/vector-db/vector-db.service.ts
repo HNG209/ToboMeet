@@ -14,8 +14,10 @@ export class VectorDbService implements OnModuleInit {
   private readonly logger = new Logger(VectorDbService.name);
   private pineconeClient: Pinecone | null = null;
   private pineconeIndex: Index | null = null;
+  private pineconeTranscriptIndex: Index | null = null;
   private googleApiKey: string = "";
   private indexName: string = "calendar-events";
+  private transcriptIndexName: string = "meeting-transcripts";
 
   constructor(private readonly configService: ConfigService) {
     this.googleApiKey =
@@ -26,6 +28,10 @@ export class VectorDbService implements OnModuleInit {
       this.configService.get<string>("PINECONE_INDEX_NAME") ||
       process.env.PINECONE_INDEX_NAME ||
       "calendar-events";
+    this.transcriptIndexName =
+      this.configService.get<string>("PINECONE_TRANSCRIPT_INDEX_NAME") ||
+      process.env.PINECONE_TRANSCRIPT_INDEX_NAME ||
+      "meeting-transcripts";
 
     const pineconeApiKey =
       this.configService.get<string>("PINECONE_API_KEY") ||
@@ -64,6 +70,25 @@ export class VectorDbService implements OnModuleInit {
       this.pineconeIndex = this.pineconeClient.index(this.indexName);
     }
     return this.pineconeIndex;
+  }
+
+  private getTranscriptIndex(): Index {
+    if (!this.pineconeTranscriptIndex) {
+      const pineconeApiKey =
+        this.configService.get<string>("PINECONE_API_KEY") ||
+        process.env.PINECONE_API_KEY ||
+        "";
+      if (!pineconeApiKey) {
+        throw new Error("PINECONE_API_KEY is not configured.");
+      }
+      if (!this.pineconeClient) {
+        this.pineconeClient = new Pinecone({ apiKey: pineconeApiKey });
+      }
+      this.pineconeTranscriptIndex = this.pineconeClient.index(
+        this.transcriptIndexName,
+      );
+    }
+    return this.pineconeTranscriptIndex;
   }
 
   /**
@@ -275,6 +300,135 @@ export class VectorDbService implements OnModuleInit {
         error?.stack,
       );
       return [];
+    }
+  }
+
+  /**
+   * Upsert các đoạn văn bản kịch bản cuộc họp (chunks) lên Pinecone index meeting-transcripts
+   */
+  async upsertTranscriptDocuments(
+    documents: Array<{
+      id: string;
+      embedding: number[];
+      sessionId: string;
+      meetingCode: string;
+      chunkIndex: number;
+      text: string;
+      startTime?: string;
+      endTime?: string;
+      speakers?: string[];
+    }>,
+  ): Promise<void> {
+    if (!documents || documents.length === 0) return;
+
+    try {
+      const index = this.getTranscriptIndex();
+      const pineconeDocs = documents.map((doc) => ({
+        _id: doc.id,
+        embedding: doc.embedding,
+        sessionId: doc.sessionId,
+        meetingCode: doc.meetingCode,
+        chunkIndex: doc.chunkIndex,
+        text: doc.text,
+        startTime: doc.startTime || "",
+        endTime: doc.endTime || "",
+        speakers: doc.speakers || [],
+      }));
+
+      // Upsert theo từng batch 40 documents để an toàn về payload
+      const batchSize = 40;
+      for (let i = 0; i < pineconeDocs.length; i += batchSize) {
+        const batch = pineconeDocs.slice(i, i + batchSize);
+        await (index as any).upsertDocuments({
+          documents: batch,
+        });
+      }
+
+      this.logger.log(
+        `[VectorDbService] Upserted ${documents.length} transcript chunks for session ${documents[0].sessionId} to index "${this.transcriptIndexName}"`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `[VectorDbService] Error upserting transcript documents: ${error?.message}`,
+        error?.stack,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Tìm kiếm các đoạn transcript tương đồng nhất cho một phiên họp cụ thể
+   */
+  async searchTranscriptDocuments(
+    sessionId: string,
+    queryVector: number[],
+    topK = 4,
+  ): Promise<
+    Array<{
+      id: string;
+      score: number;
+      text: string;
+      startTime?: string;
+      endTime?: string;
+      speakers?: string[];
+      chunkIndex?: number;
+    }>
+  > {
+    try {
+      const index = this.getTranscriptIndex();
+      const searchRes = await (index as any).searchDocuments({
+        scoreBy: [
+          {
+            type: "dense_vector",
+            field: "embedding",
+            values: queryVector,
+          },
+        ],
+        topK,
+        includeFields: ["*"],
+        filter: {
+          sessionId: { $eq: sessionId },
+        },
+      });
+
+      const matches = searchRes?.matches || [];
+      return matches.map((m: any) => ({
+        id: m._id,
+        score: m._score || 0,
+        text: m.text || "",
+        startTime: m.startTime || "",
+        endTime: m.endTime || "",
+        speakers: m.speakers || [],
+        chunkIndex: m.chunkIndex,
+      }));
+    } catch (error: any) {
+      this.logger.error(
+        `[VectorDbService] Error searching transcript documents for session ${sessionId}: ${error?.message}`,
+        error?.stack,
+      );
+      return [];
+    }
+  }
+
+  /**
+   * Xóa tất cả các chunk vector của một phiên họp khỏi Pinecone
+   */
+  async deleteTranscriptDocumentsBySession(sessionId: string): Promise<void> {
+    try {
+      const index = this.getTranscriptIndex();
+      await (index as any).deleteDocuments({
+        filter: {
+          sessionId: { $eq: sessionId },
+        },
+      });
+      this.logger.log(
+        `[VectorDbService] Deleted transcript documents for session ${sessionId}`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `[VectorDbService] Error deleting transcript documents for session ${sessionId}: ${error?.message}`,
+        error?.stack,
+      );
     }
   }
 }
