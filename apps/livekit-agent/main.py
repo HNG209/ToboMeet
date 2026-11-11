@@ -599,6 +599,68 @@ async def entrypoint(ctx: JobContext):
             t_lang = p.attributes.get("translate_target_language")
             update_participant_target_lang(p.identity, t_lang)
 
+    async def _async_translate_and_broadcast_update(
+        seg_id: str,
+        txt: str,
+        spk_id: str,
+        spk_name: str,
+        src: str,
+        lang: str,
+        targets: set[str],
+        entry_obj: dict | None,
+        existing_translations: dict[str, str],
+    ):
+        """Dịch văn bản ở tiến trình nền (background task) và gửi cập nhật bản dịch xuống phòng khi hoàn tất."""
+        new_translations = dict(existing_translations)
+
+        async def _do_translate(tgt: str):
+            try:
+                trans = await translate_text(txt, src, tgt)
+                if trans and trans.strip():
+                    new_translations[tgt] = trans.strip()
+            except Exception as e:
+                logger.debug("Async translation error for target '%s': %s", tgt, e)
+
+        try:
+            await asyncio.gather(
+                *(_do_translate(tgt) for tgt in targets),
+                return_exceptions=True,
+            )
+        except Exception as e:
+            logger.debug("Async translation gather error: %s", e)
+
+        if not new_translations or new_translations == existing_translations:
+            return
+
+        # Cập nhật bản dịch vào đối tượng transcript lưu trong bộ nhớ
+        if entry_obj is not None:
+            entry_obj["translations"] = new_translations
+
+        # Gửi bản cập nhật phụ đề với cùng segment_id để Client gắn bản dịch vào câu gốc
+        attributes = {
+            "lk.transcription_final": "true",
+            "lk.transcription_segment_id": seg_id,
+            "speaker_id": spk_id or "",
+            "speaker_name": spk_name or "",
+            "speaker_language": lang or "vi",
+            "translations": json.dumps(new_translations, ensure_ascii=False),
+        }
+
+        try:
+            await ctx.room.local_participant.send_text(
+                txt,
+                topic="lk.transcription",
+                attributes=attributes,
+            )
+            logger.info(
+                "[Async Translation] Sent translation update for seg '%s' (%s): %s",
+                seg_id,
+                spk_name,
+                list(new_translations.keys()),
+            )
+        except Exception as e:
+            logger.debug("send_text update failed for seg '%s': %s", seg_id, e)
+
     async def broadcast(
         text: str,
         is_final: bool,
@@ -607,33 +669,34 @@ async def entrypoint(ctx: JobContext):
         segment_id: str | None = None,
         language: str = "vi",
     ):
-        """Phát transcript qua LiveKit Data Channel đến các client trong phòng (kèm bản dịch gom lại cho các người xem)."""
+        """Phát transcript qua LiveKit Data Channel ngay lập tức, sau đó dịch bất đồng bộ ở background."""
         if segment_id is None:
             segment_id = f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
 
-        translations: dict[str, str] = {}
         src_code = (language or "vi").split("-")[0].lower()
+        translations: dict[str, str] = {}
+        needed_targets: set[str] = set()
 
-        # CHỈ DỊCH BẢN FINAL CỦA DEEPGRAM:
-        # Gom lại các ngôn ngữ dịch: nếu nhiều người cùng chọn 1 ngôn ngữ thì DeepL chỉ dịch 1 lần
+        # Kiểm tra ngôn ngữ cần dịch khi câu đã đạt FINAL
         if is_final and deepl_client:
-            needed_targets = {
+            all_targets = {
                 tgt.split("-")[0].lower()
                 for tgt in participant_target_languages.values()
                 if tgt and tgt not in ("off", "none") and tgt.split("-")[0].lower() != src_code
             }
-
-            if needed_targets:
-                async def _do_translate(tgt):
-                    trans = await translate_text(text, src_code, tgt)
-                    if trans and trans.strip():
-                        translations[tgt] = trans.strip()
-
-                await asyncio.gather(
-                    *(_do_translate(tgt) for tgt in needed_targets),
-                    return_exceptions=True,
+            # Ưu tiên lấy ngay bản dịch nếu đã có sẵn trong TRANSLATION_CACHE (0ms latency)
+            for tgt in all_targets:
+                cache_key = (
+                    map_deepl_source_lang(src_code) or "auto",
+                    map_deepl_target_lang(tgt),
+                    text.strip().lower(),
                 )
+                if cache_key in TRANSLATION_CACHE:
+                    translations[tgt] = TRANSLATION_CACHE[cache_key]
+                else:
+                    needed_targets.add(tgt)
 
+        # 1. PHÁT NGAY LẬP TỨC CÂU GỐC XUỐNG PHÒNG (KHÔNG CHỜ DEEPL)
         attributes = {
             "lk.transcription_final": "true" if is_final else "false",
             "lk.transcription_segment_id": segment_id,
@@ -652,6 +715,7 @@ async def entrypoint(ctx: JobContext):
         except Exception as e:
             logger.debug("send_text failed: %s", e)
 
+        entry = None
         if is_final:
             entry = {
                 "id": segment_id,
@@ -666,6 +730,22 @@ async def entrypoint(ctx: JobContext):
             if not segments or segments[-1].get("text") != text or segments[-1].get("speaker_id") != speaker_id:
                 segments.append(entry)
                 await asyncio.to_thread(_sync_append_jsonl, jsonl_path, entry)
+
+        # 2. XỬ LÝ DỊCH BẤT ĐỒNG BỘ: Chạy ở background task riêng cho các ngôn ngữ chưa có trong cache
+        if is_final and deepl_client and needed_targets:
+            asyncio.create_task(
+                _async_translate_and_broadcast_update(
+                    segment_id,
+                    text,
+                    speaker_id,
+                    speaker_name,
+                    src_code,
+                    language,
+                    needed_targets,
+                    entry,
+                    translations,
+                )
+            )
 
     # Quản lý audio trackers & tối đa 3 slot transcribe trong phòng
     trackers: dict[str, ParticipantAudioTracker] = {}
