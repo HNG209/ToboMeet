@@ -20,6 +20,7 @@ import UserProfileMenu from "@/components/common/UserProfileMenu";
 import DashboardContent from "@/components/dashboard/DashboardContent";
 import CalendarView from "@/components/calendar/CalendarView";
 import ChatLayout from "@/components/chat/ChatLayout";
+import RoomContent from "@/components/room/RoomContent";
 
 type TabType = "teams" | "calendar" | "chat";
 
@@ -29,10 +30,20 @@ function getTabFromPath(path: string): TabType {
   return "teams";
 }
 
+function getRoomIdFromPath(path: string): string | null {
+  const match = path.match(/\/room\/([a-zA-Z0-9_-]+)/);
+  if (match && match[1] !== "join") {
+    return match[1];
+  }
+  return null;
+}
+
 // Context để các trang con (children) gọi lệnh mở Modal dùng chung
 interface HomeContextType {
   setShowJoinDialog: (show: boolean) => void;
   setShowCreateDialog: (show: boolean) => void;
+  selectedRoomId: string | null;
+  selectRoom: (roomId: string | null) => void;
 }
 
 const HomeContext = createContext<HomeContextType>({} as HomeContextType);
@@ -64,33 +75,69 @@ function HomeLayoutInner({
   const { data: myProfile } = useGetMeQuery();
   const { updateUnreadNotificationBadge } = useNotificationCacheManager();
 
-  // Xác định tab ban đầu dựa vào URL
+  // Xác định tab ban đầu và roomId dựa vào URL
   const initialTab = getTabFromPath(pathname);
+  const initialRoomId = getRoomIdFromPath(pathname) || (typeof window !== "undefined" ? getRoomIdFromPath(window.location.pathname) : null);
+
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(initialRoomId);
+  const isInRoom = activeTab === "teams" && Boolean(selectedRoomId);
   const [mountedTabs, setMountedTabs] = useState<Record<TabType, boolean>>({
     teams: initialTab === "teams",
     calendar: initialTab === "calendar",
     chat: initialTab === "chat",
   });
 
+  // Hàm chọn phòng tức thì (0ms) và đồng bộ URL Teams style
+  const selectRoom = (roomId: string | null) => {
+    setSelectedRoomId(roomId);
+    setActiveTab("teams");
+    setMountedTabs((prev) => ({ ...prev, teams: true }));
+
+    if (roomId) {
+      window.history.pushState({ tab: "teams", roomId }, "", `/${locale}/room/${roomId}`);
+    } else {
+      window.history.pushState({ tab: "teams", roomId: null }, "", `/${locale}/dashboard`);
+    }
+  };
+
   // Đồng bộ khi pathname thay đổi từ bên ngoài (ví dụ router.push từ GlobalSearch hoặc Header)
   useEffect(() => {
     const tab = getTabFromPath(pathname);
     setActiveTab(tab);
     setMountedTabs((prev) => ({ ...prev, [tab]: true }));
+    const rId = getRoomIdFromPath(pathname);
+    if (rId !== selectedRoomId) {
+      setSelectedRoomId(rId);
+    }
   }, [pathname]);
 
   // Đồng bộ khi người dùng bấm nút Back / Forward trên trình duyệt
   useEffect(() => {
     const handlePopState = () => {
-      const tab = getTabFromPath(window.location.pathname);
+      const currentPath = window.location.pathname;
+      const tab = getTabFromPath(currentPath);
+      const rId = getRoomIdFromPath(currentPath);
       setActiveTab(tab);
+      setSelectedRoomId(rId);
       setMountedTabs((prev) => ({ ...prev, [tab]: true }));
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  // Lắng nghe sự kiện custom "select-room" phát từ bất kỳ đâu (GlobalSearch, EventDetailModal, ...)
+  useEffect(() => {
+    const handleCustomSelectRoom = (e: any) => {
+      const rId = e.detail?.roomId;
+      if (rId) {
+        selectRoom(rId);
+      }
+    };
+    window.addEventListener("select-room", handleCustomSelectRoom);
+    return () => window.removeEventListener("select-room", handleCustomSelectRoom);
+  }, [locale]);
 
   // Chuyển tab lập tức (0ms) và đồng bộ URL bằng pushState (không gọi request server _rsc)
   const handleTabClick = (
@@ -102,13 +149,22 @@ function HomeLayoutInner({
     if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
 
     e.preventDefault();
+
+    if (targetTab === "teams" && activeTab === "teams" && selectedRoomId) {
+      // Nếu đang trong room và bấm lại vào tab Teams -> Quay về danh sách Dashboard
+      selectRoom(null);
+      return;
+    }
+
     if (activeTab === targetTab) return;
 
     setActiveTab(targetTab);
     setMountedTabs((prev) => ({ ...prev, [targetTab]: true }));
 
-    const targetUrl = `/${locale}${href}`;
-    window.history.pushState({ tab: targetTab }, "", targetUrl);
+    const targetUrl = targetTab === "teams" && selectedRoomId
+      ? `/${locale}/room/${selectedRoomId}`
+      : `/${locale}${href}`;
+    window.history.pushState({ tab: targetTab, roomId: targetTab === "teams" ? selectedRoomId : null }, "", targetUrl);
   };
 
   // Chuyển hướng nếu có link mời tham gia
@@ -134,7 +190,7 @@ function HomeLayoutInner({
     {
       id: "teams" as const,
       icon: Video,
-      label: t("tab_teams", { defaultValue: "Teams" }),
+      label: t("tab_teams", { defaultValue: "Rooms" }),
       href: "/dashboard",
       isActive: activeTab === "teams",
     },
@@ -155,7 +211,14 @@ function HomeLayoutInner({
   ];
 
   return (
-    <HomeContext.Provider value={{ setShowJoinDialog, setShowCreateDialog }}>
+    <HomeContext.Provider
+      value={{
+        setShowJoinDialog,
+        setShowCreateDialog,
+        selectedRoomId,
+        selectRoom,
+      }}
+    >
       {/* Container chính với Top Header và Main Content */}
       <div className="h-screen h-[100dvh] bg-[#f5f5f5] font-sans flex flex-col overflow-hidden">
         {/* ── Global Top Bar (Teams Style) ── */}
@@ -194,11 +257,10 @@ function HomeLayoutInner({
                   }
                   setShowNotifications(!showNotifications);
                 }}
-                className={`relative p-2 rounded-full transition-colors focus:outline-none ${
-                  showNotifications
+                className={`relative p-2 rounded-full transition-colors focus:outline-none ${showNotifications
                     ? "bg-slate-100 text-brand-600"
                     : "hover:bg-slate-100 text-slate-500 hover:text-slate-800"
-                }`}
+                  }`}
                 title={t("tab_notifications", { defaultValue: "Thông báo" })}
               >
                 <Bell className="w-5 h-5" />
@@ -223,52 +285,61 @@ function HomeLayoutInner({
 
         {/* ── Workspace Area (Sidebar + Children) ── */}
         <div className="flex-1 flex overflow-hidden min-h-0 relative">
-          {/* ── Left Sidebar ── */}
-          <aside className="w-16 md:w-20 h-full bg-[#f8f9fa] border-r border-slate-200 flex flex-col justify-between items-center py-3 shrink-0 z-40 shadow-[1px_0_6px_rgba(0,0,0,0.02)] relative">
-            <div className="w-full flex flex-col items-center gap-1.5">
-              {/* Tự động render danh sách Menu */}
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    prefetch={true}
-                    onClick={(e) => handleTabClick(e, item.id, item.href)}
-                    className={`flex flex-col items-center justify-center gap-1.5 w-full py-3 px-1 md:px-1.5 transition-all group border-l-2 ${
-                      item.isActive
-                        ? "text-brand-600 bg-brand-50/50 border-brand-500 font-semibold"
-                        : "text-slate-600 hover:bg-slate-50 border-transparent font-medium"
-                    }`}
-                  >
-                    <div className="relative">
-                      <Icon className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                    </div>
-                    <span className="hidden md:block text-[10px] tracking-tight text-center leading-tight truncate max-w-[72px]">
-                      {item.label}
-                    </span>
-                  </Link>
-                );
-              })}
-            </div>
-          </aside>
+          {/* ── Left Sidebar (Ẩn đi khi đang vào trong 1 phòng cụ thể) ── */}
+          {!isInRoom && (
+            <aside className="w-16 md:w-20 h-full bg-[#f8f9fa] border-r border-slate-200 flex flex-col justify-between items-center py-3 shrink-0 z-40 shadow-[1px_0_6px_rgba(0,0,0,0.02)] relative">
+              <div className="w-full flex flex-col items-center gap-1.5">
+                {/* Tự động render danh sách Menu */}
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      prefetch={true}
+                      onClick={(e) => handleTabClick(e, item.id, item.href)}
+                      className={`flex flex-col items-center justify-center gap-1.5 w-full py-3 px-1 md:px-1.5 transition-all group border-l-2 ${item.isActive
+                          ? "text-brand-600 bg-brand-50/50 border-brand-500 font-semibold"
+                          : "text-slate-600 hover:bg-slate-50 border-transparent font-medium"
+                        }`}
+                    >
+                      <div className="relative">
+                        <Icon className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                      </div>
+                      <span className="hidden md:block text-[10px] tracking-tight text-center leading-tight truncate max-w-[72px]">
+                        {item.label}
+                      </span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </aside>
+          )}
 
           {/* ── Main Content Area (Persistent Tabs Shell) ── */}
           <div className="flex-1 flex flex-col relative min-w-0 overflow-hidden bg-[#fcfcfc]">
-            {/* Tab 1: Teams / Dashboard */}
+            {/* Tab 1: Teams / Dashboard hoặc Room Detail (Teams Style) */}
             <div
-              className={`h-full w-full flex-col min-h-0 ${
-                activeTab === "teams" ? "flex" : "hidden"
-              }`}
+              className={`h-full w-full flex-col min-h-0 ${activeTab === "teams" ? "flex" : "hidden"
+                }`}
             >
-              {mountedTabs.teams && <DashboardTab />}
+              {mountedTabs.teams && (
+                selectedRoomId ? (
+                  <RoomContent
+                    roomId={selectedRoomId}
+                    userId={myProfile?.supabaseId || ""}
+                    onBack={() => selectRoom(null)}
+                  />
+                ) : (
+                  <DashboardTab />
+                )
+              )}
             </div>
 
             {/* Tab 2: Calendar */}
             <div
-              className={`h-full w-full flex-col min-h-0 ${
-                activeTab === "calendar" ? "flex" : "hidden"
-              }`}
+              className={`h-full w-full flex-col min-h-0 ${activeTab === "calendar" ? "flex" : "hidden"
+                }`}
             >
               {mountedTabs.calendar && (
                 <Suspense fallback={<TabFallback />}>
@@ -279,9 +350,8 @@ function HomeLayoutInner({
 
             {/* Tab 3: Chat */}
             <div
-              className={`h-full w-full flex-col min-h-0 ${
-                activeTab === "chat" ? "flex" : "hidden"
-              }`}
+              className={`h-full w-full flex-col min-h-0 ${activeTab === "chat" ? "flex" : "hidden"
+                }`}
             >
               {mountedTabs.chat && (
                 <Suspense fallback={<TabFallback />}>

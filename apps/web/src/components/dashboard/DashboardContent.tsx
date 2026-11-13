@@ -44,7 +44,7 @@ export default function DashboardContent({
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-xl font-bold text-slate-900 tracking-tight">
-                    {t("title", { defaultValue: "Teams" })}
+                    {t("title", { defaultValue: "Phòng của bạn" })}
                   </h1>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
@@ -60,7 +60,7 @@ export default function DashboardContent({
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-xs active:scale-[0.98] transition-all"
               >
                 <Users className="w-4 h-4 text-slate-500" />
-                <span>{t("join_team", { defaultValue: "Tham gia bằng mã" })}</span>
+                <span>{t("join_team", { defaultValue: "Tham gia phòng" })}</span>
               </button>
 
               <button
@@ -68,7 +68,7 @@ export default function DashboardContent({
                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs font-bold shadow-sm shadow-brand-500/20 active:scale-[0.98] transition-all"
               >
                 <Plus className="w-4 h-4" />
-                <span>{t("create_team", { defaultValue: "Tạo nhóm mới" })}</span>
+                <span>{t("create_team", { defaultValue: "Tạo phòng mới" })}</span>
               </button>
             </div>
           </div>
@@ -115,7 +115,7 @@ export default function DashboardContent({
                     className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-xs active:scale-[0.98] transition-all"
                   >
                     <Users className="w-4 h-4 text-slate-500" />
-                    <span>{t("join_team", { defaultValue: "Tham gia bằng mã" })}</span>
+                    <span>{t("join_team", { defaultValue: "Tham gia phòng" })}</span>
                   </button>
                   <button
                     onClick={() => setShowCreateDialog(true)}
@@ -123,7 +123,7 @@ export default function DashboardContent({
                          hover:bg-brand-600 transition-all shadow-md shadow-brand-500/20 active:scale-[0.98]"
                   >
                     <Plus className="w-4 h-4" />
-                    <span>{t("create_team", { defaultValue: "Tạo nhóm mới" })}</span>
+                    <span>{t("create_team", { defaultValue: "Tạo phòng mới" })}</span>
                   </button>
                 </div>
               </div>

@@ -63,16 +63,24 @@ export default function RoomDetailScreen() {
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
 
+  const handleGoBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/dashboard");
+    }
+  };
+
   const {
     data: room,
     isLoading,
     error,
     refetch,
-  } = useGetRoomByIdQuery(id, { refetchOnMountOrArgChange: true });
+  } = useGetRoomByIdQuery(id);
   const { data: profile } = useGetMeQuery();
   const { data: membersList, refetch: refetchMembers } = useGetRoomMembersQuery(
     room?._id || "",
-    { skip: !room?._id, refetchOnMountOrArgChange: true },
+    { skip: !room?._id },
   );
 
   const [addMember] = useAddMemberByEmailOrIdMutation();
@@ -443,7 +451,8 @@ export default function RoomDetailScreen() {
     }
   };
 
-  if (isLoading) {
+  // Chỉ hiển thị loading toàn màn hình khi chưa có dữ liệu room trong cache
+  if (isLoading && !room) {
     return (
       <View className="flex-1 justify-center items-center bg-slate-50">
         <ActivityIndicator size="large" color="#0052FF" />
@@ -459,7 +468,7 @@ export default function RoomDetailScreen() {
           {t("room.room_not_found")}
         </Text>
         <TouchableOpacity
-          onPress={() => router.replace("/dashboard")}
+          onPress={handleGoBack}
           className="mt-6 bg-[#0052FF] px-6 py-3 rounded-xl"
         >
           <Text className="text-white font-bold text-sm">
@@ -747,7 +756,7 @@ export default function RoomDetailScreen() {
         }}
         onOpenGroupActions={() => setShowGroupActionsModal(true)}
         onCopyLink={handleCopyLink}
-        onGoBack={() => router.replace("/dashboard")}
+        onGoBack={handleGoBack}
       />
 
 

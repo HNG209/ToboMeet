@@ -157,6 +157,15 @@ export default function GlobalSearch() {
   // Navigation handlers
   const handleOpenRoom = (room: any) => {
     setIsOpen(false);
+    const targetRoomId = room._id || room.id;
+    if (targetRoomId) {
+      window.dispatchEvent(
+        new CustomEvent("select-room", {
+          detail: { roomId: targetRoomId },
+        })
+      );
+      return;
+    }
     if (room.code) {
       router.push(`/${locale}/room/join?code=${room.code}`);
     } else {

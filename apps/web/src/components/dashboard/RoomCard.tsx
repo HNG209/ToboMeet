@@ -8,6 +8,7 @@ import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/lib/redux/store";
 import { roomsApi } from "@/lib/redux/api/roomsApi";
 import { Users, Hash, Layers, Copy, Check } from "lucide-react";
+import { useHomeContext } from "@/app/[locale]/(home)/layout";
 
 // Gradient presets nâng cấp tương tự Microsoft Teams / Slack
 const CARD_GRADIENTS = [
@@ -39,9 +40,20 @@ export default function RoomCard({ room }: RoomCardProps) {
 
   const [copied, setCopied] = useState(false);
   const dispatch = useDispatch<AppDispatch>();
+  const homeContext = useHomeContext();
 
   const handleWarmCache = () => {
     dispatch(roomsApi.util.upsertQueryData("getRoomById", room._id, room));
+  };
+
+  const handleClickRoom = (e: React.MouseEvent) => {
+    handleWarmCache();
+    // Nếu có homeContext.selectRoom (đang ở trong home layout), chuyển phòng tức thì 0ms
+    if (homeContext?.selectRoom) {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault();
+      homeContext.selectRoom(room._id);
+    }
   };
 
   const handleCopyCode = (e: React.MouseEvent) => {
@@ -61,7 +73,7 @@ export default function RoomCard({ room }: RoomCardProps) {
       href={`/room/${room._id}`}
       prefetch={true}
       onMouseEnter={handleWarmCache}
-      onClick={handleWarmCache}
+      onClick={handleClickRoom}
       className="group relative text-left w-full bg-white rounded-2xl overflow-hidden border border-slate-200/80
                  shadow-sm hover:shadow-xl hover:shadow-slate-200/50 hover:border-slate-300
                  hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between block"

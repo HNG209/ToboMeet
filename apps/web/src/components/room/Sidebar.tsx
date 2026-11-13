@@ -53,6 +53,7 @@ interface SidebarProps {
   activeChannel: string;
   setActiveChannel: (channelName: string) => void;
   roomMembers?: any[];
+  onBack?: () => void;
 }
 
 export default function Sidebar({
@@ -62,6 +63,7 @@ export default function Sidebar({
   setActiveChannel,
   onClose,
   roomMembers: propRoomMembers,
+  onBack,
 }: SidebarProps) {
 
   const t = useTranslations("room");
@@ -306,8 +308,14 @@ export default function Sidebar({
       <div className="px-4 h-14 flex items-center justify-between border-b border-slate-200 shrink-0">
         <div className="flex items-center gap-1 flex-1 min-w-0">
           <button
-            onClick={() => router.push("../dashboard")}
-            className="w-7 h-7 rounded-md hover:bg-slate-200 flex items-center justify-center transition-colors"
+            onClick={() => {
+              if (onBack) {
+                onBack();
+              } else {
+                router.push("../dashboard");
+              }
+            }}
+            className="w-7 h-7 rounded-md hover:bg-slate-200 flex items-center justify-center transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 text-slate-500" />
           </button>

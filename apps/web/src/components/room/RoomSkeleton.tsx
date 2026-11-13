@@ -4,7 +4,7 @@ import React from "react";
 
 export default function RoomSkeleton() {
   return (
-    <div className="h-screen w-full flex bg-white font-sans overflow-hidden text-slate-900 select-none animate-pulse">
+    <div className="h-full w-full flex bg-white font-sans overflow-hidden text-slate-900 select-none animate-pulse">
       {/* ================= LEFT SIDEBAR SKELETON ================= */}
       <aside className="w-64 h-full bg-[#f5f5f5] flex flex-col border-r border-slate-200 shrink-0">
         {/* Room Header */}

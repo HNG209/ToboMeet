@@ -30,12 +30,15 @@ import ChannelMeetingButton from "./ChannelMeetingButton";
 import AssignmentModule from "@/components/assignments/AssignmentModule";
 import CreateTaskDropdown from "@/components/assignments/CreateTaskDropdown";
 
+import RoomSkeleton from "./RoomSkeleton";
+
 interface RoomContentProps {
   roomId: string;
   userId: string;
+  onBack?: () => void;
 }
 
-export default function RoomContent({ roomId, userId }: RoomContentProps) {
+export default function RoomContent({ roomId, userId, onBack }: RoomContentProps) {
   const socket = useSocket();
   const t = useTranslations("room");
   const dispatch = useDispatch<AppDispatch>();
@@ -294,11 +297,7 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
   };
 
   if (roomLoading && !room) {
-    return (
-      <div className="h-screen w-full flex items-center justify-center bg-white">
-        <Loader2 className="w-8 h-8 text-brand-500 animate-spin" />
-      </div>
-    );
+    return <RoomSkeleton />;
   }
 
   if (roomError) {
@@ -313,10 +312,13 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
           defaultValue: "Bạn không còn là thành viên của phòng này",
         });
       return (
-        <div className="h-screen flex flex-col items-center justify-center bg-white gap-3">
+        <div className="h-full w-full flex flex-col items-center justify-center bg-white gap-3 p-6 text-center">
           <p className="text-slate-600 font-bold text-base">{msg}</p>
           <button
-            onClick={() => (window.location.href = "/dashboard")}
+            onClick={() => {
+              if (onBack) onBack();
+              else window.location.href = "/dashboard";
+            }}
             className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-semibold transition-colors"
           >
             {t("back_to_dashboard", { defaultValue: "Quay lại Dashboard" })}
@@ -326,7 +328,7 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
     }
     if (isLocked) {
       return (
-        <div className="h-screen flex items-center justify-center bg-white">
+        <div className="h-full w-full flex items-center justify-center bg-white">
           <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
         </div>
       );
@@ -335,14 +337,22 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
 
   if (roomError || !room) {
     return (
-      <div className="h-screen flex items-center justify-center bg-white">
+      <div className="h-full w-full flex flex-col items-center justify-center bg-white gap-3 p-6">
         <p className="text-slate-500 text-sm">{t("room_not_found")}</p>
+        {onBack && (
+          <button
+            onClick={onBack}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-semibold transition-colors"
+          >
+            {t("back_to_dashboard", { defaultValue: "Quay lại Dashboard" })}
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="h-screen w-full flex bg-white font-sans overflow-hidden text-slate-900">
+    <div className="h-full w-full flex bg-white font-sans overflow-hidden text-slate-900">
       {/* ================= LEFT SIDEBAR (KÊNH) ================= */}
       <div
         className={`
@@ -357,6 +367,7 @@ export default function RoomContent({ roomId, userId }: RoomContentProps) {
           activeChannel={activeChannel}
           setActiveChannel={setActiveChannel}
           onClose={() => setIsLeftSidebarOpen(false)}
+          onBack={onBack}
           roomMembers={members}
         />
 

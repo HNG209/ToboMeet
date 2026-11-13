@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   FlatList,
   TextInput,
-  Image,
   RefreshControl,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -14,7 +13,10 @@ import { User } from "@supabase/supabase-js";
 import { useTranslation } from "react-i18next";
 import { supabase } from "../../lib/supabase";
 import { useGetMeQuery } from "../../lib/redux/features/users/usersApi";
-import { useGetMyRoomsQuery } from "../../lib/redux/features/rooms/roomsApi";
+import { useGetMyRoomsQuery, roomsApi } from "../../lib/redux/features/rooms/roomsApi";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "../../lib/redux/store";
+import { RoomResponse } from "@tobomeet/shared/types";
 import { Feather } from "@expo/vector-icons";
 import JoinRoomModal from "../../components/JoinRoomModal";
 import CreateRoomModal from "../../components/CreateRoomModal";
@@ -25,6 +27,7 @@ import DashboardHeader from "../../components/dashboard/DashboardHeader";
 export default function DashboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const dispatch = useDispatch<AppDispatch>();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -36,14 +39,19 @@ export default function DashboardScreen() {
   // Trạng thái pull-to-refresh
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const { data: profile, refetch: refetchProfile } = useGetMeQuery(undefined, {
-    refetchOnMountOrArgChange: true,
-  });
+  // Sử dụng cache của RTK Query, chỉ gọi lại khi người dùng pull-to-refresh
+  const { data: profile, refetch: refetchProfile } = useGetMeQuery();
   const {
     data: rooms,
     isLoading: isRoomsLoading,
     refetch: refetchRooms,
-  } = useGetMyRoomsQuery(undefined, { refetchOnMountOrArgChange: true });
+  } = useGetMyRoomsQuery();
+
+  const handleOpenRoom = (room: RoomResponse) => {
+    // Làm ấm cache getRoomById để khi vào room/[id] hiển thị tức thì (0ms)
+    dispatch(roomsApi.util.upsertQueryData("getRoomById", room._id, room));
+    router.push(`/room/${room._id}`);
+  };
 
   useEffect(() => {
     fetchSession();
@@ -90,7 +98,8 @@ export default function DashboardScreen() {
       room.code.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  if (loading || isRoomsLoading) {
+  // Chỉ hiển thị spinner chặn màn hình khi CHƯA có dữ liệu trong cache
+  if ((loading && !user && !profile) || (isRoomsLoading && !rooms)) {
     return (
       <View className="flex-1 justify-center items-center bg-slate-50">
         <ActivityIndicator size="large" color="#0052FF" />
@@ -276,7 +285,7 @@ export default function DashboardScreen() {
           renderItem={({ item }) => (
             <RoomCard
               item={item}
-              onPress={() => router.push(`/room/${item._id}`)}
+              onPress={() => handleOpenRoom(item)}
             />
           )}
         />

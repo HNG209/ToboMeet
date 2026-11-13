@@ -64,7 +64,11 @@ export default function JoinScreen() {
   };
 
   const handleCancel = () => {
-    router.replace("/dashboard");
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/dashboard");
+    }
   };
 
   // Lỗi thiếu Code
