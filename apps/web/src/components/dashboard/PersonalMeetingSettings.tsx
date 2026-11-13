@@ -12,18 +12,35 @@ import {
   ExternalLink,
   ChevronDown,
   StickyNote,
+  Clock,
+  ArrowLeft,
+  X,
 } from "lucide-react";
 import { useEnsurePersonalMeetingMutation } from "@/lib/redux/api/meetingsApi";
+import { useGetMeQuery } from "@/lib/redux/api/usersApi";
+import ChannelSessionsTab from "@/components/room/ChannelSessionsTab";
 
 interface PersonalMeetingSettingsProps {
   onClose?: () => void;
+  isViewingHistory?: boolean;
+  onToggleHistory?: (isHistory: boolean) => void;
 }
 
 export function PersonalMeetingSettings({
   onClose,
+  isViewingHistory: externalIsViewingHistory,
+  onToggleHistory: externalOnToggleHistory,
 }: PersonalMeetingSettingsProps) {
   const t = useTranslations("settings.personal_meeting");
   const router = useRouter();
+  const { data: myProfile } = useGetMeQuery();
+
+  const [internalHistory, setInternalHistory] = useState(false);
+  const isViewingHistory = externalIsViewingHistory ?? internalHistory;
+  const handleToggleHistory = (val: boolean) => {
+    setInternalHistory(val);
+    externalOnToggleHistory?.(val);
+  };
 
   const [ensurePersonalMeeting, { isLoading }] =
     useEnsurePersonalMeetingMutation();
@@ -116,25 +133,63 @@ export function PersonalMeetingSettings({
     }
   };
 
+  if (isViewingHistory) {
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden animate-fade-in bg-slate-50/50">
+        {/* Header bar với nút Quay về */}
+        <div className="px-6 py-4 bg-white border-b border-slate-200 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => handleToggleHistory(false)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition-all active:scale-95 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 text-slate-600" />
+              <span>{t("back_to_settings", { defaultValue: "Quay về" })}</span>
+            </button>
+            <div className="h-4 w-[1px] bg-slate-200" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">
+                {t("history_modal_title", {
+                  defaultValue: "Lịch sử cuộc họp cá nhân",
+                })}
+              </h3>
+              {meetingCode && (
+                <p className="text-[11px] text-slate-400 font-mono">
+                  Mã: {meetingCode}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Nhúng ChannelSessionsTab trực tiếp trong Modal Settings */}
+        <div className="flex-1 overflow-hidden min-h-0">
+          <ChannelSessionsTab
+            initialMeetingCode={meetingCode}
+            userId={myProfile?.supabaseId || ""}
+            title="Lịch sử phiên họp cá nhân"
+            isPersonalMeeting={true}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 p-6 md:p-8 overflow-y-auto flex flex-col gap-6 animate-fade-in">
-      {/* Header */}
+      {/* Header (đã bỏ icon camera) */}
       <div className="border-b border-slate-100 pb-4">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center">
-            <Video className="w-4 h-4" />
-          </div>
-          <div>
-            <h3 className="text-lg font-bold text-slate-800 tracking-tight">
-              {t("header", { defaultValue: "Cuộc họp cá nhân" })}
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {t("desc", {
-                defaultValue:
-                  "Phòng họp riêng cố định dành riêng cho bạn. Sử dụng liên kết hoặc mã cuộc họp này để mời mọi người tham gia bất kỳ lúc nào.",
-              })}
-            </p>
-          </div>
+        <div>
+          <h3 className="text-lg font-bold text-slate-800 tracking-tight">
+            {t("header", { defaultValue: "Cuộc họp cá nhân" })}
+          </h3>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {t("desc", {
+              defaultValue:
+                "Phòng họp riêng cố định dành riêng cho bạn. Sử dụng liên kết hoặc mã cuộc họp này để mời mọi người tham gia bất kỳ lúc nào.",
+            })}
+          </p>
         </div>
       </div>
 
@@ -222,7 +277,7 @@ export function PersonalMeetingSettings({
             </div>
           </div>
 
-          {/* Action Button: Bắt đầu cuộc họp */}
+          {/* Action Button: Bắt đầu cuộc họp & Lịch sử cuộc họp */}
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
             {isDesktop ? (
               // DESKTOP: Bắt đầu trực tiếp trong cửa sổ mới
@@ -230,7 +285,7 @@ export function PersonalMeetingSettings({
                 type="button"
                 disabled={!meetingCode || isStarting}
                 onClick={() => handleStartMeeting("new")}
-                className="w-full sm:w-auto px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group shadow-xs"
+                className="flex-1 w-full px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group shadow-xs"
               >
                 {isStarting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -239,19 +294,19 @@ export function PersonalMeetingSettings({
                 )}
                 <span>
                   {t("start_meeting_btn", {
-                    defaultValue: "Bắt đầu cuộc họp cá nhân",
+                    defaultValue: "Bắt đầu cuộc họp",
                   })}
                 </span>
                 <ExternalLink className="w-3.5 h-3.5 opacity-70 group-hover:opacity-100 transition-opacity" />
               </button>
             ) : (
               // WEB: Dropdown lựa chọn tab này hoặc tab mới
-              <div className="relative w-full sm:w-auto">
+              <div className="relative flex-1 w-full">
                 <button
                   type="button"
                   disabled={!meetingCode || isStarting}
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                  className="w-full sm:w-auto px-6 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold flex items-center justify-between sm:justify-center gap-3 transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs group"
+                  className="w-full px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2.5 transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs group"
                 >
                   <div className="flex items-center gap-2">
                     {isStarting ? (
@@ -261,7 +316,7 @@ export function PersonalMeetingSettings({
                     )}
                     <span>
                       {t("start_meeting_btn", {
-                        defaultValue: "Bắt đầu cuộc họp cá nhân",
+                        defaultValue: "Bắt đầu cuộc họp",
                       })}
                     </span>
                   </div>
@@ -332,6 +387,21 @@ export function PersonalMeetingSettings({
                 )}
               </div>
             )}
+
+            {/* Action Button: Lịch sử cuộc họp */}
+            <button
+              type="button"
+              disabled={!meetingCode}
+              onClick={() => handleToggleHistory(true)}
+              className="flex-1 w-full px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 hover:text-brand-600 border border-slate-200 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+            >
+              <Clock className="w-4 h-4 text-brand-600" />
+              <span>
+                {t("history_btn", {
+                  defaultValue: "Lịch sử cuộc họp",
+                })}
+              </span>
+            </button>
           </div>
 
           {/* Feature Highlights with Note icon */}

@@ -7,6 +7,7 @@ export default function SettingsLayout() {
       <Stack.Screen name="devices" />
       <Stack.Screen name="language" />
       <Stack.Screen name="personal-meeting" />
+      <Stack.Screen name="personal-meeting-history" />
     </Stack>
   );
 }

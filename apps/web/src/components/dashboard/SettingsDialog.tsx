@@ -45,10 +45,24 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
     router.replace(pathname, { locale: newLocale });
   };
 
+  const [isPersonalMeetingHistory, setIsPersonalMeetingHistory] =
+    useState(false);
+
+  // Khi chuyển tab, reset trạng thái history
+  useEffect(() => {
+    if (activeTab !== "personal_meeting") {
+      setIsPersonalMeetingHistory(false);
+    }
+  }, [activeTab]);
+
   const maxWidthClass =
-    activeTab === "devices" || activeTab === "recording"
-      ? "max-w-3xl"
-      : "max-w-2xl";
+    activeTab === "personal_meeting" && isPersonalMeetingHistory
+      ? "max-w-5xl"
+      : activeTab === "devices" ||
+          activeTab === "recording" ||
+          activeTab === "personal_meeting"
+        ? "max-w-3xl"
+        : "max-w-2xl";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -259,7 +273,11 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
 
           {/* Tab Cuộc họp cá nhân */}
           {activeTab === "personal_meeting" && (
-            <PersonalMeetingSettings onClose={onClose} />
+            <PersonalMeetingSettings
+              onClose={onClose}
+              isViewingHistory={isPersonalMeetingHistory}
+              onToggleHistory={setIsPersonalMeetingHistory}
+            />
           )}
         </main>
       </div>

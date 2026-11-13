@@ -462,8 +462,10 @@ export class MeetingsController {
   @UseGuards(SupabaseGuard)
   async getAttendance(
     @Param("code") meetingCode: string,
-    @Query("sessionId") sessionId?: string,
+    @Query("sessionId") sessionId: string | undefined,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.meetingsService.checkPersonalMeetingAccess(meetingCode, req.user.id);
     return this.attendanceService.getByMeetingCode(meetingCode, sessionId);
   }
 
@@ -478,8 +480,10 @@ export class MeetingsController {
     @Query("sessionId") sessionId: string | undefined,
     @Query("lang") lang: string | undefined,
     @Query("mode") mode: "detailed" | "minimal" | "summary" | undefined,
+    @Req() req: AuthenticatedRequest,
     @Res() res: Response,
   ) {
+    await this.meetingsService.checkPersonalMeetingAccess(meetingCode, req.user.id);
     const validMode =
       mode === "minimal" || mode === "summary" ? "minimal" : "detailed";
     const { buffer, fileName } =
@@ -512,12 +516,14 @@ export class MeetingsController {
   @UseGuards(SupabaseGuard)
   async getMeetingSessions(
     @Param("code") meetingCode: string,
+    @Req() req: AuthenticatedRequest,
     @Query("cursor") cursor?: string,
     @Query("limit") limit?: number,
   ) {
     const parsedLimit = Math.min(100, Math.max(1, Number(limit) || 50));
     return this.meetingsService.getMeetingSessions(
       meetingCode,
+      req.user.id,
       cursor,
       parsedLimit,
     );
@@ -532,8 +538,13 @@ export class MeetingsController {
   async getMeetingSessionDetails(
     @Param("code") meetingCode: string,
     @Param("sessionId") sessionId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
-    return this.meetingsService.getMeetingSessionDetails(meetingCode, sessionId);
+    return this.meetingsService.getMeetingSessionDetails(
+      meetingCode,
+      sessionId,
+      req.user.id,
+    );
   }
 
   /**
@@ -546,7 +557,9 @@ export class MeetingsController {
     @Param("code") meetingCode: string,
     @Param("sessionId") sessionId: string,
     @Body("question") question: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.meetingsService.checkPersonalMeetingAccess(meetingCode, req.user.id);
     return this.meetingRagService.askQuestion(sessionId, meetingCode, question);
   }
 
@@ -559,7 +572,9 @@ export class MeetingsController {
   async getSessionQaSuggestions(
     @Param("code") meetingCode: string,
     @Param("sessionId") sessionId: string,
+    @Req() req: AuthenticatedRequest,
   ) {
+    await this.meetingsService.checkPersonalMeetingAccess(meetingCode, req.user.id);
     return this.meetingRagService.getSuggestedQuestions(sessionId, meetingCode);
   }
 }

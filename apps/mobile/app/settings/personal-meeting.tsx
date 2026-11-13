@@ -194,7 +194,25 @@ export default function PersonalMeetingScreen() {
             >
               <Feather name="video" size={18} color="#ffffff" />
               <Text className="text-sm font-bold text-white">
-                {t("settings.personal_meeting.start_meeting_btn", "Bắt đầu cuộc họp cá nhân")}
+                {t("settings.personal_meeting.start_meeting_btn", "Bắt đầu cuộc họp")}
+              </Text>
+            </TouchableOpacity>
+
+            {/* View History Button */}
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: "/settings/personal-meeting-history",
+                  params: { meetingCode },
+                })
+              }
+              activeOpacity={0.85}
+              disabled={!meetingCode}
+              className="w-full bg-white border border-slate-200/90 py-3.5 rounded-2xl flex-row items-center justify-center gap-2.5 shadow-xs active:bg-slate-50"
+            >
+              <Feather name="clock" size={18} color="#0052FF" />
+              <Text className="text-sm font-bold text-slate-800">
+                {t("settings.personal_meeting.history_btn", "Lịch sử cuộc họp")}
               </Text>
             </TouchableOpacity>
 

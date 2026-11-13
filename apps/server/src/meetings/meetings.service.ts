@@ -1376,10 +1376,31 @@ export class MeetingsService {
   }
 
   /**
+   * Kiểm tra quyền truy cập phiên họp cho cuộc họp cá nhân (personal meeting)
+   * Chỉ chủ cuộc họp mới có quyền xem lịch sử phiên họp
+   */
+  async checkPersonalMeetingAccess(meetingCode: string, userId?: string) {
+    if (!meetingCode) return null;
+    const cleanCode = meetingCode.trim();
+    const meeting = await this.meetingModel
+      .findOne({ meetingCode: cleanCode })
+      .lean()
+      .exec();
+    if (!meeting) {
+      throw new AppException(ErrorCode.MEETING_NOT_FOUND);
+    }
+    if (meeting.type === "personal" && userId && meeting.ownerId !== userId) {
+      throw new AppException(ErrorCode.INVALID_PERMISSION);
+    }
+    return meeting;
+  }
+
+  /**
    * Lấy danh sách các session của 1 meetingCode có phân trang
    */
   async getMeetingSessions(
     meetingCode: string,
+    userId?: string,
     cursor?: string,
     limit: number = 50,
   ): Promise<PageResponse<MeetingSessionResponse>> {
@@ -1393,6 +1414,8 @@ export class MeetingsService {
     }
 
     const cleanCode = meetingCode.trim();
+    await this.checkPersonalMeetingAccess(cleanCode, userId);
+
     const filter: Record<string, any> = { meetingCode: cleanCode };
 
     if (cursor && Types.ObjectId.isValid(cursor)) {
@@ -1483,13 +1506,17 @@ export class MeetingsService {
   async getMeetingSessionDetails(
     meetingCode: string,
     sessionId: string,
+    userId?: string,
   ): Promise<MeetingSessionResponse> {
     if (!meetingCode || !sessionId) {
       throw new AppException(ErrorCode.MEETING_NOT_FOUND);
     }
 
+    const cleanCode = meetingCode.trim();
+    await this.checkPersonalMeetingAccess(cleanCode, userId);
+
     const doc: any = await this.sessionModel
-      .findOne({ _id: sessionId, meetingCode: meetingCode.trim() })
+      .findOne({ _id: sessionId, meetingCode: cleanCode })
       .lean()
       .exec();
 

@@ -32,10 +32,14 @@ import HlsRecordingPlayer from "./HlsRecordingPlayer";
 import MeetingSummaryCard from "./MeetingSummaryCard";
 
 interface ChannelSessionsTabProps {
-  roomId: string;
-  channelId: string;
+  roomId?: string;
+  channelId?: string;
   channelName?: string;
   userId: string;
+  initialMeetingCode?: string;
+  title?: string;
+  isPersonalMeeting?: boolean;
+  onBack?: () => void;
 }
 
 export default function ChannelSessionsTab({
@@ -43,19 +47,28 @@ export default function ChannelSessionsTab({
   channelId,
   channelName,
   userId,
+  initialMeetingCode,
+  title,
+  isPersonalMeeting,
+  onBack,
 }: ChannelSessionsTabProps) {
   const { t, i18n } = useTranslation();
   const isVi = i18n.language === "vi";
   const router = useRouter();
 
-  const [meetingCode, setMeetingCode] = useState<string>("");
+  const [meetingCode, setMeetingCode] = useState<string>(initialMeetingCode || "");
   const [selectedSession, setSelectedSession] = useState<MeetingSessionResponse | null>(null);
 
   const [ensureChannelMeeting, { isLoading: isEnsuringMeeting }] =
     useEnsureChannelMeetingMutation();
 
-  // Gọi ensureChannelMeeting để lấy mã phòng khi mount hoặc đổi kênh
+  // Gọi ensureChannelMeeting để lấy mã phòng khi mount hoặc đổi kênh (nếu không có initialMeetingCode)
   useEffect(() => {
+    if (initialMeetingCode) {
+      setMeetingCode(initialMeetingCode);
+      return;
+    }
+
     let isMounted = true;
     if (!roomId || !channelId) return;
 
@@ -178,17 +191,32 @@ export default function ChannelSessionsTab({
     <View className="flex-1 bg-slate-50">
       {/* Header Bar */}
       <View className="px-4 py-3 bg-white border-b border-slate-100 flex-row items-center justify-between">
-        <View className="flex-1">
-          <View className="flex-row items-center gap-2">
-            <Text className="text-sm font-bold text-slate-900">
-              {t("room.sessions_title")}
-            </Text>
+        <View className="flex-row items-center gap-2.5 flex-1 mr-2">
+          {onBack && (
+            <TouchableOpacity
+              onPress={onBack}
+              className="p-1 -ml-1 active:bg-slate-100 rounded-lg"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Feather name="arrow-left" size={22} color="#0f172a" />
+            </TouchableOpacity>
+          )}
+          <View className="flex-1">
+            <View className="flex-row items-center gap-2">
+              <Text className="text-base font-bold text-slate-900" numberOfLines={1}>
+                {title || t("room.sessions_title")}
+              </Text>
+            </View>
+            {channelName ? (
+              <Text className="text-xs text-slate-500 mt-0.5">
+                #{channelName}
+              </Text>
+            ) : isPersonalMeeting ? (
+              <Text className="text-xs text-slate-400 font-mono mt-0.5">
+                {meetingCode ? `Mã: ${meetingCode}` : t("settings.personal_meeting.title", "Cuộc họp cá nhân")}
+              </Text>
+            ) : null}
           </View>
-          {channelName ? (
-            <Text className="text-xs text-slate-500 mt-0.5">
-              #{channelName}
-            </Text>
-          ) : null}
         </View>
 
         <TouchableOpacity

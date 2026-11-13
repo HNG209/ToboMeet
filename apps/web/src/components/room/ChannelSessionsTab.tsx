@@ -40,10 +40,14 @@ import { useGetPollsQuery } from "@/lib/redux/api/pollsApi";
 import PollDetailsModal from "@/components/meeting/PollDetailsModal";
 
 interface ChannelSessionsTabProps {
-  roomId: string;
-  channelId: string;
+  roomId?: string;
+  channelId?: string;
   channelName?: string;
   userId: string;
+  initialMeetingCode?: string;
+  title?: string;
+  subtitle?: string;
+  isPersonalMeeting?: boolean;
 }
 
 export default function ChannelSessionsTab({
@@ -51,19 +55,28 @@ export default function ChannelSessionsTab({
   channelId,
   channelName,
   userId,
+  initialMeetingCode,
+  title,
+  subtitle,
+  isPersonalMeeting,
 }: ChannelSessionsTabProps) {
   const t = useTranslations("room");
   const locale = useLocale();
   const router = useRouter();
 
-  const [meetingCode, setMeetingCode] = useState<string>("");
+  const [meetingCode, setMeetingCode] = useState<string>(initialMeetingCode || "");
   const [selectedSession, setSelectedSession] = useState<MeetingSessionResponse | null>(null);
 
   const [ensureChannelMeeting, { isLoading: isEnsuringMeeting }] =
     useEnsureChannelMeetingMutation();
 
-  // Gọi ensureChannelMeeting để lấy mã phòng (meetingCode) khi mount hoặc chuyển kênh
+  // Gọi ensureChannelMeeting để lấy mã phòng (meetingCode) khi mount hoặc chuyển kênh (nếu chưa có initialMeetingCode)
   useEffect(() => {
+    if (initialMeetingCode) {
+      setMeetingCode(initialMeetingCode);
+      return;
+    }
+
     let isMounted = true;
     if (!roomId || !channelId) return;
 
@@ -210,16 +223,16 @@ export default function ChannelSessionsTab({
         <div>
           <div className="flex items-center gap-2.5">
             <h2 className="text-base font-bold text-slate-900">
-              {t("sessions_title")}
+              {title || t("sessions_title")}
             </h2>
-            {channelName && (
+            {channelName ? (
               <span className="hidden sm:inline-flex items-center gap-1 text-xs text-slate-500 font-medium">
                 #{channelName}
               </span>
-            )}
+            ) : null}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            {t("sessions_subtitle")}
+            {subtitle || t("sessions_subtitle")}
           </p>
         </div>
 
@@ -698,16 +711,16 @@ function SessionDetailView({
                     <div
                       key={rec.recordingId || idx}
                       className={`relative p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 ${isSelected
-                          ? "bg-rose-50/50 border-rose-300 shadow-xs"
-                          : "bg-slate-50/70 hover:bg-slate-50 border-slate-200 hover:border-slate-300"
+                        ? "bg-rose-50/50 border-rose-300 shadow-xs"
+                        : "bg-slate-50/70 hover:bg-slate-50 border-slate-200 hover:border-slate-300"
                         }`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2.5">
                           <div
                             className={`p-2 rounded-lg ${isSelected
-                                ? "bg-rose-500 text-white shadow-xs"
-                                : "bg-white text-rose-600 border border-slate-200"
+                              ? "bg-rose-500 text-white shadow-xs"
+                              : "bg-white text-rose-600 border border-slate-200"
                               }`}
                           >
                             <Video size={16} />
@@ -742,8 +755,8 @@ function SessionDetailView({
                           setActiveRecording(isSelected ? null : rec)
                         }
                         className={`w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${isSelected
-                            ? "bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
-                            : "bg-white hover:bg-rose-600 hover:text-white text-slate-800 border border-slate-200 hover:border-rose-600 shadow-2xs"
+                          ? "bg-rose-600 hover:bg-rose-700 text-white shadow-xs"
+                          : "bg-white hover:bg-rose-600 hover:text-white text-slate-800 border border-slate-200 hover:border-rose-600 shadow-2xs"
                           }`}
                       >
                         <PlayCircle size={15} />
