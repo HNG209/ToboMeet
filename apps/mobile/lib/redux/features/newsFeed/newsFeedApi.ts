@@ -32,6 +32,20 @@ export interface PostReactionUserDto {
   user: AuthorDto;
 }
 
+export interface PostCalendarEventDto {
+  _id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  meetingCode?: string;
+  hostId?: string;
+  roomId?: string;
+  channelId?: string;
+  roomType?: string;
+  isJoined?: boolean;
+  isHost?: boolean;
+}
+
 export interface PostDto {
   _id: string;
   roomId: string;
@@ -48,9 +62,11 @@ export interface PostDto {
   author: AuthorDto;
   // Meeting post fields
   isMeeting?: boolean;
+  eventId?: string;
+  meetingCode?: string;
+  calendarEvent?: PostCalendarEventDto;
   meetingId?: string;
   meetingTitle?: string;
-  meetingCode?: string;
   meetingStartDate?: string;
   meetingEndDate?: string;
   // Assignment post fields

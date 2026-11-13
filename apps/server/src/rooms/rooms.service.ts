@@ -266,14 +266,14 @@ export class RoomsService {
     });
     if (!room) throw new NotFoundException("Không tìm thấy phòng với mã này");
 
-    // Ràng buộc 1: Giới hạn tối đa 500 thành viên trong phòng (kênh công khai kế thừa từ giới hạn này)
+    // Ràng buộc 1: Giới hạn tối đa 100 thành viên trong phòng (kênh công khai kế thừa từ giới hạn này)
     const activeMembersCount = room.members.filter(
       (member) =>
         member.status !== "removed" &&
         member.status !== "left",
     ).length;
-    if (activeMembersCount >= 500) {
-      throw new BadRequestException("Phòng đã đạt số lượng tối đa (500 người)");
+    if (activeMembersCount >= 100) {
+      throw new BadRequestException("Phòng đã đạt số lượng tối đa (100 người)");
     }
 
     // Ràng buộc: Người dùng chỉ được tham gia và tạo tối đa 100 phòng họp

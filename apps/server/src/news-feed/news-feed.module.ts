@@ -6,6 +6,7 @@ import { Post, PostSchema } from "./schemas/post.schema";
 import { Comment, CommentSchema } from "./schemas/comment.schema";
 import { Room, RoomSchema } from "../rooms/schemas/room.schema";
 import { User, UserSchema } from "../users/schemas/user.schema";
+import { CalendarEvent, CalendarEventSchema } from "../calendar/schemas/calendar-event.schema";
 import { SupabaseModule } from "../supabase/supabase.module";
 import { MeetingsModule } from "../meetings/meetings.module";
 
@@ -16,6 +17,7 @@ import { MeetingsModule } from "../meetings/meetings.module";
       { name: Comment.name, schema: CommentSchema },
       { name: Room.name, schema: RoomSchema },
       { name: User.name, schema: UserSchema },
+      { name: CalendarEvent.name, schema: CalendarEventSchema },
     ]),
     SupabaseModule,
     MeetingsModule,

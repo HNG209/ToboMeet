@@ -58,7 +58,7 @@ import ChannelSessionsTab from "../../components/room/ChannelSessionsTab";
 import AssignmentModule from "../../components/assignments/AssignmentModule";
 
 export default function RoomDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, channelId } = useLocalSearchParams<{ id: string; channelId?: string }>();
   const { t } = useTranslation();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
@@ -273,12 +273,16 @@ export default function RoomDetailScreen() {
     };
   }, [activeChannelId, id, dispatch]);
 
-  // Set default active channel once room loads
+  // Set default active channel once room loads (hoặc nhận từ params channelId)
   useEffect(() => {
-    if (room && room.channels && room.channels.length > 0 && !activeChannelId) {
-      setActiveChannelId(room.channels[0]._id || null);
+    if (room && room.channels && room.channels.length > 0) {
+      if (channelId && room.channels.some((c) => c._id === channelId)) {
+        setActiveChannelId(channelId);
+      } else if (!activeChannelId) {
+        setActiveChannelId(room.channels[0]._id || null);
+      }
     }
-  }, [room]);
+  }, [room, channelId]);
 
   // Navigation Guard: Nếu kênh hiện tại không nằm trong danh sách được phép truy cập (VD: bị xóa khỏi Kênh riêng tư)
   useEffect(() => {

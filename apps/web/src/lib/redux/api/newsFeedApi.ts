@@ -32,6 +32,20 @@ export interface PostReactionUserDto {
   user: AuthorDto;
 }
 
+export interface PostCalendarEventDto {
+  _id: string;
+  title: string;
+  startDate: string;
+  endDate: string;
+  meetingCode?: string;
+  hostId?: string;
+  roomId?: string;
+  channelId?: string;
+  roomType?: string;
+  isJoined?: boolean;
+  isHost?: boolean;
+}
+
 export interface PostDto {
   _id: string;
   roomId: string;
@@ -47,11 +61,14 @@ export interface PostDto {
   updatedAt: string;
   author: AuthorDto;
   isMeeting?: boolean;
+  eventId?: string;
+  meetingCode?: string;
+  calendarEvent?: PostCalendarEventDto;
+  // Giữ lại để tương thích ngược nếu cần
   meetingId?: string;
   meetingTitle?: string;
   meetingStartDate?: string;
   meetingEndDate?: string;
-  meetingCode?: string;
   isAssignment?: boolean;
   assignmentId?: string;
   assignmentTitle?: string;

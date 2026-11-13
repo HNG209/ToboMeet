@@ -169,6 +169,22 @@ export function useNewsFeedSocket(roomId: string, channelId: string, currentUser
       );
     });
 
+    // Lắng nghe cập nhật RSVP sự kiện lịch họp
+    socket.on("rsvp_updated", (data: { eventId: string; userId: string; status: string }) => {
+      dispatch(
+        newsFeedApi.util.updateQueryData("getPosts", { roomId, channelId }, (draft) => {
+          draft.forEach((p) => {
+            const evId = p.calendarEvent?._id || p.eventId || p.meetingId;
+            if (p.isMeeting && evId === data.eventId) {
+              if (currentUserId && data.userId === currentUserId && p.calendarEvent) {
+                p.calendarEvent.isJoined = data.status === "ACCEPTED";
+              }
+            }
+          });
+        })
+      );
+    });
+
     return () => {
       socket.off("post_created");
       socket.off("post_updated");
@@ -178,6 +194,7 @@ export function useNewsFeedSocket(roomId: string, channelId: string, currentUser
       socket.off("comment_updated");
       socket.off("comment_deleted");
       socket.off("comment_reaction_updated");
+      socket.off("rsvp_updated");
     };
-  }, [roomId, channelId, dispatch]);
+  }, [roomId, channelId, currentUserId, dispatch]);
 }

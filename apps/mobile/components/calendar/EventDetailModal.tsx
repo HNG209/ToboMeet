@@ -18,6 +18,7 @@ import {
   useToggleCalendarNotificationMutation,
 } from "../../lib/redux/api/calendarApi";
 import { useGetMeQuery } from "../../lib/redux/features/users/usersApi";
+import { useGetRoomByIdQuery } from "../../lib/redux/features/rooms/roomsApi";
 import InviteCalendarModal from "./InviteCalendarModal";
 import DeleteEventConfirmModal from "./DeleteEventConfirmModal";
 import ToggleNotificationConfirmModal from "./ToggleNotificationConfirmModal";
@@ -59,6 +60,10 @@ export default function EventDetailModal({
   const [notificationsEnabledUsers, setNotificationsEnabledUsers] = useState<
     string[] | undefined
   >(event?.notificationsEnabledUserIds);
+
+  const { data: roomData } = useGetRoomByIdQuery(event?.roomId || "", {
+    skip: !event?.roomId,
+  });
 
   useEffect(() => {
     setNotificationsEnabledUsers(event?.notificationsEnabledUserIds);
@@ -600,6 +605,43 @@ export default function EventDetailModal({
                   </View>
                 </View>
 
+                {/* Room / Channel info & Navigate */}
+                {Boolean(event.roomId) && (
+                  <View className="flex-row items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-2xl gap-2">
+                    <View className="flex-row items-center gap-2.5 flex-1 min-w-0">
+                      <View className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-100 items-center justify-center shrink-0">
+                        <Feather name="hash" size={15} color="#0052FF" />
+                      </View>
+                      <View className="flex-1 min-w-0">
+                        <Text className="text-xs font-bold text-slate-800" numberOfLines={1}>
+                          {roomData?.name || (isVi ? "Phòng học" : "Room")}
+                          {event.channelId && roomData?.channels && (
+                            <Text className="text-slate-500 font-medium">
+                              {" "}• #{roomData.channels.find((c) => c._id === event.channelId)?.name || (isVi ? "Kênh" : "Channel")}
+                            </Text>
+                          )}
+                        </Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => {
+                        onClose();
+                        router.push(
+                          `/room/${event.roomId}${
+                            event.channelId ? `?channelId=${event.channelId}` : ""
+                          }`
+                        );
+                      }}
+                      className="px-3 py-1.5 bg-white border border-slate-200 rounded-xl flex-row items-center gap-1 active:bg-blue-50"
+                    >
+                      <Text className="text-xs font-bold text-blue-600">
+                        {isVi ? "Vào phòng" : "Go to room"}
+                      </Text>
+                      <Feather name="external-link" size={12} color="#0052FF" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+
                 {/* Description */}
                 {hasDescription && (
                   <View className="flex-row items-start gap-3">
@@ -632,7 +674,7 @@ export default function EventDetailModal({
                           })}
                         </Text>
                       </View>
-                      {isHost && (
+                      {isHost && !isChannelMeeting && (
                         <TouchableOpacity
                           onPress={() => setInviteModalVisible(true)}
                           className="flex-row items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg active:bg-blue-100"

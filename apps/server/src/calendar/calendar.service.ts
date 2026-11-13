@@ -1,4 +1,4 @@
-import { Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 
@@ -243,10 +243,7 @@ export class CalendarService {
           authorId: userId,
           content: "Đã lên lịch cuộc họp",
           isMeeting: true,
-          meetingId: event._id.toString(),
-          meetingTitle: event.title,
-          meetingStartDate: event.startDate,
-          meetingEndDate: event.endDate,
+          eventId: event._id.toString(),
           meetingCode: event.meetingCode,
           attachments: [],
           reactions: [],
@@ -267,6 +264,18 @@ export class CalendarService {
               "Người dùng ẩn danh",
             avatarUrl: authorUser?.avatarUrl || "",
             role: "member",
+          },
+          calendarEvent: {
+            _id: event._id.toString(),
+            title: event.title,
+            startDate: event.startDate,
+            endDate: event.endDate,
+            meetingCode: event.meetingCode,
+            hostId: event.hostId,
+            roomId: event.roomId,
+            channelId: event.channelId,
+            roomType: event.roomType,
+            isJoined: true,
           },
           commentsCount: 0,
           reactionStats: [],
@@ -715,12 +724,10 @@ export class CalendarService {
       ) {
         try {
           const post = await this.postModel.findOneAndUpdate(
-            { meetingId: eventId, isDeleted: { $ne: true } },
+            { eventId: eventId, isDeleted: { $ne: true } },
             {
               $set: {
-                meetingTitle: updatedEvent.title,
-                meetingStartDate: updatedEvent.startDate,
-                meetingEndDate: updatedEvent.endDate,
+                meetingCode: updatedEvent.meetingCode,
               },
             },
             { new: true },
@@ -740,6 +747,17 @@ export class CalendarService {
                   "Người dùng ẩn danh",
                 avatarUrl: authorUser?.avatarUrl || "",
                 role: "member",
+              },
+              calendarEvent: {
+                _id: updatedEvent._id.toString(),
+                title: updatedEvent.title,
+                startDate: updatedEvent.startDate,
+                endDate: updatedEvent.endDate,
+                meetingCode: updatedEvent.meetingCode,
+                hostId: updatedEvent.hostId,
+                roomId: updatedEvent.roomId,
+                channelId: updatedEvent.channelId,
+                roomType: updatedEvent.roomType,
               },
             };
             this.appGateway.server
@@ -843,7 +861,7 @@ export class CalendarService {
       ) {
         try {
           const post = await this.postModel.findOneAndUpdate(
-            { meetingId: eventId, isDeleted: { $ne: true } },
+            { eventId: eventId, isDeleted: { $ne: true } },
             { $set: { isDeleted: true } },
             { new: true },
           );
@@ -974,6 +992,49 @@ export class CalendarService {
       return { success: true, status: "ACCEPTED" };
     }
 
+    // Nếu là sự kiện trong kênh: chỉ thành viên trong kênh mới được tham gia
+    if (event.roomType === "channel_meeting" && event.roomId && event.channelId) {
+      const room = await this.roomModel.findOne({
+        _id: event.roomId,
+        isDeleted: { $ne: true },
+      });
+      if (!room) {
+        throw new BadRequestException("Phòng họp không tồn tại");
+      }
+
+      const channel = room.channels.find(
+        (ch) => ch._id?.toString() === event.channelId,
+      );
+      if (!channel) {
+        throw new BadRequestException("Kênh không tồn tại");
+      }
+
+      const isRoomOwner = room.ownerId === userId;
+      let isMember = false;
+      if (channel.isPrivate) {
+        isMember =
+          isRoomOwner ||
+          Boolean(channel.members?.some((m) => m.userId === userId));
+      } else {
+        isMember =
+          isRoomOwner ||
+          Boolean(
+            room.members?.some(
+              (m) =>
+                m.userId === userId &&
+                m.status !== "left" &&
+                m.status !== "removed",
+            ),
+          );
+      }
+
+      if (!isMember) {
+        throw new ForbiddenException(
+          "Bạn không phải là thành viên của kênh này nên không thể tham gia sự kiện.",
+        );
+      }
+    }
+
     // Rút user ra khỏi tất cả các mảng để làm sạch
     await this.calendarEventModel.findByIdAndUpdate(eventId, {
       $pull: {
@@ -1023,6 +1084,13 @@ export class CalendarService {
     this.appGateway.server
       .to(`user_${updatedEvent.hostId}`)
       .emit("rsvp_updated", { eventId, userId, status });
+
+    // Nếu sự kiện gắn với room, emit cho room để News Feed cập nhật ngay
+    if (updatedEvent.roomId) {
+      this.appGateway.server
+        .to(`room_${updatedEvent.roomId}`)
+        .emit("rsvp_updated", { eventId, userId, status });
+    }
 
     return { success: true, status };
   }
@@ -1157,6 +1225,13 @@ export class CalendarService {
     // Host hoặc người tham gia đã được chấp nhận đều có thể mời (hoặc ưu tiên host)
     if (event.hostId !== userId && !event.acceptedUserIds?.includes(userId)) {
       throw new AppException(ErrorCode.CALENDAR_EVENT_FORBIDDEN);
+    }
+
+    // Sự kiện trong kênh: không cho phép mời người ngoài kênh
+    if (event.roomType === "channel_meeting" && event.roomId && event.channelId) {
+      throw new BadRequestException(
+        "Sự kiện cuộc họp kênh chỉ dành cho các thành viên trong kênh, không thể mời thêm người ngoài.",
+      );
     }
 
     const candidateIds = new Set<string>();
@@ -1333,6 +1408,12 @@ export class CalendarService {
     this.appGateway.server
       .to(`user_${event.hostId}`)
       .emit("rsvp_updated", { eventId, userId, status: "DECLINED" });
+
+    if (event.roomId) {
+      this.appGateway.server
+        .to(`room_${event.roomId}`)
+        .emit("rsvp_updated", { eventId, userId, status: "DECLINED" });
+    }
 
     const targetUserIds = Array.from(
       new Set([

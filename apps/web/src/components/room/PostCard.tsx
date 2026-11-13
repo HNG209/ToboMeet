@@ -28,7 +28,11 @@ import {
   useCreateCommentMutation,
   useDeleteCommentMutation,
   useToggleCommentReactionMutation,
+  newsFeedApi,
 } from "@/lib/redux/api/newsFeedApi";
+import { useUpdateCalendarRsvpMutation } from "@/lib/redux/api/calendarApi";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "@/lib/redux/store";
 import { parseMarkdownToHtml } from "@/utils/markdownParser";
 import ReactionsListModal from "./ReactionsListModal";
 import { toast } from "sonner";
@@ -247,9 +251,51 @@ export default function PostCard({ post, userId, userRole, onEdit }: PostCardPro
   const [createComment, { isLoading: isCreatingComment }] = useCreateCommentMutation();
   const [deleteComment] = useDeleteCommentMutation();
   const [toggleCommentReaction] = useToggleCommentReactionMutation();
+  const [updateCalendarRsvp, { isLoading: isUpdatingRsvp }] = useUpdateCalendarRsvpMutation();
+  const dispatch = useDispatch<AppDispatch>();
 
   const isTeacher = userRole === "owner" || userRole === "admin";
   const isAuthor = post.authorId === userId;
+
+  const targetEventId = post.calendarEvent?._id || post.eventId || post.meetingId;
+  const [localJoined, setLocalJoined] = useState<boolean | null>(null);
+  const isEventJoined = localJoined !== null ? localJoined : Boolean(post.calendarEvent?.isJoined);
+
+  const handleJoinMeeting = async () => {
+    if (isEventJoined || !targetEventId) return;
+    try {
+      await updateCalendarRsvp({
+        eventId: targetEventId,
+        status: "ACCEPTED",
+      }).unwrap();
+      setLocalJoined(true);
+      // Optimistic update RTK Query cache để các component khác cũng nhận được
+      dispatch(
+        newsFeedApi.util.updateQueryData(
+          "getPosts",
+          { roomId: post.roomId, channelId: post.channelId },
+          (draft) => {
+            const target = draft.find((p) => p._id === post._id);
+            if (target && target.calendarEvent) {
+              target.calendarEvent.isJoined = true;
+            }
+          }
+        )
+      );
+      toast.success(
+        locale === "vi"
+          ? "Đã xác nhận tham gia sự kiện thành công!"
+          : "Successfully joined the event!",
+      );
+    } catch (err: any) {
+      toast.error(
+        err?.data?.message ||
+          (locale === "vi"
+            ? "Không thể cập nhật trạng thái tham gia"
+            : "Failed to join event"),
+      );
+    }
+  };
 
   const handleCopyLink = () => {
     const link = `${window.location.origin}${window.location.pathname}?postId=${post._id}`;
@@ -560,17 +606,18 @@ export default function PostCard({ post, userId, userRole, onEdit }: PostCardPro
         <div className="space-y-4">
           <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4.5 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all hover:bg-slate-100/40">
             <div className="flex items-start gap-3.5">
-              <div className="w-10 h-10 bg-indigo-50 border border-indigo-100 flex items-center justify-center rounded-xl text-indigo-600 shrink-0">
+              <div className="w-10 h-10 bg-blue-50 border border-blue-100 flex items-center justify-center rounded-xl text-blue-600 shrink-0">
                 <CalendarDays className="w-5 h-5" />
               </div>
               <div className="min-w-0">
                 <h4 className="text-sm font-bold text-slate-800 tracking-tight truncate">
-                  {post.meetingTitle}
+                  {post.calendarEvent?.title || post.meetingTitle || (locale === "vi" ? "Cuộc họp" : "Meeting")}
                 </h4>
                 <p className="text-xs text-slate-400 font-semibold mt-1">
                   {(() => {
-                    if (!post.meetingStartDate) return "";
-                    const date = new Date(post.meetingStartDate);
+                    const startDateStr = post.calendarEvent?.startDate || post.meetingStartDate;
+                    if (!startDateStr) return "";
+                    const date = new Date(startDateStr);
                     const daysVi = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
                     const daysEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
                     const isVi = locale === "vi";
@@ -591,15 +638,24 @@ export default function PostCard({ post, userId, userRole, onEdit }: PostCardPro
               </div>
             </div>
             
-            <button
-              onClick={() => {
-                // Tham gia cuộc họp kênh: điều hướng trực tiếp vào room/channel
-                window.location.href = `/${locale}/room/${post.roomId}?channel=${post.channelId}`;
-              }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0 self-start sm:self-center"
-            >
-              {locale === "vi" ? "Tham gia" : "Join"}
-            </button>
+            {isEventJoined ? (
+              <button
+                disabled
+                className="bg-blue-50 border border-blue-200 text-blue-700 px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 self-start sm:self-center cursor-default flex items-center gap-1.5"
+              >
+                <CheckCircle className="w-3.5 h-3.5 text-blue-600" />
+                <span>{locale === "vi" ? "Đã tham gia" : "Joined"}</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleJoinMeeting}
+                disabled={isUpdatingRsvp}
+                className="bg-blue-600 hover:bg-blue-700 active:scale-95 text-white px-5 py-2 rounded-xl text-xs font-bold transition-all shadow-xs shrink-0 self-start sm:self-center cursor-pointer flex items-center gap-1.5"
+              >
+                {isUpdatingRsvp && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                <span>{locale === "vi" ? "Tham gia" : "Join"}</span>
+              </button>
+            )}
           </div>
           
           <div className="text-xs font-bold text-slate-400 uppercase tracking-wider text-left pl-1 select-none">
@@ -650,9 +706,9 @@ export default function PostCard({ post, userId, userRole, onEdit }: PostCardPro
                 const newUrl = `/${locale}/room/${post.roomId}?channel=__assignments__&assignmentId=${post.assignmentId}`;
                 window.history.pushState({}, "", newUrl);
               }}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0 self-start sm:self-center cursor-pointer"
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-xs font-bold transition-colors shadow-xs shrink-0 self-start sm:self-center cursor-pointer"
             >
-              {locale === "vi" ? "Nhiệm vụ" : "Task"}
+              {locale === "vi" ? "Xem" : "View"}
             </button>
           </div>
           

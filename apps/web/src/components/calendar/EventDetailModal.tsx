@@ -19,6 +19,8 @@ import {
   RefreshCw,
   Bell,
   BellOff,
+  Hash,
+  ExternalLink,
 } from "lucide-react";
 import { CalendarEvent, RsvpMember } from "./types";
 import {
@@ -29,6 +31,7 @@ import {
 import EventInviteView from "./EventInviteView";
 import EventEditView from "./EventEditView";
 import ToggleNotificationConfirmModal from "./ToggleNotificationConfirmModal";
+import { useGetRoomByIdQuery } from "@/lib/redux/api/roomsApi";
 import { toast } from "sonner";
 
 interface EventDetailModalProps {
@@ -77,6 +80,10 @@ export default function EventDetailModal({
   const [notificationsEnabledUsers, setNotificationsEnabledUsers] = useState<
     string[] | undefined
   >(event?.notificationsEnabledUserIds);
+
+  const { data: roomData } = useGetRoomByIdQuery(event?.roomId || "", {
+    skip: !event?.roomId,
+  });
 
   useEffect(() => {
     setNotificationsEnabledUsers(event?.notificationsEnabledUserIds);
@@ -466,6 +473,31 @@ export default function EventDetailModal({
               </span>
             </div>
 
+            {event.roomId && (
+              <div className="flex items-center gap-2 text-xs text-slate-700 bg-slate-50 border border-slate-200/80 rounded-xl p-2.5">
+                <div className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                  <Hash className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="font-bold text-slate-900 truncate block">
+                    {roomData?.name || "Phòng học"}
+                    {event.channelId && roomData?.channels && (
+                      <span className="text-slate-500 font-medium">
+                        {" "}• #{roomData.channels.find((c) => c._id === event.channelId)?.name || "Kênh"}
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <a
+                  href={`/${locale}/room/${event.roomId}${event.channelId ? `?channel=${event.channelId}` : ""}`}
+                  className="px-2.5 py-1 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-200 text-blue-600 rounded-lg text-[11px] font-bold flex items-center gap-1 transition-colors shrink-0 shadow-2xs"
+                >
+                  <span>{locale === "vi" ? "Vào phòng" : "Go to room"}</span>
+                  <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
+            )}
+
             {event.description &&
               (() => {
                 const match = event.description.match(
@@ -587,15 +619,17 @@ export default function EventDetailModal({
                 <h5 className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                   {t("detail_modal.participants")}
                 </h5>
-                <button
-                  type="button"
-                  onClick={() => setView("invite")}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors cursor-pointer"
-                  title={t("detail_modal.invite_button")}
-                >
-                  <UserPlus className="w-3.5 h-3.5" />
-                  <span>{t("detail_modal.invite_button")}</span>
-                </button>
+                {!isChannelMeeting && (
+                  <button
+                    type="button"
+                    onClick={() => setView("invite")}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-brand-600 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors cursor-pointer"
+                    title={t("detail_modal.invite_button")}
+                  >
+                    <UserPlus className="w-3.5 h-3.5" />
+                    <span>{t("detail_modal.invite_button")}</span>
+                  </button>
+                )}
               </div>
               <div className="space-y-3 max-h-48 overflow-y-auto pr-1">
                 {/* Người tổ chức (Host) */}

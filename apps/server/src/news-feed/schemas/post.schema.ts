@@ -64,16 +64,7 @@ export class Post {
   isMeeting: boolean;
 
   @Prop({ type: String, default: "", index: true })
-  meetingId: string;
-
-  @Prop({ type: String, default: "" })
-  meetingTitle: string;
-
-  @Prop({ type: Date })
-  meetingStartDate: Date;
-
-  @Prop({ type: Date })
-  meetingEndDate: Date;
+  eventId: string;
 
   @Prop({ type: String, default: "" })
   meetingCode: string;
@@ -97,7 +88,6 @@ export class Post {
   @Prop({ type: [String], default: [] })
   recipientMemberIds: string[];
 
-  /** Phân biệt loại bài đăng: "assignment" | "quiz" (mặc định "assignment") */
   @Prop({ type: String, enum: ["assignment", "quiz"], default: "assignment" })
   assignmentType: string;
 }

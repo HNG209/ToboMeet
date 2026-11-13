@@ -563,12 +563,12 @@ async def entrypoint(ctx: JobContext):
     jsonl_path = session_dir / "transcript.jsonl"
 
     stt_instance = deepgram.STT(
-        model="nova-2",
+        model="nova-3",
         language="vi",
         interim_results=True,
         punctuate=True,
         smart_format=True,
-        endpointing_ms=150,
+        endpointing_ms=250,
         utterance_end_ms=1000,
         http_session=http_session,
     )

@@ -10,6 +10,10 @@ import { Post, PostDocument } from "./schemas/post.schema";
 import { Comment, CommentDocument } from "./schemas/comment.schema";
 import { Room, RoomDocument } from "../rooms/schemas/room.schema";
 import { User, UserDocument } from "../users/schemas/user.schema";
+import {
+  CalendarEvent,
+  CalendarEventDocument,
+} from "../calendar/schemas/calendar-event.schema";
 import { MeetingsGateway } from "../meetings/meetings.gateway";
 import { SupabaseService } from "../supabase/supabase.service";
 import { CreatePostDto } from "./dto/create-post.dto";
@@ -64,6 +68,8 @@ export class NewsFeedService {
     private readonly commentModel: Model<CommentDocument>,
     @InjectModel(Room.name) private readonly roomModel: Model<RoomDocument>,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+    @InjectModel(CalendarEvent.name)
+    private readonly calendarEventModel: Model<CalendarEventDocument>,
     private readonly meetingsGateway: MeetingsGateway,
     private readonly supabaseService: SupabaseService,
   ) {}
@@ -223,8 +229,28 @@ export class NewsFeedService {
     // Lấy số lượng comment cho từng bài viết
     const populated = await this.populateAuthors(accessiblePosts, roomId);
 
+    // Batch get các calendar events cho các post là cuộc họp (tránh N+1 query)
+    const eventIds = Array.from(
+      new Set(
+        populated
+          .filter((p: any) => p.isMeeting && p.eventId)
+          .map((p: any) => p.eventId)
+          .filter(Boolean),
+      ),
+    );
+
+    let eventMap = new Map<string, any>();
+    if (eventIds.length > 0) {
+      const events = await this.calendarEventModel
+        .find({ _id: { $in: eventIds } })
+        .exec();
+      events.forEach((ev) => {
+        eventMap.set(ev._id.toString(), ev);
+      });
+    }
+
     const postsWithCommentCount = await Promise.all(
-      populated.map(async (post) => {
+      populated.map(async (post: any) => {
         const commentCount = await this.commentModel.countDocuments({
           postId: post._id,
         });
@@ -232,8 +258,35 @@ export class NewsFeedService {
           this.getReactionStatsAndUserReaction(post.reactions || [], userId);
         const postWithoutRawReactions = { ...post } as Partial<PopulatedPost>;
         delete postWithoutRawReactions.reactions;
+
+        // Bổ sung thông tin calendar event và trạng thái tham gia
+        let calendarEventData: any = undefined;
+        if (post.isMeeting && post.eventId) {
+          const ev = eventMap.get(post.eventId.toString());
+          if (ev) {
+            const isHost = ev.hostId === userId;
+            const isAccepted = Array.isArray(ev.acceptedUserIds) && ev.acceptedUserIds.includes(userId);
+            const isJoined = isHost || isAccepted;
+
+            calendarEventData = {
+              _id: ev._id.toString(),
+              title: ev.title,
+              startDate: ev.startDate,
+              endDate: ev.endDate,
+              meetingCode: ev.meetingCode || post.meetingCode,
+              hostId: ev.hostId,
+              roomId: ev.roomId,
+              channelId: ev.channelId,
+              roomType: ev.roomType,
+              isJoined,
+              isHost,
+            };
+          }
+        }
+
         return {
           ...postWithoutRawReactions,
+          calendarEvent: calendarEventData,
           commentsCount: commentCount,
           reactionStats,
           userReaction,

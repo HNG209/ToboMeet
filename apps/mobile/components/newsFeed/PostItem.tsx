@@ -6,6 +6,7 @@ import {
   Image,
   Alert,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
@@ -14,7 +15,11 @@ import {
   PostDto,
   useDeletePostMutation,
   useTogglePostReactionMutation,
+  newsFeedApi,
 } from "../../lib/redux/features/newsFeed/newsFeedApi";
+import { useUpdateCalendarRsvpMutation } from "../../lib/redux/api/calendarApi";
+import { useDispatch } from "react-redux";
+import { AppDispatch } from "../../lib/redux/store";
 import { REACTION_ICONS } from "./ReactionPicker";
 import ReactionPicker from "./ReactionPicker";
 import CommentSectionModal from "./CommentSectionModal";
@@ -36,6 +41,8 @@ export default function PostItem({
   const router = useRouter();
   const [deletePost] = useDeletePostMutation();
   const [toggleReaction] = useTogglePostReactionMutation();
+  const [updateCalendarRsvp, { isLoading: isUpdatingRsvp }] = useUpdateCalendarRsvpMutation();
+  const dispatch = useDispatch<AppDispatch>();
 
   const [showReactions, setShowReactions] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
@@ -43,6 +50,42 @@ export default function PostItem({
   const [showPostReactionsModal, setShowPostReactionsModal] = useState(false);
 
   const isAuthor = post.authorId === currentUserId;
+
+  const targetEventId = post.calendarEvent?._id || post.eventId || post.meetingId;
+  const [localJoined, setLocalJoined] = useState<boolean | null>(null);
+  const isEventJoined = localJoined !== null ? localJoined : Boolean(post.calendarEvent?.isJoined);
+
+  const handleJoinMeeting = async () => {
+    if (isEventJoined || !targetEventId) return;
+    try {
+      await updateCalendarRsvp({
+        eventId: targetEventId,
+        status: "ACCEPTED",
+      }).unwrap();
+      setLocalJoined(true);
+      dispatch(
+        newsFeedApi.util.updateQueryData(
+          "getPosts",
+          { roomId: post.roomId, channelId: post.channelId },
+          (draft) => {
+            const target = draft.find((p) => p._id === post._id);
+            if (target && target.calendarEvent) {
+              target.calendarEvent.isJoined = true;
+            }
+          }
+        )
+      );
+    } catch (err: any) {
+      console.log("Join meeting error:", err);
+      Alert.alert(
+        t("room.error"),
+        err?.data?.message ||
+          (i18n.language === "vi"
+            ? "Không thể cập nhật trạng thái tham gia"
+            : "Failed to join event"),
+      );
+    }
+  };
 
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
@@ -163,29 +206,40 @@ export default function PostItem({
           <View className="bg-slate-50 border border-slate-200 rounded-2xl p-4 flex-row items-center justify-between gap-3 mb-2">
             <View className="flex-row items-center gap-3 flex-1 min-w-0">
               {/* Calendar icon */}
-              <View className="w-10 h-10 bg-indigo-50 border border-indigo-100 rounded-xl items-center justify-center shrink-0">
-                <Feather name="calendar" size={20} color="#4F46E5" />
+              <View className="w-10 h-10 bg-blue-50 border border-blue-100 rounded-xl items-center justify-center shrink-0">
+                <Feather name="calendar" size={20} color="#0052FF" />
               </View>
               {/* Info */}
               <View className="flex-1 min-w-0">
                 <Text className="text-sm font-bold text-slate-800" numberOfLines={1}>
-                  {post.meetingTitle || ""}
+                  {post.calendarEvent?.title || post.meetingTitle || (i18n.language === "vi" ? "Cuộc họp" : "Meeting")}
                 </Text>
                 <Text className="text-xs text-slate-400 font-semibold mt-0.5" numberOfLines={1}>
-                  {formatMeetingDate(post.meetingStartDate || "")}
+                  {formatMeetingDate(post.calendarEvent?.startDate || post.meetingStartDate || "")}
                 </Text>
               </View>
             </View>
             {/* Tham gia button */}
-            <TouchableOpacity
-              onPress={() => router.push(`/room/${post.roomId}`)}
-              className="bg-indigo-600 px-4 py-2 rounded-xl shrink-0"
-              activeOpacity={0.8}
-            >
-              <Text className="text-white text-xs font-bold">
-                {i18n.language === "vi" ? "Tham gia" : "Join"}
-              </Text>
-            </TouchableOpacity>
+            {isEventJoined ? (
+              <View className="bg-blue-50 border border-blue-200 px-3.5 py-2 rounded-xl flex-row items-center gap-1.5 shrink-0">
+                <Feather name="check-circle" size={14} color="#0052FF" />
+                <Text className="text-blue-700 text-xs font-bold">
+                  {i18n.language === "vi" ? "Đã tham gia" : "Joined"}
+                </Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                onPress={handleJoinMeeting}
+                disabled={isUpdatingRsvp}
+                className="bg-blue-600 px-4 py-2 rounded-xl shrink-0 flex-row items-center gap-1"
+                activeOpacity={0.8}
+              >
+                {isUpdatingRsvp && <ActivityIndicator size="small" color="#FFFFFF" />}
+                <Text className="text-white text-xs font-bold">
+                  {i18n.language === "vi" ? "Tham gia" : "Join"}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
           {/* Label */}
           <Text className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">
@@ -211,14 +265,14 @@ export default function PostItem({
                 </Text>
               </View>
             </View>
-            {/* Nhiệm vụ button */}
+            {/* Xem button */}
             <TouchableOpacity
               onPress={() => router.push(`/assignment/${post.assignmentId}?roomId=${post.roomId}`)}
-              className="bg-indigo-600 px-4 py-2 rounded-xl shrink-0"
+              className="bg-blue-600 px-4 py-2 rounded-xl shrink-0"
               activeOpacity={0.8}
             >
               <Text className="text-white text-xs font-bold">
-                {i18n.language === "vi" ? "Nhiệm vụ" : "Task"}
+                {i18n.language === "vi" ? "Xem" : "View"}
               </Text>
             </TouchableOpacity>
           </View>

@@ -302,14 +302,14 @@ export class RoomChannelService {
       existingRoomMember.status === "left";
 
     if (isAddingToRoom) {
-      // Giới hạn tối đa 500 thành viên trong phòng (kênh công khai kế thừa từ giới hạn này)
+      // Giới hạn tối đa 100 thành viên trong phòng (kênh công khai kế thừa từ giới hạn này)
       const activeMembersCount = room.members.filter(
         (m) =>
           m.status !== "removed" &&
           m.status !== "left",
       ).length;
-      if (activeMembersCount >= 500) {
-        throw new BadRequestException("Phòng đã đạt số lượng tối đa (500 người)");
+      if (activeMembersCount >= 100) {
+        throw new BadRequestException("Phòng đã đạt số lượng tối đa (100 người)");
       }
 
       // Giới hạn người dùng được phép tham gia và tạo tối đa 100 phòng họp
