@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export const preferredRegion = "sin1";
+export const dynamic = "force-dynamic";
+
 // GET /api/auth/logout
 // Đăng xuất session Supabase hiện tại rồi chuyển hướng về trang login.
 // Dùng cho nút "Đăng nhập" trên landing page để đảm bảo user luôn phải nhập lại thông tin.

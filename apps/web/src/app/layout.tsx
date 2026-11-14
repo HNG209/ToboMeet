@@ -5,6 +5,8 @@ import { ConfirmProvider } from "@/providers/ConfirmProvider";
 import { GpsSync } from "@/components/common/GpsSync";
 import { Toaster } from "sonner";
 
+export const preferredRegion = "sin1";
+
 export default async function RootLayout({
   children,
 }: {

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export const preferredRegion = "sin1";
+export const dynamic = "force-dynamic";
+
 const NESTJS_BASE_URL =
   process.env.NESTJS_BASE_URL || "http://localhost:3001/api";
 

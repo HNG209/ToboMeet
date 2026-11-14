@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
+export const preferredRegion = "sin1";
+export const dynamic = "force-dynamic";
+
 /**
  * Route handler nhận access_token và refresh_token từ mobile webview qua POST body,
  * thiết lập session Supabase hợp lệ trong HTTP-only cookies và chuyển hướng sang URL đích (?next=).
