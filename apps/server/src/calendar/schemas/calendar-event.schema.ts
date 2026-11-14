@@ -77,3 +77,6 @@ CalendarEventSchema.index({ acceptedUserIds: 1, startDate: 1 });
 CalendarEventSchema.index({ hostId: 1, startDate: 1 });
 CalendarEventSchema.index({ pendingUserIds: 1 });
 CalendarEventSchema.index({ notificationsEnabledUserIds: 1 });
+// Compound index tối ưu tìm kiếm theo dải thời gian & cờ lặp
+CalendarEventSchema.index({ hostId: 1, isRecurring: 1, startDate: 1, endDate: 1 });
+CalendarEventSchema.index({ acceptedUserIds: 1, isRecurring: 1, startDate: 1, endDate: 1 });

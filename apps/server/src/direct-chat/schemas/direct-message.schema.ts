@@ -107,4 +107,6 @@ DirectMessageSchema.pre("save", function () {
 });
 
 DirectMessageSchema.index({ conversationId: 1, createdAt: -1 });
+DirectMessageSchema.index({ conversationId: 1, _id: -1 });
+DirectMessageSchema.index({ conversationId: 1, isPinned: 1, _id: -1 });
 DirectMessageSchema.index({ conversationId: 1, deletedAt: 1 });

@@ -93,3 +93,6 @@ export class Post {
 }
 
 export const PostSchema = SchemaFactory.createForClass(Post);
+
+// Compound index tối ưu tìm kiếm bài viết theo phòng, kênh và sắp xếp theo ngày tạo
+PostSchema.index({ roomId: 1, channelId: 1, isDeleted: 1, createdAt: -1 });

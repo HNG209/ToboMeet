@@ -54,3 +54,6 @@ export class Comment {
 }
 
 export const CommentSchema = SchemaFactory.createForClass(Comment);
+
+// Compound index tối ưu tìm kiếm bình luận theo bài viết và sắp xếp theo ngày
+CommentSchema.index({ postId: 1, createdAt: 1 });

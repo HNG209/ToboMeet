@@ -163,17 +163,35 @@ export class NewsFeedService {
   /**
    * Helper populate thông tin tác giả và vai trò trong phòng
    */
-  private async populateAuthors(items: PopulateItem[], roomId: string) {
-    const room = await this.roomModel.findById(roomId);
+  private async populateAuthors(items: PopulateItem[], roomIdOrRoom: string | any) {
+    let room: any = null;
+    if (typeof roomIdOrRoom === "string") {
+      room = await this.roomModel.findById(roomIdOrRoom).lean();
+    } else {
+      room = roomIdOrRoom;
+    }
+
     const authorIds = Array.from(new Set(items.map((item) => item.authorId)));
-    const users = await this.userModel
-      .find({ supabaseId: { $in: authorIds } })
-      .exec();
+    const users =
+      authorIds.length > 0
+        ? await this.userModel
+            .find({ supabaseId: { $in: authorIds } })
+            .select("supabaseId displayName avatarUrl")
+            .lean()
+            .exec()
+        : [];
+
+    const userMap = new Map<string, any>(
+      users.map((u: any) => [u.supabaseId, u] as [string, any]),
+    );
+    const memberMap = new Map<string, any>(
+      (room?.members || []).map((m: any) => [m.userId, m] as [string, any]),
+    );
 
     return items.map((item) => {
       const itemObj = item.toObject ? item.toObject() : item;
-      const user = users.find((u) => u.supabaseId === item.authorId);
-      const member = room?.members.find((m) => m.userId === item.authorId);
+      const user = userMap.get(item.authorId);
+      const member = memberMap.get(item.authorId);
 
       return {
         ...itemObj,
@@ -203,6 +221,7 @@ export class NewsFeedService {
     const posts = await this.postModel
       .find({ roomId, channelId, isDeleted: { $ne: true } })
       .sort({ createdAt: -1 })
+      .lean()
       .exec();
 
     // Lọc bài đăng nhiệm vụ theo quyền của user
@@ -226,8 +245,8 @@ export class NewsFeedService {
       return true;
     });
 
-    // Lấy số lượng comment cho từng bài viết
-    const populated = await this.populateAuthors(accessiblePosts, roomId);
+    // Lấy thông tin tác giả (dùng luôn room đã query sẵn để tránh query lại DB)
+    const populated = await this.populateAuthors(accessiblePosts, room);
 
     // Batch get các calendar events cho các post là cuộc họp (tránh N+1 query)
     const eventIds = Array.from(
@@ -239,60 +258,71 @@ export class NewsFeedService {
       ),
     );
 
-    let eventMap = new Map<string, any>();
-    if (eventIds.length > 0) {
-      const events = await this.calendarEventModel
-        .find({ _id: { $in: eventIds } })
-        .exec();
-      events.forEach((ev) => {
-        eventMap.set(ev._id.toString(), ev);
-      });
-    }
+    // Batch gom comment count cho TẤT CẢ bài viết bằng 1 câu aggregate duy nhất (thay vì N queries)
+    const postIds = populated.map((p: any) => new Types.ObjectId(p._id));
 
-    const postsWithCommentCount = await Promise.all(
-      populated.map(async (post: any) => {
-        const commentCount = await this.commentModel.countDocuments({
-          postId: post._id,
-        });
-        const { reactionStats, userReaction } =
-          this.getReactionStatsAndUserReaction(post.reactions || [], userId);
-        const postWithoutRawReactions = { ...post } as Partial<PopulatedPost>;
-        delete postWithoutRawReactions.reactions;
+    const [events, commentAgg] = await Promise.all([
+      eventIds.length > 0
+        ? this.calendarEventModel
+            .find({ _id: { $in: eventIds } })
+            .lean()
+            .exec()
+        : [],
+      postIds.length > 0
+        ? this.commentModel.aggregate([
+            { $match: { postId: { $in: postIds } } },
+            { $group: { _id: "$postId", count: { $sum: 1 } } },
+          ])
+        : [],
+    ]);
 
-        // Bổ sung thông tin calendar event và trạng thái tham gia
-        let calendarEventData: any = undefined;
-        if (post.isMeeting && post.eventId) {
-          const ev = eventMap.get(post.eventId.toString());
-          if (ev) {
-            const isHost = ev.hostId === userId;
-            const isAccepted = Array.isArray(ev.acceptedUserIds) && ev.acceptedUserIds.includes(userId);
-            const isJoined = isHost || isAccepted;
-
-            calendarEventData = {
-              _id: ev._id.toString(),
-              title: ev.title,
-              startDate: ev.startDate,
-              endDate: ev.endDate,
-              meetingCode: ev.meetingCode || post.meetingCode,
-              hostId: ev.hostId,
-              roomId: ev.roomId,
-              channelId: ev.channelId,
-              roomType: ev.roomType,
-              isJoined,
-              isHost,
-            };
-          }
-        }
-
-        return {
-          ...postWithoutRawReactions,
-          calendarEvent: calendarEventData,
-          commentsCount: commentCount,
-          reactionStats,
-          userReaction,
-        };
-      }),
+    const eventMap = new Map<string, any>(
+      events.map((ev: any) => [ev._id.toString(), ev] as [string, any]),
     );
+    const commentCountMap = new Map<string, number>(
+      commentAgg.map((c: any) => [c._id.toString(), c.count] as [string, number]),
+    );
+
+    const postsWithCommentCount = populated.map((post: any) => {
+      const commentCount = commentCountMap.get(post._id.toString()) || 0;
+      const { reactionStats, userReaction } =
+        this.getReactionStatsAndUserReaction(post.reactions || [], userId);
+      const postWithoutRawReactions = { ...post } as Partial<PopulatedPost>;
+      delete postWithoutRawReactions.reactions;
+
+      // Bổ sung thông tin calendar event và trạng thái tham gia
+      let calendarEventData: any = undefined;
+      if (post.isMeeting && post.eventId) {
+        const ev = eventMap.get(post.eventId.toString());
+        if (ev) {
+          const isHost = ev.hostId === userId;
+          const isAccepted = Array.isArray(ev.acceptedUserIds) && ev.acceptedUserIds.includes(userId);
+          const isJoined = isHost || isAccepted;
+
+          calendarEventData = {
+            _id: ev._id.toString(),
+            title: ev.title,
+            startDate: ev.startDate,
+            endDate: ev.endDate,
+            meetingCode: ev.meetingCode || post.meetingCode,
+            hostId: ev.hostId,
+            roomId: ev.roomId,
+            channelId: ev.channelId,
+            roomType: ev.roomType,
+            isJoined,
+            isHost,
+          };
+        }
+      }
+
+      return {
+        ...postWithoutRawReactions,
+        calendarEvent: calendarEventData,
+        commentsCount: commentCount,
+        reactionStats,
+        userReaction,
+      };
+    });
 
     return postsWithCommentCount;
   }

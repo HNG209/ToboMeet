@@ -72,93 +72,102 @@ export class SupabaseGuard implements CanActivate, OnModuleInit {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<Request>();
-    const token = this.extractTokenFromHeader(request);
+    const guardStart = performance.now();
 
-    if (!token) {
-      console.warn(
-        `[SupabaseGuard] No Bearer token found for ${request.method} ${request.url}`,
-      );
-      throw new AppException(ErrorCode.INVALID_TOKEN);
-    }
-
-    // Verify chữ ký JWT locally bằng JWKS (ES256 / P-256)
-    let payload: SupabaseJWTPayload;
     try {
-      const { payload: verified } = await jwtVerify<SupabaseJWTPayload>(
-        token,
-        await this.getLocalJWKS(),
-        {
-          audience: "authenticated",
-          algorithms: ["ES256"],
-        },
-      );
-      payload = verified;
-    } catch (err: any) {
-      console.error(
-        `[SupabaseGuard] JWT verification failed for ${request.method} ${request.url}:`,
-        err?.code || err?.message,
-      );
-      throw new AppException(ErrorCode.INVALID_TOKEN);
-    }
+      const token = this.extractTokenFromHeader(request);
 
-    const userId = payload.sub;
-    if (!userId) {
-      throw new AppException(ErrorCode.INVALID_TOKEN);
-    }
-
-    // Kiểm tra thu hồi phiên (isRevoked) từ MongoDB
-    try {
-      const userAgent = ((request.headers["user-agent"] as string) || "")
-        .trim()
-        .toLowerCase();
-
-      let sessionId =
-        payload.session_id ||
-        payload.sid ||
-        (payload.jti as string) ||
-        "";
-
-      if (!sessionId && userId && userAgent) {
-        const { createHash } = await import("crypto");
-        sessionId = createHash("sha256")
-          .update(`${userId}-${userAgent}`)
-          .digest("hex");
-      }
-      if (!sessionId) {
-        sessionId = userId;
+      if (!token) {
+        console.warn(
+          `[SupabaseGuard] No Bearer token found for ${request.method} ${request.url}`,
+        );
+        throw new AppException(ErrorCode.INVALID_TOKEN);
       }
 
-      if (sessionId) {
-        const sessionDoc = await this.sessionModel
-          .findOne({ sessionId, userId })
-          .lean();
+      // Verify chữ ký JWT locally bằng JWKS (ES256 / P-256)
+      let payload: SupabaseJWTPayload;
+      try {
+        const { payload: verified } = await jwtVerify<SupabaseJWTPayload>(
+          token,
+          await this.getLocalJWKS(),
+          {
+            audience: "authenticated",
+            algorithms: ["ES256"],
+          },
+        );
+        payload = verified;
+      } catch (err: any) {
+        console.error(
+          `[SupabaseGuard] JWT verification failed for ${request.method} ${request.url}:`,
+          err?.code || err?.message,
+        );
+        throw new AppException(ErrorCode.INVALID_TOKEN);
+      }
 
-        if (sessionDoc?.isRevoked) {
-          console.error(
-            `[SupabaseGuard] Session REVOKED in DB! sessionId=${sessionId}, userId=${userId}`,
-          );
-          throw new AppException(ErrorCode.INVALID_TOKEN);
+      const userId = payload.sub;
+      if (!userId) {
+        throw new AppException(ErrorCode.INVALID_TOKEN);
+      }
+
+      // Kiểm tra thu hồi phiên (isRevoked) từ MongoDB
+      try {
+        const userAgent = ((request.headers["user-agent"] as string) || "")
+          .trim()
+          .toLowerCase();
+
+        let sessionId =
+          payload.session_id ||
+          payload.sid ||
+          (payload.jti as string) ||
+          "";
+
+        if (!sessionId && userId && userAgent) {
+          const { createHash } = await import("crypto");
+          sessionId = createHash("sha256")
+            .update(`${userId}-${userAgent}`)
+            .digest("hex");
         }
+        if (!sessionId) {
+          sessionId = userId;
+        }
+
+        if (sessionId) {
+          const sessionDoc = await this.sessionModel
+            .findOne({ sessionId, userId })
+            .lean();
+
+          if (sessionDoc?.isRevoked) {
+            console.error(
+              `[SupabaseGuard] Session REVOKED in DB! sessionId=${sessionId}, userId=${userId}`,
+            );
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+          }
+        }
+      } catch (err) {
+        if (err instanceof AppException) throw err;
+        console.error("[SupabaseGuard] Error during session revoke check:", err);
       }
-    } catch (err) {
-      if (err instanceof AppException) throw err;
-      console.error("[SupabaseGuard] Error during session revoke check:", err);
+
+      const mappedRole =
+        payload.app_metadata?.role ||
+        payload.role ||
+        "user";
+
+      (request as any).user = {
+        id: userId,
+        email: payload.email ?? "",
+        role: mappedRole,
+        app_metadata: payload.app_metadata || {},
+        user_metadata: payload.user_metadata || {},
+      };
+
+      return true;
+    } finally {
+      if ((request as any)._timings) {
+        (request as any)._timings.guard =
+          Math.round((performance.now() - guardStart) * 100) / 100;
+      }
     }
-
-    const mappedRole =
-      payload.app_metadata?.role ||
-      payload.role ||
-      "user";
-
-    (request as any).user = {
-      id: userId,
-      email: payload.email ?? "",
-      role: mappedRole,
-      app_metadata: payload.app_metadata || {},
-      user_metadata: payload.user_metadata || {},
-    };
-
-    return true;
   }
 
   private extractTokenFromHeader(request: Request): string | undefined {

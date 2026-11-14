@@ -79,3 +79,8 @@ apps/whiteboard/data/
 # Recordings & Media storage
 recordings/
 **/recordings/
+
+# Performance & Load Test Logs
+latency_report.csv
+**/latency_report.csv
+

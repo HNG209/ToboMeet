@@ -164,3 +164,7 @@ export class Assignment {
 }
 
 export const AssignmentSchema = SchemaFactory.createForClass(Assignment);
+
+// Compound indexes tối ưu tìm kiếm deadline theo phòng & thời gian
+AssignmentSchema.index({ deadline: 1, status: 1 });
+AssignmentSchema.index({ roomId: 1, deadline: 1, status: 1 });

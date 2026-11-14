@@ -1,6 +1,7 @@
 import "./polyfill";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+import { LoggingInterceptor } from "./core/interceptors/logging.interceptor";
 import { TransformInterceptor } from "./core/interceptors/transform.interceptor";
 import { GlobalExceptionFilter } from "./core/filters/global-exception.filter";
 import * as express from "express";
@@ -10,6 +11,20 @@ async function bootstrap() {
   console.log("🚀 Starting Nest application bootstrap...");
   const app = await NestFactory.create(AppModule, {
     bodyParser: false,
+  });
+
+  // Đo thời gian request đa tầng (Total, Guard, Service)
+  app.use((req: any, _res: any, next: any) => {
+    if (process.env.ENABLE_LATENCY_LOG === "false") {
+      return next();
+    }
+    req._startTime = performance.now();
+    req._timings = {
+      guard: 0,
+      service: 0,
+      isLogged: false,
+    };
+    next();
   });
 
   // Tự cấu hình lại bodyParser để nhận diện cả JSON thường và Webhook của LiveKit
@@ -44,7 +59,10 @@ async function bootstrap() {
     allowedHeaders: "Content-Type,Authorization,X-Socket-Id,x-device-name,x-device-model,x-device-brand,x-device-os,ngrok-skip-browser-warning",
     credentials: true,
   });
-  app.useGlobalInterceptors(new TransformInterceptor());
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new TransformInterceptor(),
+  );
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const port = process.env.PORT || 3001;

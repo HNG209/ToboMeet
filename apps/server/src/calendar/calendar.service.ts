@@ -398,8 +398,8 @@ export class CalendarService {
     });
 
     const query = { $and: andConditions };
-    const events = await this.calendarEventModel.find(query).exec();
-    const resultEvents = [];
+    const events = await this.calendarEventModel.find(query).lean().exec();
+    const resultEvents: any[] = [];
 
     for (const event of events) {
       if (!event.isRecurring) {
@@ -409,14 +409,21 @@ export class CalendarService {
         // Sự kiện lặp chuẩn RFC 5545
         try {
           const offsetMs = 7 * 60 * 60 * 1000; // GMT+07:00 (Asia/Ho_Chi_Minh)
-          const localStart = new Date(event.startDate.getTime() + offsetMs);
+          const startMs = (event.startDate as any)?.getTime
+            ? (event.startDate as any).getTime()
+            : new Date(event.startDate).getTime();
+          const endMs = (event.endDate as any)?.getTime
+            ? (event.endDate as any).getTime()
+            : new Date(event.endDate).getTime();
+
+          const localStart = new Date(startMs + offsetMs);
           const localRangeStart = new Date(rangeStart.getTime() + offsetMs);
           const localRangeEnd = new Date(rangeEnd.getTime() + offsetMs);
 
           const rule = rrulestr(event.recurrenceRule, { dtstart: localStart });
           const occurrences = rule.between(localRangeStart, localRangeEnd, true);
 
-          const duration = event.endDate.getTime() - event.startDate.getTime();
+          const duration = endMs - startMs;
 
           for (const occ of occurrences) {
             const dateStr = occ.toISOString().substring(0, 10);
@@ -431,7 +438,7 @@ export class CalendarService {
 
             // Clone Event
             resultEvents.push({
-              ...event.toObject(),
+              ...event,
               startDate: occStart,
               endDate: occEnd,
               isOccurrence: true,
@@ -444,24 +451,34 @@ export class CalendarService {
       }
     }
 
-    // Đính kèm thông tin người tổ chức (hostEmail, hostDisplayName)
-    const finalEvents = [];
-    for (const e of resultEvents) {
-      const hostUser = await this.userModel
-        .findOne({ supabaseId: e.hostId })
-        .select("email displayName avatarUrl")
-        .exec();
+    // Đính kèm thông tin người tổ chức (hostEmail, hostDisplayName) - BATCH QUERY (O(1) thay vì O(N))
+    const hostIds = Array.from(
+      new Set(resultEvents.map((e) => e.hostId).filter(Boolean)),
+    );
+    const hostUsers =
+      hostIds.length > 0
+        ? await this.userModel
+            .find({ supabaseId: { $in: hostIds } })
+            .select("supabaseId email displayName avatarUrl")
+            .lean()
+            .exec()
+        : [];
+    const hostUserMap = new Map<string, any>(
+      hostUsers.map((u: any) => [u.supabaseId, u] as [string, any]),
+    );
 
+    const finalEvents: any[] = resultEvents.map((e) => {
+      const hostUser = hostUserMap.get(e.hostId);
       const eventObj = typeof e.toObject === "function" ? e.toObject() : e;
-      finalEvents.push({
+      return {
         ...eventObj,
         hostEmail: hostUser ? hostUser.email : "",
         hostDisplayName: hostUser
-          ? hostUser.displayName || hostUser.email.split("@")[0]
+          ? hostUser.displayName || hostUser.email?.split("@")[0] || ""
           : "",
         hostAvatarUrl: hostUser ? hostUser.avatarUrl : "",
-      });
-    }
+      };
+    });
 
     // Tìm các nhiệm vụ (Assignment) có hạn nộp (deadline) trong khoảng thời gian [rangeStart, rangeEnd]
     const assignmentQuery: Record<string, unknown> = {
@@ -473,13 +490,47 @@ export class CalendarService {
       assignmentQuery.roomId = filters.roomId;
     }
 
-    const assignments = await this.assignmentModel.find(assignmentQuery).exec();
+    const assignments = await this.assignmentModel
+      .find(assignmentQuery)
+      .lean()
+      .exec();
     const now = new Date();
 
     if (assignments.length > 0) {
       const roomIds = Array.from(new Set(assignments.map((a) => a.roomId)));
-      const rooms = await this.roomModel.find({ _id: { $in: roomIds } }).exec();
-      const roomMap = new Map(rooms.map((r) => [r._id.toString(), r]));
+      const assignmentIds = assignments.map((a) => a._id.toString());
+      const creatorIds = Array.from(
+        new Set(assignments.map((a) => a.createdBy).filter(Boolean)),
+      );
+
+      // Query gộp theo lô song song (Parallel Batching - 3 queries chạy cùng lúc)
+      const [rooms, submissions, creatorUsers] = await Promise.all([
+        this.roomModel.find({ _id: { $in: roomIds } }).lean().exec(),
+        this.submissionModel
+          .find({
+            assignmentId: { $in: assignmentIds },
+            studentId: userId,
+          })
+          .lean()
+          .exec(),
+        creatorIds.length > 0
+          ? this.userModel
+              .find({ supabaseId: { $in: creatorIds } })
+              .select("supabaseId email displayName avatarUrl")
+              .lean()
+              .exec()
+          : [],
+      ]);
+
+      const roomMap = new Map<string, any>(
+        rooms.map((r: any) => [r._id.toString(), r] as [string, any]),
+      );
+      const submissionMap = new Map<string, any>(
+        submissions.map((s: any) => [s.assignmentId, s] as [string, any]),
+      );
+      const creatorMap = new Map<string, any>(
+        creatorUsers.map((u: any) => [u.supabaseId, u] as [string, any]),
+      );
 
       for (const assignment of assignments) {
         const room = roomMap.get(assignment.roomId);
@@ -487,7 +538,7 @@ export class CalendarService {
 
         const isCreator = assignment.createdBy === userId;
         const member = room.members?.find(
-          (m) => m.userId === userId && m.status === "active",
+          (m: any) => m.userId === userId && m.status === "active",
         );
 
         // Quyền truy cập: Người tạo HOẶC thành viên hợp lệ trong phòng
@@ -508,24 +559,20 @@ export class CalendarService {
           }
         }
 
-        // Xác định trạng thái của nhiệm vụ đối với người dùng này
+        // Xác định trạng thái của nhiệm vụ đối với người dùng này từ Cache Map O(1)
         let assignmentStatus:
           | "in_progress"
           | "submitted"
           | "graded"
           | "overdue"
           | "closed" = "in_progress";
-        const submission = await this.submissionModel
-          .findOne({
-            assignmentId: assignment._id.toString(),
-            studentId: userId,
-          })
-          .exec();
+
+        const submission = submissionMap.get(assignment._id.toString());
 
         if (
           assignment.submissionPolicy === "lock_after_deadline" &&
           assignment.deadline &&
-          now > assignment.deadline
+          now > new Date(assignment.deadline)
         ) {
           assignmentStatus = "closed";
         }
@@ -536,17 +583,14 @@ export class CalendarService {
           } else {
             assignmentStatus = "submitted";
           }
-        } else if (assignment.deadline && now > assignment.deadline) {
+        } else if (assignment.deadline && now > new Date(assignment.deadline)) {
           if (assignmentStatus !== "closed") {
             assignmentStatus = "overdue";
           }
         }
 
-        // Thông tin người giao
-        const creatorUser = await this.userModel
-          .findOne({ supabaseId: assignment.createdBy })
-          .select("email displayName avatarUrl")
-          .exec();
+        // Thông tin người giao từ Map O(1)
+        const creatorUser = creatorMap.get(assignment.createdBy);
 
         finalEvents.push({
           _id: `assignment_${assignment._id}`,
