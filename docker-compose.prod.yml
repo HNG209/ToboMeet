@@ -1,14 +1,21 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # 1. REDIS: Dùng chung cho BullMQ (Server & Scheduler)
   redis:
     image: redis:7-alpine
     container_name: tobomeet-redis
-    ports:
-      - "6379:6379"
+    # Không expose port 6379 ra ngoài Internet để tránh bị bot tấn công biến thành replica
+    # Các container nội bộ vẫn kết nối qua redis:6379 bình thường trong tobomeet-network
     volumes:
       - redis_data:/data
     restart: unless-stopped
     command: redis-server --appendonly yes --maxmemory 48mb --maxmemory-policy allkeys-lru
+    logging: *default-logging
     mem_limit: 64m
     mem_reservation: 32m
     cpus: 0.15
@@ -44,6 +51,7 @@ services:
     volumes:
       - ./uploads:/app/apps/server/uploads
     restart: unless-stopped
+    logging: *default-logging
     mem_limit: 320m
     mem_reservation: 180m
     cpus: 0.50
@@ -73,6 +81,7 @@ services:
     volumes:
       - ./data/whiteboard:/app/data/rooms
     restart: unless-stopped
+    logging: *default-logging
     mem_limit: 160m
     mem_reservation: 80m
     cpus: 0.25
@@ -104,6 +113,7 @@ services:
     depends_on:
       - redis
     restart: unless-stopped
+    logging: *default-logging
     mem_limit: 160m
     mem_reservation: 80m
     cpus: 0.25
@@ -132,6 +142,7 @@ services:
     volumes:
       - ./transcripts:/app/transcripts
     restart: unless-stopped
+    logging: *default-logging
     shm_size: 128m
     mem_limit: 320m
     mem_reservation: 100m
@@ -162,6 +173,7 @@ services:
     depends_on:
       - server
       - whiteboard
+    logging: *default-logging
     mem_limit: 64m
     mem_reservation: 30m
     cpus: 0.15
