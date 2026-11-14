@@ -23,8 +23,29 @@ interface SupabaseJWTPayload extends JWTPayload {
 /** TTL để tự refresh JWKS (hỗ trợ key rotation), đơn vị ms */
 const JWKS_REFRESH_TTL = 10 * 60 * 1000; // 10 phút
 
+interface CachedSessionStatus {
+  isRevoked: boolean;
+  cachedAt: number;
+}
+
 @Injectable()
 export class SupabaseGuard implements CanActivate, OnModuleInit {
+  /** In-memory cache cho trạng thái thu hồi phiên (tránh query MongoDB trên từng request) */
+  private static readonly sessionRevokeCache = new Map<string, CachedSessionStatus>();
+  private static readonly SESSION_CACHE_TTL = 30 * 1000; // 30 giây
+
+  public static invalidateSessionCache(userId: string, sessionId?: string): void {
+    if (sessionId) {
+      SupabaseGuard.sessionRevokeCache.delete(`${userId}:${sessionId}`);
+    } else {
+      for (const key of SupabaseGuard.sessionRevokeCache.keys()) {
+        if (key.startsWith(`${userId}:`)) {
+          SupabaseGuard.sessionRevokeCache.delete(key);
+        }
+      }
+    }
+  }
+
   /**
    * Local key set được build từ JWKS đã fetch sẵn.
    * createLocalJWKSet không có network call — verify hoàn toàn in-memory.
@@ -132,11 +153,31 @@ export class SupabaseGuard implements CanActivate, OnModuleInit {
         }
 
         if (sessionId) {
-          const sessionDoc = await this.sessionModel
-            .findOne({ sessionId, userId })
-            .lean();
+          const cacheKey = `${userId}:${sessionId}`;
+          const cached = SupabaseGuard.sessionRevokeCache.get(cacheKey);
+          const now = Date.now();
 
-          if (sessionDoc?.isRevoked) {
+          let isRevoked = false;
+          if (cached && now - cached.cachedAt < SupabaseGuard.SESSION_CACHE_TTL) {
+            isRevoked = cached.isRevoked;
+          } else {
+            const sessionDoc = await this.sessionModel
+              .findOne({ sessionId, userId })
+              .select("isRevoked")
+              .lean();
+
+            isRevoked = !!sessionDoc?.isRevoked;
+
+            if (SupabaseGuard.sessionRevokeCache.size > 2000) {
+              SupabaseGuard.sessionRevokeCache.clear();
+            }
+            SupabaseGuard.sessionRevokeCache.set(cacheKey, {
+              isRevoked,
+              cachedAt: now,
+            });
+          }
+
+          if (isRevoked) {
             console.error(
               `[SupabaseGuard] Session REVOKED in DB! sessionId=${sessionId}, userId=${userId}`,
             );

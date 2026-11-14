@@ -33,3 +33,7 @@ export class Room {
 }
 
 export const RoomSchema = SchemaFactory.createForClass(Room);
+
+// Compound index phục vụ getMyRooms (tìm phòng của user sắp xếp theo updatedAt)
+RoomSchema.index({ "members.userId": 1, isDeleted: 1, status: 1, updatedAt: -1 });
+RoomSchema.index({ ownerId: 1, isDeleted: 1 });

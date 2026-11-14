@@ -21,6 +21,7 @@ import * as path from "path";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { PageResponse, UserResponse } from "@tobomeet/shared/types";
+import { SupabaseGuard } from "../core/guards/supabase.guard";
 
 export interface MappedSession {
   id: string;
@@ -321,7 +322,7 @@ export class UsersService {
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
+      const timeout = setTimeout(() => controller.abort(), 1200);
 
       const res = await fetch(targetUrl, { signal: controller.signal });
       clearTimeout(timeout);
@@ -427,7 +428,46 @@ export class UsersService {
       }
 
       const cleanIp = this.getRealIpAddress(clientIp) || "127.0.0.1";
-      const geo = await this.getGeolocation(cleanIp);
+      const isPrivate = this.isPrivateIp(cleanIp);
+      const cacheKey = isPrivate ? "LOCAL_WAN" : cleanIp;
+      let geo = this.geoCache.get(cacheKey);
+
+      // Nếu chưa có trong cache, ưu tiên dùng dữ liệu cũ của session hoặc fallback tức thì (không block HTTP request)
+      if (!geo) {
+        geo = {
+          city: existing?.city || "",
+          country:
+            existing?.country && existing.country !== "Không xác định"
+              ? existing.country
+              : "Việt Nam",
+          isp: existing?.isp || "",
+          publicIp: cleanIp,
+        };
+        // Fetch ngầm ở background để cập nhật vào sessionModel
+        this.getGeolocation(cleanIp)
+          .then((freshGeo) => {
+            if (
+              freshGeo &&
+              freshGeo.country &&
+              freshGeo.country !== "Không xác định"
+            ) {
+              this.sessionModel
+                .updateOne(
+                  { sessionId },
+                  {
+                    $set: {
+                      city: freshGeo.city,
+                      country: freshGeo.country,
+                      isp: freshGeo.isp,
+                    },
+                  },
+                )
+                .exec()
+                .catch(() => {});
+            }
+          })
+          .catch(() => {});
+      }
 
       let payload: Record<string, unknown> = {};
       try {
@@ -687,6 +727,7 @@ export class UsersService {
           { $set: { isRevoked: true, revokedAt: new Date() } },
         )
         .exec();
+      SupabaseGuard.invalidateSessionCache(userId, sessionId);
     } catch (err) {
       this.logger.error(
         "Lỗi khi đánh dấu thu hồi DeviceSession khỏi MongoDB: " + String(err),
@@ -830,6 +871,7 @@ export class UsersService {
       { userId, sessionId: { $ne: currentSessionId } },
       { $set: { isRevoked: true, revokedAt: new Date() } },
     );
+    SupabaseGuard.invalidateSessionCache(userId);
     this.logger.log(
       `[RevokeAll] MongoDB đã revoke ${updateResult.modifiedCount} session(s).`,
     );
@@ -1175,6 +1217,7 @@ export class UsersService {
           { sessionId: { $in: expiredIds } },
           { $set: { isRevoked: true, revokedAt: new Date() } },
         );
+        SupabaseGuard.invalidateSessionCache(userId);
         this.logger.log(
           `Đã đồng bộ và đánh dấu ${expiredIds.length} session hết hạn/bị buộc đăng xuất.`,
         );

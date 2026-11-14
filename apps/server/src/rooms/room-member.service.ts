@@ -35,18 +35,43 @@ export class RoomMemberService {
   /**
    * Lấy danh sách user trong phòng
    */
-  async getRoomMembers(roomId: string): Promise<RoomMemberResponse[]> {
-    const room = await this.roomModel.findById(roomId);
+  async getRoomMembers(roomId: string, currentUserId?: string): Promise<RoomMemberResponse[]> {
+    const room = await this.roomModel
+      .findOne({
+        _id: roomId,
+        isDeleted: { $ne: true },
+      })
+      .lean();
     if (!room) {
       throw new NotFoundException("Phòng không tồn tại");
     }
 
-    const activeMembers = room.members.filter(
-      (member) => member.status !== "removed" && member.status !== "left",
+    if (room.status === "blocked") {
+      throw new ForbiddenException(
+        "Phòng họp này đang bị tạm khóa do vi phạm quy định cộng đồng.",
+      );
+    }
+
+    if (currentUserId) {
+      const isMember = (room.members || []).some(
+        (m: any) =>
+          m.userId === currentUserId &&
+          m.status !== "removed" &&
+          m.status !== "left",
+      );
+      if (!isMember) {
+        throw new ForbiddenException("Bạn không còn là thành viên của phòng này");
+      }
+    }
+
+    const activeMembers = (room.members || []).filter(
+      (member: any) => member.status !== "removed" && member.status !== "left",
     );
-    const memberUserIds = activeMembers.map((member) => member.userId);
+    const memberUserIds = activeMembers.map((member: any) => member.userId);
     const users = await this.userModel
       .find({ supabaseId: { $in: memberUserIds } })
+      .select("supabaseId displayName avatarUrl email")
+      .lean()
       .exec();
 
     // Định nghĩa thứ tự ưu tiên vai trò: owner (1) -> admin (2) -> member (3)

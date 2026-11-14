@@ -645,14 +645,14 @@ export class DirectChatService {
   /**
    * Lấy chi tiết các tin nhắn đã ghim trong một cuộc trò chuyện
    */
-  async getPinnedMessagesDetail(conversationId: string) {
+  async getPinnedMessagesDetail(conversationId: string, existingConversation?: any) {
     if (!Types.ObjectId.isValid(conversationId)) {
       throw new BadRequestException("Mã cuộc trò chuyện không hợp lệ");
     }
 
-    const conversation = await this.conversationModel
-      .findById(conversationId)
-      .lean();
+    const conversation =
+      existingConversation ||
+      (await this.conversationModel.findById(conversationId).lean());
 
     if (!conversation) {
       throw new NotFoundException("Không tìm thấy cuộc trò chuyện");
@@ -734,7 +734,7 @@ export class DirectChatService {
       throw new ForbiddenException("Bạn không có quyền truy cập cuộc trò chuyện này");
     }
 
-    return this.getPinnedMessagesDetail(conversationId);
+    return this.getPinnedMessagesDetail(conversationId, conversation);
   }
 
   /**

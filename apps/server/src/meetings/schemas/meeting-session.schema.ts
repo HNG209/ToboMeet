@@ -126,3 +126,8 @@ MeetingSessionSchema.index(
   { unique: true, partialFilterExpression: { status: "ongoing" } },
 );
 
+// Compound index phục vụ phân trang lịch sử phiên họp (getMeetingSessions)
+MeetingSessionSchema.index({ meetingCode: 1, _id: -1 });
+MeetingSessionSchema.index({ meetingCode: 1, startedAt: -1 });
+MeetingSessionSchema.index({ hostId: 1, createdAt: -1 });
+

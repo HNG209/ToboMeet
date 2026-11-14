@@ -104,8 +104,21 @@ export class MeetingsService {
     let humanParticipantsCount = 0;
 
     if (livekitRoom && this.livekitRoomService) {
-      humanParticipantsCount = await this.getHumanParticipantsCount(meeting.meetingCode);
-      const hasAgent = await this.hasAgentInRoom(meeting.meetingCode);
+      const participants = await this.livekitRoomService.listParticipants(meeting.meetingCode);
+      const isAgentParticipant = (p: any) => {
+        const id = p.identity || "";
+        const name = p.name || "";
+        return (
+          id.startsWith("EG_") ||
+          id.startsWith("agent-") ||
+          id.includes(this.STT_AGENT_NAME) ||
+          name.includes(this.STT_AGENT_NAME) ||
+          p.kind === 2 ||
+          Boolean(p.isAgent)
+        );
+      };
+      humanParticipantsCount = participants.filter((p) => !isAgentParticipant(p)).length;
+      const hasAgent = participants.some((p) => isAgentParticipant(p));
 
       // Nếu tất cả người dùng đều đã thoát nhưng Agent vẫn còn trong phòng (đang đếm ngược 10s hoặc lưu dữ liệu):
       // Chặn người dùng không cho xin token vào phòng tới khi Agent đã thoát hoàn toàn (chống spam)
@@ -991,6 +1004,8 @@ export class MeetingsService {
         roomId,
         channelId,
       })
+      .select("meetingCode hostId")
+      .lean()
       .exec();
 
     if (!meeting) {
@@ -1001,11 +1016,33 @@ export class MeetingsService {
       };
     }
 
+    // 1. Kiểm tra nhanh trong MongoDB: Nếu không có session nào đang 'ongoing'
+    // thì chắc chắn không có cuộc họp đang diễn ra (tiết kiệm gọi LiveKit Cloud ~1.5s - 4s)
+    const ongoingSession = await this.sessionModel
+      .findOne({
+        meetingCode: meeting.meetingCode,
+        status: "ongoing",
+      })
+      .select("_id")
+      .lean()
+      .exec();
+
+    if (!ongoingSession) {
+      return {
+        isOngoing: false,
+        meetingCode: meeting.meetingCode,
+      };
+    }
+
+    // 2. Chỉ khi MongoDB ghi nhận có session ongoing, ta mới gọi LiveKit đối soát thực tế
     const livekitRoom = await this.isRoomActive(meeting.meetingCode);
     let isActuallyOngoing = false;
 
     if (livekitRoom) {
-      const humanCount = await this.getHumanParticipantsCount(meeting.meetingCode);
+      let humanCount = 0;
+      if ((livekitRoom as any).numParticipants > 0) {
+        humanCount = await this.getHumanParticipantsCount(meeting.meetingCode);
+      }
       if (humanCount > 0) {
         isActuallyOngoing = true;
       } else {
@@ -1015,13 +1052,7 @@ export class MeetingsService {
       }
     } else {
       // Không có phòng LiveKit, nếu session vẫn còn ongoing thì đóng lại
-      const ongoingSession = await this.sessionModel.findOne({
-        meetingCode: meeting.meetingCode,
-        status: "ongoing",
-      });
-      if (ongoingSession) {
-        await this.endMeetingByCode(meeting.meetingCode);
-      }
+      await this.endMeetingByCode(meeting.meetingCode);
     }
 
     return {

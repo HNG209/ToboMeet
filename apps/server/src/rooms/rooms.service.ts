@@ -99,6 +99,7 @@ export class RoomsService {
         status: { $nin: ["disbanded", "blocked"] },
       })
       .sort({ updatedAt: -1 })
+      .lean()
       .exec();
 
     // Map qua toàn bộ mảng, truyền userId để filter channels đã rời

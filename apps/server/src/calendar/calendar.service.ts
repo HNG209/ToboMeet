@@ -1143,7 +1143,7 @@ export class CalendarService {
    * Lấy chi tiết RSVP của sự kiện bao gồm người tổ chức (hostId) và các thành viên được mời
    */
   async getRSVPList(eventId: string): Promise<CalendarRSVPMember[]> {
-    const event = await this.calendarEventModel.findById(eventId).exec();
+    const event = await this.calendarEventModel.findById(eventId).lean().exec();
     if (!event) {
       throw new AppException(ErrorCode.CALENDAR_EVENT_NOT_FOUND);
     }
@@ -1184,6 +1184,7 @@ export class CalendarService {
         ],
       })
       .select("_id supabaseId email displayName avatarUrl")
+      .lean()
       .exec();
 
     const userMap = new Map<string, any>();

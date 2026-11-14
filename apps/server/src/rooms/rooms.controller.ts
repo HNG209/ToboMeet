@@ -76,9 +76,7 @@ export class RoomsController {
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user.id;
-    // Kiểm tra quyền thành viên trước
-    await this.roomsService.getRoomByIdForUser(roomId, userId);
-    return this.roomMemberService.getRoomMembers(roomId);
+    return this.roomMemberService.getRoomMembers(roomId, userId);
   }
 
   /**
