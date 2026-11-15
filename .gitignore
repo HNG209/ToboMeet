@@ -89,4 +89,10 @@ tokens.json
 **/tokens.json
 load-tests/tokens.json
 
+# Load testing HTML reports & artifacts
+load-tests/*.html
+load-tests/report.html
+report.html
+
+
 
