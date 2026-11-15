@@ -50,11 +50,10 @@ services:
       - ./uploads:/app/apps/server/uploads
     restart: unless-stopped
     logging: *default-logging
-    # Cấu hình tài nguyên thoải mái cho bài test 100 - 200 users đồng thời
+    # Tối ưu tài nguyên cho VPS (Tự động thích ứng VPS 1 core hoặc nhiều core)
     deploy:
       resources:
         limits:
-          cpus: "1.50"
           memory: 512M
         reservations:
           memory: 256M
