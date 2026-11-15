@@ -101,8 +101,9 @@ jobs:
           # 1. Tự động tạo thư mục tobomeet-deploy trên VPS nếu chưa có
           ssh $SSH_OPTS "$VPS_USERNAME@$VPS_IP" "mkdir -p ~/tobomeet-deploy"
 
-          # 2. Copy docker-compose.prod.yml và Caddyfile vào thư mục ~/tobomeet-deploy
+          # 2. Copy docker-compose.prod.yml, docker-compose.loadtest.yml và Caddyfile vào thư mục ~/tobomeet-deploy
           scp $SSH_OPTS docker-compose.prod.yml "$VPS_USERNAME@$VPS_IP:~/tobomeet-deploy/docker-compose.prod.yml"
+          scp $SSH_OPTS docker-compose.loadtest.yml "$VPS_USERNAME@$VPS_IP:~/tobomeet-deploy/docker-compose.loadtest.yml"
           scp $SSH_OPTS Caddyfile "$VPS_USERNAME@$VPS_IP:~/tobomeet-deploy/Caddyfile"
 
           # 3. Chạy pull images và khởi động hệ thống trên VPS

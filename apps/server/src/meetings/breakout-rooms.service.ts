@@ -9,6 +9,7 @@ import {
   RoomServiceClient,
   TrackSource,
 } from "livekit-server-sdk";
+import { isLoadTestMode, createMockLiveKitProxy } from "./utils/mock-livekit.util";
 import { AppException } from "../core/exceptions/app.exception";
 import {
   BreakoutRoomMetadata,
@@ -37,7 +38,9 @@ export class BreakoutRoomsService {
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-    if (livekitHost && apiKey && apiSecret) {
+    if (isLoadTestMode()) {
+      this.livekitRoomService = createMockLiveKitProxy<RoomServiceClient>("BreakoutRoomsService");
+    } else if (livekitHost && apiKey && apiSecret) {
       this.livekitRoomService = new RoomServiceClient(
         livekitHost,
         apiKey,

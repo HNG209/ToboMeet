@@ -7,6 +7,7 @@ import {
     DirectFileOutput,
     EncodedFileType,
 } from "livekit-server-sdk";
+import { isLoadTestMode, createMockLiveKitProxy } from "./utils/mock-livekit.util";
 import { AppException } from "../core/exceptions/app.exception";
 import { ErrorCode } from "@tobomeet/shared/types";
 import { exec, execFile } from "child_process";
@@ -48,7 +49,10 @@ export class RecordingsService {
         const apiKey = process.env.LIVEKIT_API_KEY;
         const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-        if (livekitHost && apiKey && apiSecret) {
+        if (isLoadTestMode()) {
+            this.livekitRoomService = createMockLiveKitProxy<RoomServiceClient>("RecordingsService");
+            this.egressClient = createMockLiveKitProxy<EgressClient>("RecordingsService.Egress");
+        } else if (livekitHost && apiKey && apiSecret) {
             this.livekitRoomService = new RoomServiceClient(livekitHost, apiKey, apiSecret);
             this.egressClient = new EgressClient(livekitHost, apiKey, apiSecret);
         }

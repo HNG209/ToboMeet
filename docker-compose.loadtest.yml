@@ -1,0 +1,92 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # =========================================================================
+  # 1. REDIS: Session Cache, Rate Limiter và In-Memory Locks
+  # =========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: tobomeet-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 128mb --maxmemory-policy allkeys-lru
+    logging: *default-logging
+    networks:
+      - tobomeet-network
+
+  # =========================================================================
+  # 2. TOBOMEET CORE API SERVER (NestJS)
+  # =========================================================================
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    image: ${DOCKER_USERNAME:-tobomeet}/tobomeet-server:latest
+    container_name: tobomeet-server
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - LOAD_TEST_MODE=true
+      - ENABLE_LATENCY_LOG=true
+      - LATENCY_LOG_CONSOLE=false
+      - NODE_OPTIONS=--max-old-space-size=512 --expose-gc
+    env_file:
+      - path: .env
+        required: false
+      - path: apps/server/.env
+        required: false
+    depends_on:
+      - redis
+    volumes:
+      - ./uploads:/app/apps/server/uploads
+    restart: unless-stopped
+    logging: *default-logging
+    # Cấu hình tài nguyên thoải mái cho bài test 100 - 200 users đồng thời
+    deploy:
+      resources:
+        limits:
+          cpus: "1.50"
+          memory: 512M
+        reservations:
+          memory: 256M
+    networks:
+      - tobomeet-network
+
+  # =========================================================================
+  # 3. CADDY REVERSE PROXY & AUTOMATIC HTTPS
+  # =========================================================================
+  caddy:
+    image: caddy:2-alpine
+    container_name: tobomeet-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp" # HTTP/3 QUIC
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - server
+    logging: *default-logging
+    networks:
+      - tobomeet-network
+
+volumes:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  tobomeet-network:
+    driver: bridge

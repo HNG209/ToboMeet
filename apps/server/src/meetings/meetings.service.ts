@@ -28,6 +28,7 @@ import {
 import { MeetingsGateway } from "./meetings.gateway";
 import { AppException } from "../core/exceptions/app.exception";
 import { SupabaseService } from "../supabase/supabase.service";
+import { isLoadTestMode, createMockLiveKitProxy } from "./utils/mock-livekit.util";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import {
   MeetingSession,
@@ -57,7 +58,10 @@ export class MeetingsService {
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-    if (livekitHost && apiKey && apiSecret) {
+    if (isLoadTestMode()) {
+      this.livekitRoomService = createMockLiveKitProxy<RoomServiceClient>("MeetingsService");
+      this.agentDispatchClient = createMockLiveKitProxy<AgentDispatchClient>("MeetingsService.AgentDispatch");
+    } else if (livekitHost && apiKey && apiSecret) {
       this.livekitRoomService = new RoomServiceClient(
         livekitHost,
         apiKey,
@@ -81,8 +85,12 @@ export class MeetingsService {
     allowStart = false,
     skipWaitingRoom = false,
   ): Promise<MeetingJoinResponse> {
-    const apiKey = process.env.LIVEKIT_API_KEY;
-    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    const apiKey =
+      process.env.LIVEKIT_API_KEY ||
+      (isLoadTestMode() ? "mock_livekit_api_key_load_test" : "");
+    const apiSecret =
+      process.env.LIVEKIT_API_SECRET ||
+      (isLoadTestMode() ? "mock_livekit_api_secret_load_test_32chars" : "");
 
     if (!apiKey || !apiSecret) {
       throw new AppException(ErrorCode.SERVER_ERROR);
@@ -837,6 +845,10 @@ export class MeetingsService {
     meetingCode: string,
     identity: string,
   ): Promise<void> {
+    if (isLoadTestMode()) {
+      return;
+    }
+
     if (!this.livekitRoomService) {
       throw new AppException(ErrorCode.SERVER_ERROR);
     }
@@ -885,6 +897,10 @@ export class MeetingsService {
     meetingCode: string,
     identity: string,
   ): Promise<void> {
+    if (isLoadTestMode()) {
+      return;
+    }
+
     if (!this.livekitRoomService) return;
 
     try {
@@ -1065,6 +1081,10 @@ export class MeetingsService {
    * Xoá người dùng ra khỏi cuộc họp
    */
   async removeParticipant(meetingCode: string, participantIdentity: string) {
+    if (isLoadTestMode()) {
+      return;
+    }
+
     if (!this.livekitRoomService) {
       console.error("LiveKit Admin Client chưa được cấu hình");
       throw new AppException(ErrorCode.SERVER_ERROR);
@@ -1214,6 +1234,10 @@ export class MeetingsService {
     participantIdentity: string,
     trackType: "audio" | "video",
   ) {
+    if (isLoadTestMode()) {
+      return;
+    }
+
     if (!this.livekitRoomService) return;
     try {
       const participant = await this.livekitRoomService.getParticipant(
@@ -1392,6 +1416,28 @@ export class MeetingsService {
 
   async isRoomActive(meetingCode: string): Promise<LiveKitRoom | null> {
     if (this.livekitRoomService) {
+      if (isLoadTestMode()) {
+        const ongoing = await this.sessionModel
+          .findOne({ meetingCode, status: "ongoing" })
+          .select("_id")
+          .lean();
+        if (ongoing) {
+          return {
+            sid: `RM_${meetingCode}`,
+            name: meetingCode,
+            emptyTimeout: 300,
+            maxParticipants: 100,
+            creationTime: BigInt(Math.floor(Date.now() / 1000)),
+            turnPassword: "",
+            enabledCodecs: [],
+            metadata: "{}",
+            numParticipants: 2,
+            numPublishers: 1,
+            activeRecording: false,
+          } as any;
+        }
+        return null;
+      }
       try {
         const rooms = await this.livekitRoomService.listRooms([meetingCode]);
 

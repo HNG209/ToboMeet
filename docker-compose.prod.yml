@@ -40,6 +40,7 @@ services:
       - PORT=3001
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - LOAD_TEST_MODE=false
       - WHITEBOARD_SERVER_URL=http://whiteboard:3002
       - SCHEDULER_SERVICE_URL=http://scheduler:2909
       - NODE_OPTIONS=--max-old-space-size=256 --expose-gc

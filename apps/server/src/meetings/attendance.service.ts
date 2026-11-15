@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
 import { Model } from "mongoose";
 import { RoomServiceClient } from "livekit-server-sdk";
+import { isLoadTestMode, createMockLiveKitProxy } from "./utils/mock-livekit.util";
 import { AppException } from "../core/exceptions/app.exception";
 import { ErrorCode } from "@tobomeet/shared/types";
 import {
@@ -51,7 +52,9 @@ export class AttendanceService {
         const apiKey = process.env.LIVEKIT_API_KEY;
         const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-        if (livekitHost && apiKey && apiSecret) {
+        if (isLoadTestMode()) {
+            this.livekitRoomService = createMockLiveKitProxy<RoomServiceClient>("AttendanceService");
+        } else if (livekitHost && apiKey && apiSecret) {
             this.livekitRoomService = new RoomServiceClient(
                 livekitHost,
                 apiKey,

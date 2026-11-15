@@ -11,6 +11,7 @@ import {
 } from "./schemas/meeting-session.schema";
 import { AppGateway } from "../core/gateways/app.gateway";
 import { RoomServiceClient } from "livekit-server-sdk";
+import { isLoadTestMode, createMockLiveKitProxy } from "./utils/mock-livekit.util";
 import { AppException } from "../core/exceptions/app.exception";
 import { ErrorCode } from "@tobomeet/shared/types";
 import { User, UserDocument } from "../users/schemas/user.schema";
@@ -36,7 +37,9 @@ export class MeetingInviteService {
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
 
-    if (livekitHost && apiKey && apiSecret) {
+    if (isLoadTestMode()) {
+      this.livekitRoomService = createMockLiveKitProxy<RoomServiceClient>("MeetingInviteService");
+    } else if (livekitHost && apiKey && apiSecret) {
       this.livekitRoomService = new RoomServiceClient(
         livekitHost,
         apiKey,

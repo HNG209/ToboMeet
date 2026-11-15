@@ -84,3 +84,9 @@ recordings/
 latency_report.csv
 **/latency_report.csv
 
+# Load testing credentials & tokens (Bảo mật - không đẩy token lên Git)
+tokens.json
+**/tokens.json
+load-tests/tokens.json
+
+
