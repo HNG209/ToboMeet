@@ -201,32 +201,39 @@ export class PollsService {
     const voterName = user?.displayName || user?.email || "Người tham gia";
     const voterAvatar = user?.avatarUrl;
 
-    // Xóa phiếu bầu trước đó của người dùng trên mọi lựa chọn trong cuộc bình chọn này
-    for (const option of poll.options) {
-      option.voters = option.voters.filter((v) => v.userId !== userId);
-    }
+    // CẬP NHẬT NGUYÊN TỬ (ATOMIC UPDATE) - CHỐNG RACE CONDITION VÀ VERSION ERROR KHI TẢI CAO
+    // 1. Xóa phiếu bầu trước đó của người dùng trên mọi lựa chọn trong cuộc bình chọn này (nguyên tử)
+    await this.pollModel.updateOne(
+      { _id: poll._id },
+      { $pull: { "options.$[].voters": { userId } } }
+    );
 
-    // Thêm người dùng vào các lựa chọn đã chọn
-    for (const optId of optionIds) {
-      const targetOption = poll.options.find((o) => o.id === optId);
-      if (targetOption) {
-        targetOption.voters.push({
-          userId,
-          name: voterName,
-          avatar: voterAvatar,
-          votedAt: new Date(),
-        });
+    // 2. Thêm người dùng vào các lựa chọn đã chọn (nguyên tử với arrayFilters, không dùng poll.save())
+    await this.pollModel.updateOne(
+      { _id: poll._id },
+      {
+        $push: {
+          "options.$[elem].voters": {
+            userId,
+            name: voterName,
+            avatar: voterAvatar,
+            votedAt: new Date(),
+          },
+        },
+      },
+      {
+        arrayFilters: [{ "elem.id": { $in: optionIds } }],
       }
-    }
+    );
 
-    await poll.save();
+    const updatedPoll = await this.pollModel.findById(poll._id).lean().exec();
 
-    this.meetingsGateway.notifyPollVoted(meetingCode, poll);
+    this.meetingsGateway.notifyPollVoted(meetingCode, updatedPoll);
     this.logger.log(
       `[Poll] User ${userId} voted on poll ${pollId} in meeting ${meetingCode}`,
     );
 
-    return poll;
+    return updatedPoll as any;
   }
 
   /**

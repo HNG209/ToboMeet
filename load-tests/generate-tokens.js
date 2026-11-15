@@ -84,13 +84,18 @@ async function signInWithRetry(u, retries = 3) {
         return data.session.access_token;
       }
 
-      if (error && (error.message.includes('rate limit') || error.status === 429)) {
-        console.warn(`   ⏳ Rate-limit tại [${u.email}], chờ 6s rồi thử lại... (lần ${attempt}/${retries})`);
-        await new Promise((r) => setTimeout(r, 6000));
-        continue;
-      }
-
       if (error) {
+        const isRateLimit = error.message.includes('rate limit') || error.status === 429;
+        const isNetworkErr = error.message.includes('fetch failed') || error.message.includes('network') || error.message.includes('timeout');
+
+        if ((isRateLimit || isNetworkErr) && attempt < retries) {
+          const delay = isRateLimit ? 6000 : 2500;
+          const msgType = isRateLimit ? 'Rate-limit' : 'Lỗi mạng tạm thời';
+          console.warn(`   ⏳ ${msgType} tại [${u.email}] (${error.message}), chờ ${delay / 1000}s rồi thử lại... (lần ${attempt}/${retries})`);
+          await new Promise((r) => setTimeout(r, delay));
+          continue;
+        }
+
         console.warn(`   ❌ Lỗi đăng nhập [${u.email}]: ${error.message}`);
         return null;
       }
