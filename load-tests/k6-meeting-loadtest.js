@@ -425,7 +425,59 @@ export default function (setupData) {
   });
 
   // =========================================================================
-  // 4. DIRECT CHAT CONVERSATION SETUP
+  // 4. EACH USER CREATES A POLL IN THEIR OWN ROOM (Owner Role)
+  // Executed on the first iteration of each Virtual User
+  // =========================================================================
+  if (__ITER === 0) {
+    const resEnsure = http.post(`${BASE_URL}/meetings/personal/ensure`, {}, params);
+    opCounter.add(1);
+    check(resEnsure, {
+      'Ensure personal meeting (200/201)': (r) => r.status === 200 || r.status === 201,
+    });
+
+    const pData = extractData(resEnsure);
+    const myPersonalCode = pData?.meetingCode;
+
+    if (myPersonalCode) {
+      // Host joins own room to initialize ongoing session
+      http.post(
+        `${BASE_URL}/meetings/join`,
+        JSON.stringify({
+          meetingCode: myPersonalCode,
+          deviceId: `device-owner-${__VU}`,
+          displayName: `Owner VU ${__VU}`,
+          allowStart: true,
+        }),
+        params
+      );
+
+      // Create poll as OWNER in their own room (passes @Roles('owner', 'admin') 100%)
+      const personalPollPayload = JSON.stringify({
+        question: `Poll in personal room of VU ${__VU}: Project Feedback`,
+        options: ['Agree', 'Disagree', 'Neutral'],
+        allowMultiple: false,
+      });
+
+      const startPoll = Date.now();
+      const resPoll = http.post(
+        `${BASE_URL}/meetings/${myPersonalCode}/polls`,
+        personalPollPayload,
+        params
+      );
+      const pollDur = Date.now() - startPoll;
+      pollOpsDuration.add(pollDur);
+      writeOpsDuration.add(pollDur);
+      opCounter.add(1);
+
+      check(resPoll, {
+        'Create poll in own room (200/201)': (r) =>
+          r.status === 200 || r.status === 201,
+      });
+    }
+  }
+
+  // =========================================================================
+  // 5. DIRECT CHAT CONVERSATION SETUP
   // VU 1 chats with VU 2; all other VUs chat with Host (VU 1)
   // =========================================================================
   const targetRecipientSub = (__VU === 1) ? setupData.partnerSub : setupData.hostSub;
@@ -455,8 +507,8 @@ export default function (setupData) {
     runDashboardScenario(params, setupData, myConversationId);
   }
 
-  // Think time: 0.8s - 2.0s
-  sleep(Math.random() * 1.2 + 0.8);
+  // High-throughput stress think time: 0.1s - 0.3s (ép CPU lên 80-90%)
+  sleep(Math.random() * 0.2 + 0.1);
 }
 
 /**
@@ -487,12 +539,12 @@ function runInMeetingScenario(params, meetingCode, myConversationId) {
   }
   failureRate.add(0);
 
-  sleep(0.3);
+  sleep(0.05);
 
-  // 2. DYNAMIC POLL CREATION: Any participant can comfortably create new polls
-  if (__ITER === 0 || Math.random() < 0.12) {
+  // 2. POLL CREATION IN SHARED MEETING: Only Host / Owner creates polls in shared meeting
+  if (__VU === 1 && (__ITER === 0 || Math.random() < 0.25)) {
     const newPollPayload = JSON.stringify({
-      question: `Poll from VU ${__VU} (Round ${__ITER}): Topic #${Math.floor(Math.random() * 900 + 100)}`,
+      question: `Host Poll (Round ${__ITER}): Topic #${Math.floor(Math.random() * 900 + 100)}`,
       options: ['Option Alpha', 'Option Beta', 'Option Gamma'],
       allowMultiple: false,
     });
@@ -509,7 +561,7 @@ function runInMeetingScenario(params, meetingCode, myConversationId) {
     opCounter.add(1);
 
     check(resCreatePoll, {
-      'Create in-meeting poll (200/201)': (r) =>
+      'Host create in-meeting poll (200/201)': (r) =>
         r.status === 200 || r.status === 201,
     });
   }
@@ -592,7 +644,7 @@ function runInMeetingScenario(params, meetingCode, myConversationId) {
       const resStart = http.post(`${BASE_URL}/meetings/${meetingCode}/screen-share/start`, {}, params);
       opCounter.add(1);
 
-      sleep(0.3);
+      sleep(0.05);
 
       const resStop = http.post(`${BASE_URL}/meetings/${meetingCode}/screen-share/stop`, {}, params);
       writeOpsDuration.add(Date.now() - start);
@@ -643,7 +695,7 @@ function runDashboardScenario(params, setupData, myConversationId) {
   opCounter.add(1);
   check(resRooms, { 'Get /rooms/my (200)': (r) => r.status === 200 });
 
-  sleep(0.2);
+  sleep(0.05);
 
   // 2. Create room
   if (__ITER === 0 && Math.random() < 0.20) {

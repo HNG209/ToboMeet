@@ -27,10 +27,10 @@ export class PollsController {
 
   /**
    * POST /api/meetings/:code/polls
-   * Cho phép Host, Admin hoặc Member tạo cuộc bình chọn mới
+   * HOST / ADMIN: Tạo cuộc bình chọn mới
    */
   @Post()
-  @Roles("owner", "admin", "member")
+  @Roles("owner", "admin")
   @UseGuards(SupabaseGuard, MeetingRoleGuard)
   @HttpCode(HttpStatus.CREATED)
   async createPoll(
