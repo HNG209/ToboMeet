@@ -32,7 +32,7 @@ interface CachedSessionStatus {
 export class SupabaseGuard implements CanActivate, OnModuleInit {
   /** In-memory cache cho trạng thái thu hồi phiên (tránh query MongoDB trên từng request) */
   private static readonly sessionRevokeCache = new Map<string, CachedSessionStatus>();
-  private static readonly SESSION_CACHE_TTL = 60 * 1000;
+  private static readonly SESSION_CACHE_TTL = 5 * 60 * 1000;
 
   public static invalidateSessionCache(userId: string, sessionId?: string): void {
     if (sessionId) {

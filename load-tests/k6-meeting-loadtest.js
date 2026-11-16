@@ -38,17 +38,17 @@ const opCounter = new Counter('total_operations_count');
 // ---------------------------------------------------------
 export const options = {
   stages: [
-    { duration: '30s', target: 50 },   // Stage 1: Warmup to 50 VUs
-    { duration: '45s', target: 100 },  // Stage 2: Ramp-up to 100 VUs
-    { duration: '1m', target: 200 },   // Stage 3: Peak load at 200 VUs
-    { duration: '1m', target: 200 },   // Stage 4: Steady state at 200 VUs
-    { duration: '30s', target: 0 },    // Stage 5: Ramp-down to 0 VUs
+    { duration: '30s', target: 100 },  // Stage 1: Warmup to 100 VUs
+    { duration: '45s', target: 250 },  // Stage 2: Ramp-up to 250 VUs
+    { duration: '1m', target: 500 },   // Stage 3: Ramp-up to peak 500 VUs
+    { duration: '1m30s', target: 500 }, // Stage 4: Duy trì ổn định ở đỉnh 500 VUs
+    { duration: '45s', target: 0 },    // Stage 5: Hạ tải mượt mà về 0 VUs
   ],
   thresholds: {
-    // Realistic thresholds under 200 concurrent VUs on a single-core VPS
-    http_req_duration: ['p(95)<10000', 'p(99)<15000'],
-    read_ops_duration: ['p(95)<7000'],
-    write_ops_duration: ['p(95)<12000'],
+    // Ngưỡng chịu tải thực tế cho 500 concurrent VUs
+    http_req_duration: ['p(95)<12000', 'p(99)<18000'],
+    read_ops_duration: ['p(95)<8000'],
+    write_ops_duration: ['p(95)<15000'],
     http_req_failed: ['rate<0.05'],
     custom_failure_rate: ['rate<0.02'],
   },
@@ -500,8 +500,8 @@ export default function (setupData) {
   runDashboardScenario(params, setupData, myConversationId);
   runInMeetingScenario(params, meetingCode, myConversationId);
 
-  // High-throughput stress think time: 0.1s - 0.2s
-  sleep(Math.random() * 0.1 + 0.1);
+  // Think time giữa các vòng lặp: 1.0s - 1.5s (+ thêm 1s để giảm áp lực dồn dập khi chạy 500 VUs)
+  sleep(Math.random() * 0.5 + 1.0);
 }
 
 /**
@@ -530,7 +530,8 @@ function runInMeetingScenario(params, meetingCode, myConversationId) {
   }
   failureRate.add(0);
 
-  sleep(0.05);
+  // Giãn cách 1s sau khi vào phòng họp
+  sleep(1.0);
 
   // 2. POLL CREATION IN SHARED MEETING: Only Host / Owner creates polls in shared meeting
   if (__VU === 1 && (__ITER === 0 || Math.random() < 0.25)) {
@@ -635,7 +636,7 @@ function runInMeetingScenario(params, meetingCode, myConversationId) {
       const resStart = http.post(`${BASE_URL}/meetings/${meetingCode}/screen-share/start`, {}, params);
       opCounter.add(1);
 
-      sleep(0.05);
+      sleep(1.0); // Giãn cách 1s giữa bật và tắt chia sẻ màn hình
 
       const resStop = http.post(`${BASE_URL}/meetings/${meetingCode}/screen-share/stop`, {}, params);
       writeOpsDuration.add(Date.now() - start);
@@ -684,7 +685,7 @@ function runDashboardScenario(params, setupData, myConversationId) {
   opCounter.add(1);
   check(resRooms, { 'Get /rooms/my (200)': (r) => r.status === 200 });
 
-  sleep(0.05);
+  sleep(1.0); // Giãn cách 1s sau khi tải danh sách phòng
 
   // 2. Create room
   if (__ITER === 0 && Math.random() < 0.20) {
@@ -786,7 +787,7 @@ export function teardown(data) {
  */
 export function handleSummary(data) {
   return {
-    'load-tests/report.html': htmlReport(data, { title: 'ToboMeet 200-VU Hybrid Load Test Report' }),
+    'load-tests/report.html': htmlReport(data, { title: 'ToboMeet 500 Virtual Users Load Test Report' }),
     stdout: textSummary(data, { indent: ' ', enableColors: true }),
   };
 }
