@@ -497,24 +497,15 @@ export default function (setupData) {
 
   const meetingCode = setupData.meetingCode;
 
-  // Split traffic: 80% In-Meeting workload, 20% Dashboard & Room Management
-  const mode = __ENV.TEST_MODE || 'hybrid';
-  const isMeetingUser = mode === 'meeting' || (mode === 'hybrid' && (__VU % 5 !== 0));
+  runDashboardScenario(params, setupData, myConversationId);
+  runInMeetingScenario(params, meetingCode, myConversationId);
 
-  if (isMeetingUser) {
-    runInMeetingScenario(params, meetingCode, myConversationId);
-  } else {
-    runDashboardScenario(params, setupData, myConversationId);
-  }
-
-  // High-throughput stress think time: 0.1s - 0.3s (ép CPU lên 80-90%)
-  sleep(Math.random() * 0.2 + 0.1);
+  // High-throughput stress think time: 0.1s - 0.2s
+  sleep(Math.random() * 0.1 + 0.1);
 }
 
 /**
- * =========================================================================
  * SCENARIO 1: IN-MEETING FLOW (CHANNEL MEETING, MULTI-POLL, LIVE CHAT)
- * =========================================================================
  */
 function runInMeetingScenario(params, meetingCode, myConversationId) {
   // 1. Join Meeting
@@ -683,9 +674,7 @@ function runInMeetingScenario(params, meetingCode, myConversationId) {
 }
 
 /**
- * =========================================================================
- * SCENARIO 2: DASHBOARD & ACTIVE MESSAGING (20% VUs)
- * =========================================================================
+ * SCENARIO 2: DASHBOARD & ACTIVE MESSAGING
  */
 function runDashboardScenario(params, setupData, myConversationId) {
   const start = Date.now();

@@ -96,23 +96,36 @@ export class MeetingsService {
       throw new AppException(ErrorCode.SERVER_ERROR);
     }
 
-    // Tìm meeting
-    const meeting = await this.meetingModel.findOne({ meetingCode }).exec();
+    // Tối ưu hóa: Tìm meeting và user song song (Parallel execution)
+    const [meeting, user] = await Promise.all([
+      this.meetingModel.findOne({ meetingCode }).exec(),
+      this.userModel
+        .findOne({ supabaseId: userId })
+        .select("displayName avatarUrl")
+        .lean()
+        .exec(),
+    ]);
+
     if (!meeting) {
       throw new AppException(ErrorCode.MEETING_NOT_FOUND);
     }
 
-    // Lấy thông tin user
-    const user = await this.userModel.findOne({ supabaseId: userId }).exec();
     const finalDisplayName = displayName || user?.displayName || "Người dùng ẩn danh";
     const avatarUrl = user?.avatarUrl || "";
 
     // Kiểm tra phòng LiveKit có đang active không
     let livekitRoom = await this.isRoomActive(meeting.meetingCode);
     let humanParticipantsCount = 0;
+    let participants: any[] = [];
 
     if (livekitRoom && this.livekitRoomService) {
-      const participants = await this.livekitRoomService.listParticipants(meeting.meetingCode);
+      try {
+        participants =
+          (await this.livekitRoomService.listParticipants(meeting.meetingCode)) || [];
+      } catch (e) {
+        participants = [];
+      }
+
       const isAgentParticipant = (p: any) => {
         const id = p.identity || "";
         const name = p.name || "";
@@ -128,17 +141,17 @@ export class MeetingsService {
       humanParticipantsCount = participants.filter((p) => !isAgentParticipant(p)).length;
       const hasAgent = participants.some((p) => isAgentParticipant(p));
 
-      // Nếu tất cả người dùng đều đã thoát nhưng Agent vẫn còn trong phòng (đang đếm ngược 10s hoặc lưu dữ liệu):
-      // Chặn người dùng không cho xin token vào phòng tới khi Agent đã thoát hoàn toàn (chống spam)
+      // Nếu tất cả người dùng đều đã thoát nhưng Agent vẫn còn trong phòng:
       if (humanParticipantsCount === 0 && hasAgent) {
         throw new AppException(ErrorCode.MEETING_CLOSING);
       }
 
-      // Nếu phòng LiveKit không còn ai (cả người lẫn agent đều đã thoát), kết thúc session cũ và dọn phòng
+      // Nếu phòng LiveKit không còn ai, kết thúc session cũ và dọn phòng
       if (humanParticipantsCount === 0 && !hasAgent) {
         await this.endMeetingByCode(meeting.meetingCode);
         await this.forceDeleteLiveKitRoom(meeting.meetingCode);
         livekitRoom = null;
+        participants = [];
       }
     }
 
@@ -157,10 +170,9 @@ export class MeetingsService {
       }
     }
 
-    // Chặn user đang join ở thiết bị khác (trừ khi forceSwitch) và kiểm tra phòng họp đã đầy
-    if (livekitRoom && this.livekitRoomService) {
+    // Chặn user đang join ở thiết bị khác và kiểm tra phòng họp đã đầy (Tái sử dụng mảng participants, không gọi RPC LiveKit lần 2)
+    if (livekitRoom && this.livekitRoomService && participants.length > 0) {
       try {
-        const participants = await this.livekitRoomService.listParticipants(meeting.meetingCode);
         const isAlreadyInThisRoom = participants.some((p) => p.identity === userId);
 
         if (isAlreadyInThisRoom && !forceSwitch) {
@@ -176,7 +188,7 @@ export class MeetingsService {
             p.kind !== 2,
         );
 
-        // Giới hạn tối đa 100 người trong 1 meeting, nếu lớn hơn thì báo lỗi đã đầy
+        // Giới hạn tối đa 100 người trong 1 meeting
         if (!isAlreadyInThisRoom && humanParticipants.length >= 100) {
           throw new AppException(ErrorCode.MEETING_FULL);
         }
@@ -452,12 +464,16 @@ export class MeetingsService {
       return { canStart: false, reason: "INVALID_MEETING" };
     }
 
-    const room = await this.roomModel.findById(meeting.roomId).exec();
+    const room = await this.roomModel
+      .findById(meeting.roomId)
+      .select("ownerId channels members")
+      .lean()
+      .exec();
     if (!room) {
       return { canStart: false, reason: "ROOM_NOT_FOUND" };
     }
 
-    const role = this.getUserRoleInChannel(room, meeting.channelId, userId);
+    const role = this.getUserRoleInChannel(room as any, meeting.channelId, userId);
     const allowed = role === "owner" || role === "admin" || role === "member";
 
     return {
@@ -480,12 +496,16 @@ export class MeetingsService {
     }
 
     // Channel meeting
-    const room = await this.roomModel.findById(meeting.roomId).exec();
+    const room = await this.roomModel
+      .findById(meeting.roomId)
+      .select("ownerId channels members")
+      .lean()
+      .exec();
     if (!room) {
       return { role: "guest", hasAdminPowers: false };
     }
 
-    const role = this.getUserRoleInChannel(room, meeting.channelId!, userId);
+    const role = this.getUserRoleInChannel(room as any, meeting.channelId!, userId);
     const hasAdminPowers = role === "owner" || role === "admin";
     return { role, hasAdminPowers };
   }
@@ -509,12 +529,16 @@ export class MeetingsService {
     }
 
     // Chưa có → kiểm tra quyền tạo
-    const room = await this.roomModel.findById(roomId).exec();
+    const room = await this.roomModel
+      .findById(roomId)
+      .select("ownerId channels members")
+      .lean()
+      .exec();
     if (!room) {
       throw new AppException(ErrorCode.ROOM_OR_CHANNEL_NOT_FOUND);
     }
 
-    const role = this.getUserRoleInChannel(room, channelId, userId);
+    const role = this.getUserRoleInChannel(room as any, channelId, userId);
     if (role === "guest") {
       throw new AppException(ErrorCode.INVALID_PERMISSION);
     }
@@ -1270,7 +1294,7 @@ export class MeetingsService {
    * Xác định Role của User trong một Kênh cụ thể
    */
   getUserRoleInChannel(
-    room: RoomDocument,
+    room: RoomDocument | any,
     channelId: string,
     userId: string,
   ): string {

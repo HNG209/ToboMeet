@@ -80,66 +80,43 @@ export class CalendarService {
       channelId: data.channelId,
     });
 
-    // Lấy mảng userIds cho khách mời riêng lẻ
-    const inviteeUserIds: string[] = [];
-    if (data.invitees && data.invitees.length > 0) {
-      for (const invitee of data.invitees) {
-        let uId = invitee.userId;
-        if (!uId && invitee.email) {
-          const u = await this.userModel.findOne({ email: invitee.email }).exec();
-          if (u) uId = u.supabaseId;
-        }
-        if (uId && uId !== userId && !inviteeUserIds.includes(uId)) {
-          inviteeUserIds.push(uId);
-        }
-      }
-    }
-
-    // Nếu tạo cuộc họp kênh (channel meeting), ghi nhận toàn bộ thành viên trong kênh vào acceptedUserIds (không thông báo)
-    let acceptedUserIds: string[] = [];
     const isChannelMeeting = Boolean(
       (data.roomType === "channel_meeting" || data.channelId) &&
       data.roomId &&
       data.channelId,
     );
 
-    if (isChannelMeeting) {
-      const room = await this.roomModel.findOne({
-        _id: data.roomId,
-        isDeleted: { $ne: true },
-      });
-      if (room) {
-        const channel = room.channels.find(
-          (ch) => ch._id?.toString() === data.channelId,
-        );
-        if (channel) {
-          const channelMemberIds = new Set<string>();
-          if (room.ownerId) channelMemberIds.add(room.ownerId);
+    // Lấy mảng userIds cho khách mời riêng lẻ (không phải lịch trong kênh)
+    // Tối ưu: Dùng trực tiếp userId từ request/FE (0 query DB). Nếu chỉ có email (ví dụ từ AI Agent), query gộp 1 lần.
+    const inviteeUserIds: string[] = [];
+    if (!isChannelMeeting && data.invitees && data.invitees.length > 0) {
+      const emailOnlyInvitees: string[] = [];
+      for (const invitee of data.invitees) {
+        const uId = invitee.userId || (invitee as any).id || (invitee as any)._id;
+        if (uId && uId !== userId && !inviteeUserIds.includes(uId)) {
+          inviteeUserIds.push(uId);
+        } else if (!uId && invitee.email) {
+          emailOnlyInvitees.push(invitee.email.trim().toLowerCase());
+        }
+      }
 
-          if (channel.isPrivate) {
-            // Kênh riêng tư: Lấy thành viên được phân quyền trong channel.members
-            channel.members?.forEach((m) => {
-              if (m.userId) channelMemberIds.add(m.userId);
-            });
-          } else {
-            // Kênh công khai: Tất cả thành viên trong room còn active
-            room.members?.forEach((m) => {
-              if (
-                m.userId &&
-                m.status !== "left" &&
-                m.status !== "removed"
-              ) {
-                channelMemberIds.add(m.userId);
-              }
-            });
+      if (emailOnlyInvitees.length > 0) {
+        const foundUsers = await this.userModel
+          .find({ email: { $in: emailOnlyInvitees } })
+          .select("supabaseId")
+          .lean()
+          .exec();
+        for (const u of foundUsers) {
+          if (u.supabaseId && u.supabaseId !== userId && !inviteeUserIds.includes(u.supabaseId)) {
+            inviteeUserIds.push(u.supabaseId);
           }
-
-          acceptedUserIds = Array.from(
-            new Set([...acceptedUserIds, ...channelMemberIds]),
-          ).filter((id) => id !== userId);
         }
       }
     }
+
+    // Nghiệp vụ: Người tạo lịch luôn là acceptedUser
+    // Đối với lịch trong kênh: CHỈ gán người tạo vào acceptedUserIds, thành viên khác trong kênh sẽ bấm tham gia (RSVP) sau
+    const acceptedUserIds: string[] = [userId];
 
     // Trích xuất recurrenceEndDate từ RRULE (nếu có UNTIL)
     let isRecurring = false;
@@ -169,34 +146,38 @@ export class CalendarService {
       acceptedUserIds,
       pendingUserIds: isChannelMeeting ? [] : inviteeUserIds,
       notificationsEnabledUserIds: Array.from(
-        new Set([userId, ...acceptedUserIds, ...inviteeUserIds]),
+        new Set([userId, ...(isChannelMeeting ? [] : inviteeUserIds)]),
       ),
     });
 
-    // Đồng bộ vector lên Pinecone
-    try {
-      await this.vectorDbService.upsertEventVector(
+    // Đồng bộ vector lên Pinecone (Chạy ngầm bất đồng bộ non-blocking để không chặn response)
+    this.vectorDbService
+      .upsertEventVector(
         event._id.toString(),
         event.title,
         event.description,
         userId,
         event.acceptedUserIds || [],
-      );
-    } catch (err: any) {
-      this.logger.warn(`Failed to upsert event vector: ${err?.message}`);
-    }
+      )
+      .catch((err: any) => {
+        this.logger.warn(`Failed to upsert event vector: ${err?.message}`);
+      });
+
+    // Lấy thông tin host một lần duy nhất với .lean() để tái sử dụng, tránh query lặp 3 lần
+    const hostUser = await this.userModel
+      .findOne({ supabaseId: userId })
+      .select("email displayName avatarUrl")
+      .lean()
+      .exec();
+    const hostDisplayName =
+      hostUser?.displayName ||
+      hostUser?.email?.split("@")[0] ||
+      "Người tổ chức";
+    const hostAvatarUrl = hostUser?.avatarUrl || "";
+    const hostEmail = hostUser?.email || "";
 
     // Gửi thông báo lời mời cho những người được mời riêng lẻ (không gửi thông báo riêng cho thành viên kênh nếu là cuộc họp kênh)
     if (!isChannelMeeting && inviteeUserIds.length > 0) {
-      const hostUser = await this.userModel
-        .findOne({ supabaseId: userId })
-        .select("displayName email avatarUrl")
-        .exec();
-      const hostDisplayName =
-        hostUser?.displayName ||
-        hostUser?.email?.split("@")[0] ||
-        "Người tổ chức";
-
       this.eventEmitter.emit("notification.calendar_invite", {
         userIds: inviteeUserIds,
         referenceId: event._id.toString(),
@@ -207,7 +188,7 @@ export class CalendarService {
           endDate: event.endDate.toISOString(),
           inviterId: userId,
           inviterName: hostDisplayName,
-          inviterAvatarUrl: hostUser?.avatarUrl || "",
+          inviterAvatarUrl: hostAvatarUrl,
           meetingCode: event.meetingCode,
           location: event.location,
           description: event.description,
@@ -217,16 +198,11 @@ export class CalendarService {
     }
 
     // Đính kèm thông tin host để FE hiển thị ngay không cần fetch lại
-    const hostUser = await this.userModel
-      .findOne({ supabaseId: userId })
-      .select("email displayName avatarUrl")
-      .exec();
     const eventWithHost = {
       ...event.toObject(),
-      hostEmail: hostUser?.email || "",
-      hostDisplayName:
-        hostUser?.displayName || hostUser?.email?.split("@")[0] || "",
-      hostAvatarUrl: hostUser?.avatarUrl || "",
+      hostEmail,
+      hostDisplayName,
+      hostAvatarUrl,
     };
 
     // Nếu tạo trong Group/Channel, gửi cho mọi thành viên trong kênh qua Socket
@@ -250,19 +226,13 @@ export class CalendarService {
           isEdited: false,
         });
 
-        // Lấy thông tin user để emit realtime
-        const authorUser = await this.userModel
-          .findOne({ supabaseId: userId })
-          .exec();
+        // Tái sử dụng hostUser đã fetch ở trên
         const postWithAuthor = {
           ...meetingPost.toObject(),
           author: {
             userId: userId,
-            displayName:
-              authorUser?.displayName ||
-              authorUser?.email?.split("@")[0] ||
-              "Người dùng ẩn danh",
-            avatarUrl: authorUser?.avatarUrl || "",
+            displayName: hostDisplayName,
+            avatarUrl: hostAvatarUrl,
             role: "member",
           },
           calendarEvent: {

@@ -21,12 +21,14 @@ import { BullModule } from "@nestjs/bullmq";
 import { SchedulerClientModule } from "./scheduler-client/scheduler-client.module";
 import { AiAgentModule } from "./ai-agent/ai-agent.module";
 import { VectorDbModule } from "./vector-db/vector-db.module";
+import { RedisModule } from "./redis/redis.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    RedisModule,
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

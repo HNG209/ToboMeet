@@ -13,12 +13,12 @@ import { Type } from "class-transformer";
 import { IsAfterDate, IsFutureDate } from "../validators/calendar.validators";
 
 export class InviteeDto {
-  @IsNotEmpty({ message: "Email khách mời không được để trống" })
+  @IsOptional()
   @IsEmail({}, { message: "Email khách mời không đúng định dạng" })
-  email: string;
+  email?: string;
 
   @IsOptional()
-  @IsString()
+  @IsString({ message: "UserId phải là chuỗi ký tự" })
   userId?: string;
 
   @IsOptional()

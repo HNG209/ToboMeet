@@ -11,6 +11,7 @@ import { MeetingsGateway } from "./meetings.gateway";
 import { CreatePollDto, VotePollDto } from "./dtos/poll.dto";
 import { AppException } from "../core/exceptions/app.exception";
 import { ErrorCode } from "@tobomeet/shared/types";
+import { RedisService } from "../redis/redis.service";
 
 @Injectable()
 export class PollsService {
@@ -24,6 +25,7 @@ export class PollsService {
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
     private readonly meetingsGateway: MeetingsGateway,
+    private readonly redisService: RedisService,
   ) { }
 
   /**
@@ -34,10 +36,14 @@ export class PollsService {
     userId: string,
     dto: CreatePollDto,
   ): Promise<Poll> {
-    let session = await this.sessionModel.findOne({
-      meetingCode,
-      status: "ongoing",
-    });
+    const session = await this.sessionModel
+      .findOne({
+        meetingCode,
+        status: "ongoing",
+      })
+      .select("_id")
+      .lean()
+      .exec();
 
     if (!session) {
       throw new AppException(ErrorCode.MEETING_NOT_STARTED_OR_ENDED);
@@ -53,6 +59,7 @@ export class PollsService {
 
     const user = await this.userModel
       .findOne({ supabaseId: userId })
+      .select("displayName email avatarUrl")
       .lean()
       .exec();
 
@@ -76,6 +83,20 @@ export class PollsService {
       creatorAvatar,
       status: "active",
     });
+
+    // Khởi tạo Redis In-Memory Counter cho các lựa chọn của cuộc bình chọn
+    if (this.redisService.isReady) {
+      const pollIdStr = poll._id.toString();
+      for (const opt of options) {
+        await this.redisService.hset(`poll:${pollIdStr}:counts`, opt.id, "0");
+      }
+      await this.redisService.expire(`poll:${pollIdStr}:counts`, 86400);
+      await this.redisService.set(
+        `poll:${pollIdStr}:meta`,
+        JSON.stringify(poll),
+        86400,
+      );
+    }
 
     this.meetingsGateway.notifyPollCreated(meetingCode, poll);
     this.logger.log(
@@ -174,6 +195,7 @@ export class PollsService {
     // Chặn bình chọn nếu phiên họp (session) đã kết thúc
     const session = await this.sessionModel
       .findById(poll.sessionId)
+      .select("status")
       .lean()
       .exec();
     if (!session || session.status === "ended") {
@@ -193,20 +215,96 @@ export class PollsService {
       }
     }
 
-    const user = await this.userModel
-      .findOne({ supabaseId: userId })
-      .lean()
-      .exec();
+    // Tối ưu hóa: Kiểm tra xem user đã từng vote trước đó chưa
+    let hasVotedBefore = false;
+    let voterName = "Người tham gia";
+    let voterAvatar = "";
 
-    const voterName = user?.displayName || user?.email || "Người tham gia";
-    const voterAvatar = user?.avatarUrl;
+    const pollIdStr = poll._id.toString();
 
-    // CẬP NHẬT NGUYÊN TỬ (ATOMIC UPDATE) - CHỐNG RACE CONDITION VÀ VERSION ERROR KHI TẢI CAO
-    // 1. Xóa phiếu bầu trước đó của người dùng trên mọi lựa chọn trong cuộc bình chọn này (nguyên tử)
-    await this.pollModel.updateOne(
-      { _id: poll._id },
-      { $pull: { "options.$[].voters": { userId } } }
-    );
+    // 1. Cập nhật bộ đếm nguyên tử In-Memory trên Redis nếu Redis sẵn sàng
+    if (this.redisService.isReady) {
+      const prevVoterDataStr = await this.redisService.hget(
+        `poll:${pollIdStr}:voters`,
+        userId,
+      );
+
+      let prevOptionIds: string[] = [];
+      if (prevVoterDataStr) {
+        try {
+          const parsed = JSON.parse(prevVoterDataStr);
+          prevOptionIds = parsed.optionIds || [];
+          hasVotedBefore = true;
+          voterName = parsed.name || voterName;
+          voterAvatar = parsed.avatar || voterAvatar;
+        } catch {}
+      }
+
+      // Giảm atomic counter của những options bị bỏ chọn
+      for (const oldOpt of prevOptionIds) {
+        if (!optionIds.includes(oldOpt)) {
+          await this.redisService.hincrby(`poll:${pollIdStr}:counts`, oldOpt, -1);
+        }
+      }
+
+      // Tăng atomic counter của những options mới được vote
+      for (const newOpt of optionIds) {
+        if (!prevOptionIds.includes(newOpt)) {
+          await this.redisService.hincrby(`poll:${pollIdStr}:counts`, newOpt, 1);
+        }
+      }
+
+      // Cập nhật chi tiết voter vào Redis Hash
+      await this.redisService.hset(
+        `poll:${pollIdStr}:voters`,
+        userId,
+        JSON.stringify({
+          optionIds,
+          name: voterName,
+          avatar: voterAvatar,
+          votedAt: new Date().toISOString(),
+        }),
+      );
+
+      await this.redisService.expire(`poll:${pollIdStr}:counts`, 86400);
+      await this.redisService.expire(`poll:${pollIdStr}:voters`, 86400);
+    }
+
+    if (!hasVotedBefore) {
+      for (const opt of poll.options) {
+        if (Array.isArray(opt.voters)) {
+          const v = opt.voters.find((voter: any) => voter.userId === userId);
+          if (v) {
+            hasVotedBefore = true;
+            voterName = v.name || voterName;
+            voterAvatar = v.avatar || voterAvatar;
+            break;
+          }
+        }
+      }
+    }
+
+    // Nếu chưa từng có trong poll, mới cần query DB tìm thông tin user
+    if (!hasVotedBefore && voterName === "Người tham gia") {
+      const user = await this.userModel
+        .findOne({ supabaseId: userId })
+        .select("displayName email avatarUrl")
+        .lean()
+        .exec();
+      if (user) {
+        voterName = user.displayName || user.email || voterName;
+        voterAvatar = user.avatarUrl || "";
+      }
+    }
+
+    // CẬP NHẬT NGUYÊN TỬ (ATOMIC UPDATE) - CHỐNG RACE CONDITION
+    // 1. Chỉ gọi $pull khi user ĐÃ TỪNG VOTE trước đó (Tiết kiệm 50% thao tác ghi MongoDB khi 200 users vote lần đầu)
+    if (hasVotedBefore) {
+      await this.pollModel.updateOne(
+        { _id: poll._id },
+        { $pull: { "options.$[].voters": { userId } } }
+      );
+    }
 
     // 2. Thêm người dùng vào các lựa chọn đã chọn (nguyên tử với arrayFilters, không dùng poll.save())
     await this.pollModel.updateOne(
@@ -227,6 +325,15 @@ export class PollsService {
     );
 
     const updatedPoll = await this.pollModel.findById(poll._id).lean().exec();
+
+    // Cập nhật lại poll meta trong Redis Cache
+    if (this.redisService.isReady && updatedPoll) {
+      await this.redisService.set(
+        `poll:${pollIdStr}:meta`,
+        JSON.stringify(updatedPoll),
+        86400,
+      );
+    }
 
     this.meetingsGateway.notifyPollVoted(meetingCode, updatedPoll);
     this.logger.log(
@@ -255,6 +362,10 @@ export class PollsService {
     poll.status = "closed";
     await poll.save();
 
+    if (this.redisService.isReady) {
+      await this.redisService.del(`poll:${poll._id}:meta`);
+    }
+
     this.meetingsGateway.notifyPollClosed(meetingCode, poll);
     this.logger.log(
       `[Poll] Closed poll ${pollId} in meeting ${meetingCode} by user ${userId}`,
@@ -278,6 +389,15 @@ export class PollsService {
 
     if (!poll) {
       throw new AppException(ErrorCode.POLL_NOT_FOUND);
+    }
+
+    if (this.redisService.isReady) {
+      const pollIdStr = pollId.toString();
+      await this.redisService.del([
+        `poll:${pollIdStr}:meta`,
+        `poll:${pollIdStr}:counts`,
+        `poll:${pollIdStr}:voters`,
+      ]);
     }
 
     this.meetingsGateway.notifyPollDeleted(meetingCode, pollId);
