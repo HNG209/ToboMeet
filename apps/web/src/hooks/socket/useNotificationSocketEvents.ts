@@ -48,6 +48,9 @@ export function useNotificationSocketEvents() {
         if (!canPopup) return;
 
         setTimeout(() => {
+          const livePath = typeof window !== "undefined" ? window.location.pathname : currentPath;
+          const isCurrentlyInRoom = Boolean(roomId && livePath.includes(`/room/${roomId}`));
+
           switch (notif.type) {
             case "KICKED": {
               if (roomId) removeRoomFromMyList(roomId); // dọn cache rtk query
@@ -155,6 +158,118 @@ export function useNotificationSocketEvents() {
             case "ROOM_BLOCKED": {
               toast.error(t("types.room_blocked.title"), {
                 description: t("types.room_blocked.content"),
+                duration: 8000,
+              });
+              break;
+            }
+
+            case "CHANNEL_POST": {
+              if (isCurrentlyInRoom) break;
+              const channelName = notif.metadata?.channelName || "";
+              const authorName =
+                notif.metadata?.authorName || t("common.someone");
+              const postRoomId = notif.metadata?.roomId;
+              const channelId = notif.metadata?.channelId;
+
+              toast.info(t("toast.channel_post"), {
+                description: t("types.channel_post.toast_desc", {
+                  authorName,
+                  channelName,
+                }),
+                action:
+                  postRoomId && channelId
+                    ? {
+                        label: t("actions.view_channel"),
+                        onClick: () => {
+                          router.push(`/room/${postRoomId}?channel=${channelId}`);
+                          window.dispatchEvent(
+                            new CustomEvent("navigate-to-channel", {
+                              detail: { channelId, channelName },
+                            }),
+                          );
+                        },
+                      }
+                    : undefined,
+                duration: 8000,
+              });
+              break;
+            }
+
+            case "ASSIGNMENT_CREATED": {
+              if (isCurrentlyInRoom) break;
+              const channelName = notif.metadata?.channelName || "";
+              const authorName =
+                notif.metadata?.authorName || t("common.someone");
+              const assignTitle = notif.metadata?.title || "";
+              const assignRoomId = notif.metadata?.roomId;
+              const channelId = notif.metadata?.channelId;
+              const assignmentId = notif.metadata?.assignmentId;
+
+              toast.info(t("toast.assignment_created"), {
+                description: t("types.assignment_created.toast_desc", {
+                  authorName,
+                  title: assignTitle,
+                  channelName,
+                }),
+                action:
+                  assignRoomId && channelId
+                    ? {
+                        label: t("actions.view_channel"),
+                        onClick: () => {
+                          router.push(
+                            `/room/${assignRoomId}?channel=${channelId}`,
+                          );
+                          window.dispatchEvent(
+                            new CustomEvent("navigate-to-channel", {
+                              detail: { channelId, channelName },
+                            }),
+                          );
+                          if (assignmentId) {
+                            window.dispatchEvent(
+                              new CustomEvent("navigate-to-assignment", {
+                                detail: { assignmentId },
+                              }),
+                            );
+                          }
+                        },
+                      }
+                    : undefined,
+                duration: 8000,
+              });
+              break;
+            }
+
+            case "CHANNEL_EVENT_CREATED": {
+              if (isCurrentlyInRoom) break;
+              const channelName = notif.metadata?.channelName || "";
+              const hostName =
+                notif.metadata?.hostName || t("common.someone");
+              const eventTitle = notif.metadata?.title || "";
+              const eventRoomId = notif.metadata?.roomId;
+              const channelId = notif.metadata?.channelId;
+
+              toast.info(t("toast.channel_event_created"), {
+                description: t("types.channel_event_created.toast_desc", {
+                  hostName,
+                  title: eventTitle,
+                  channelName,
+                }),
+                action:
+                  eventRoomId && channelId
+                    ? {
+                        label: t("actions.view_channel"),
+                        onClick: () => {
+                          router.push(
+                            `/room/${eventRoomId}?channel=${channelId}`,
+                          );
+                          window.dispatchEvent(
+                            new CustomEvent("navigate-to-channel", {
+                              detail: { channelId, channelName },
+                            }),
+                          );
+                        },
+                      }
+                    : undefined,
                 duration: 8000,
               });
               break;

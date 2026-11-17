@@ -98,6 +98,58 @@ export function useNotificationSocketEvents() {
               break;
             }
 
+            case "CHANNEL_POST": {
+              if (isCurrentlyInRoom) break;
+              const channelName = notif.metadata?.channelName || "";
+              const authorName =
+                notif.metadata?.authorName ||
+                t("notification.common.someone", "Ai đó");
+              toast.info(
+                t("notification.types.channel_post.toast", {
+                  authorName,
+                  channelName,
+                  defaultValue: `${authorName} đã đăng bài viết mới trong #${channelName}`,
+                }),
+              );
+              break;
+            }
+
+            case "ASSIGNMENT_CREATED": {
+              if (isCurrentlyInRoom) break;
+              const channelName = notif.metadata?.channelName || "";
+              const authorName =
+                notif.metadata?.authorName ||
+                t("notification.common.someone", "Ai đó");
+              const title = notif.metadata?.title || "";
+              toast.info(
+                t("notification.types.assignment_created.toast", {
+                  authorName,
+                  title,
+                  channelName,
+                  defaultValue: `${authorName} đã giao nhiệm vụ: ${title}`,
+                }),
+              );
+              break;
+            }
+
+            case "CHANNEL_EVENT_CREATED": {
+              if (isCurrentlyInRoom) break;
+              const channelName = notif.metadata?.channelName || "";
+              const hostName =
+                notif.metadata?.hostName ||
+                t("notification.common.someone", "Ai đó");
+              const title = notif.metadata?.title || "";
+              toast.info(
+                t("notification.types.channel_event_created.toast", {
+                  hostName,
+                  title,
+                  channelName,
+                  defaultValue: `${hostName} đã lên lịch cuộc họp: ${title}`,
+                }),
+              );
+              break;
+            }
+
             default:
               console.warn(
                 "Chưa hỗ trợ hiển thị loại thông báo này:",

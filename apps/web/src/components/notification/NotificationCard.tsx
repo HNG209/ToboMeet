@@ -12,6 +12,9 @@ import {
   X as XIcon,
   XCircle,
   Clock,
+  MessageSquare,
+  ClipboardList,
+  ArrowRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useLazyExchangeSessionQuery } from "@/lib/redux/api/meetingsApi";
@@ -161,6 +164,61 @@ export default function NotificationCard({
           icon: UserMinus,
           colorClass: "text-red-600 bg-red-100",
         };
+      case "CHANNEL_POST":
+        return {
+          title: t("types.channel_post.title", {
+            channelName: metadata?.channelName || "",
+            roomName: metadata?.roomName || "",
+          }),
+          content: metadata?.summary
+            ? `${metadata?.authorName ? metadata.authorName + ": " : ""}${metadata.summary}`
+            : t("types.channel_post.content", {
+                authorName: metadata?.authorName || t("common.someone"),
+                channelName: metadata?.channelName || "",
+              }),
+          icon: MessageSquare,
+          colorClass: "text-blue-600 bg-blue-100",
+          roomId: metadata?.roomId,
+          channelId: metadata?.channelId,
+          channelName: metadata?.channelName,
+          isChannelRedirect: Boolean(metadata?.roomId && metadata?.channelId),
+        };
+      case "ASSIGNMENT_CREATED":
+        return {
+          title: t("types.assignment_created.title", {
+            channelName: metadata?.channelName || "",
+            roomName: metadata?.roomName || "",
+          }),
+          content: t("types.assignment_created.content", {
+            authorName: metadata?.authorName || t("common.someone"),
+            title: metadata?.title || "",
+          }),
+          icon: ClipboardList,
+          colorClass: "text-emerald-600 bg-emerald-100",
+          roomId: metadata?.roomId,
+          channelId: metadata?.channelId,
+          channelName: metadata?.channelName,
+          assignmentId: metadata?.assignmentId,
+          isChannelRedirect: Boolean(metadata?.roomId && metadata?.channelId),
+        };
+      case "CHANNEL_EVENT_CREATED":
+        return {
+          title: t("types.channel_event_created.title", {
+            channelName: metadata?.channelName || "",
+            roomName: metadata?.roomName || "",
+          }),
+          content: t("types.channel_event_created.content", {
+            hostName: metadata?.hostName || t("common.someone"),
+            title: metadata?.title || "",
+          }),
+          icon: Calendar,
+          colorClass: "text-purple-600 bg-purple-100",
+          roomId: metadata?.roomId,
+          channelId: metadata?.channelId,
+          channelName: metadata?.channelName,
+          meetingCode: metadata?.meetingCode,
+          isChannelRedirect: Boolean(metadata?.roomId && metadata?.channelId),
+        };
       default:
         return {
           title: t("types.system.title"),
@@ -182,9 +240,34 @@ export default function NotificationCard({
     isCalendarInvite,
     eventId,
     startDate,
+    roomId,
+    channelId,
+    channelName,
+    assignmentId,
+    isChannelRedirect,
   } = getNotificationDetails(notification.type, notification.metadata || {});
 
-  const handleActionClick = async () => {
+  const handleChannelClick = () => {
+    if (roomId && channelId) {
+      onCloseDrawer();
+      router.push(`/room/${roomId}?channel=${channelId}`);
+      window.dispatchEvent(
+        new CustomEvent("navigate-to-channel", {
+          detail: { channelId, channelName },
+        }),
+      );
+      if (assignmentId) {
+        window.dispatchEvent(
+          new CustomEvent("navigate-to-assignment", {
+            detail: { assignmentId },
+          }),
+        );
+      }
+    }
+  };
+
+  const handleActionClick = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (meetingCode) {
       onCloseDrawer();
       if (typeof window !== "undefined" && (window as any).electronAPI?.isDesktop) {
@@ -216,7 +299,11 @@ export default function NotificationCard({
     }
   };
 
-  const handleRsvp = async (status: "ACCEPTED" | "DECLINED") => {
+  const handleRsvp = async (
+    status: "ACCEPTED" | "DECLINED",
+    e?: React.MouseEvent,
+  ) => {
+    e?.stopPropagation();
     if (!eventId) return;
 
     setRsvpLoading(status);
@@ -243,10 +330,16 @@ export default function NotificationCard({
 
   return (
     <div
-      className={`relative p-4 rounded-2xl border transition-all duration-200 ${notification.isRead
-        ? "bg-white border-slate-100"
-        : "bg-brand-50/40 border-brand-100/60"
-        }`}
+      onClick={isChannelRedirect ? handleChannelClick : undefined}
+      className={`relative p-4 rounded-2xl border transition-all duration-200 ${
+        isChannelRedirect
+          ? "cursor-pointer hover:border-brand-200 hover:shadow-sm"
+          : ""
+      } ${
+        notification.isRead
+          ? "bg-white border-slate-100"
+          : "bg-brand-50/40 border-brand-100/60"
+      }`}
     >
       {!notification.isRead && (
         <span className="absolute top-4 right-4 w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_8px_rgba(0,85,255,0.4)]" />
@@ -270,6 +363,15 @@ export default function NotificationCard({
           <p className="text-[10px] text-slate-400 font-medium mt-2 flex items-center gap-1">
             {formatTimeAgo(notification.createdAt.toString())}
           </p>
+
+          {isChannelRedirect && channelName && (
+            <div className="mt-2.5 flex items-center gap-1.5 text-[11px] font-semibold text-brand-600 hover:text-brand-700 w-fit">
+              <span className="bg-brand-50 px-2 py-0.5 rounded-md border border-brand-100/80">
+                #{channelName}
+              </span>
+              <ArrowRight className="w-3.5 h-3.5 text-brand-500" />
+            </div>
+          )}
 
           {isActionable && (
             <div className="mt-3">

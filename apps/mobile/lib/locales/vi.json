@@ -900,6 +900,21 @@
         "title": "Đã xử lý báo cáo",
         "content": "Báo cáo vi phạm của bạn đã được quản trị viên xử lý."
       },
+      "channel_post": {
+        "title": "Bài viết mới trong #{{channelName}}",
+        "content": "{{authorName}} đã đăng một bài viết mới.",
+        "toast": "{{authorName}} đã đăng bài viết mới trong #{{channelName}}"
+      },
+      "assignment_created": {
+        "title": "Nhiệm vụ mới trong #{{channelName}}",
+        "content": "{{authorName}} đã giao nhiệm vụ: {{title}}.",
+        "toast": "{{authorName}} đã giao nhiệm vụ: {{title}}"
+      },
+      "channel_event_created": {
+        "title": "Lịch họp mới trong #{{channelName}}",
+        "content": "{{hostName}} đã lên lịch cuộc họp: {{title}}.",
+        "toast": "{{hostName}} đã lên lịch cuộc họp \"{{title}}\" trong #{{channelName}}"
+      },
       "system": {
         "title": "Thông báo hệ thống",
         "content": "Sự kiện diễn ra ({{type}})."
@@ -910,7 +925,8 @@
       "accept": "Chấp nhận",
       "decline": "Từ chối",
       "accepted": "Đã chấp nhận",
-      "declined": "Đã từ chối"
+      "declined": "Đã từ chối",
+      "view_channel": "Xem kênh"
     },
     "rsvp": {
       "accept_success": "Đã chấp nhận lời mời",

@@ -18,6 +18,7 @@ import { MeetingsGateway } from "../meetings/meetings.gateway";
 import { SupabaseService } from "../supabase/supabase.service";
 import { CreatePostDto } from "./dto/create-post.dto";
 import { CreateCommentDto } from "./dto/create-comment.dto";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 import * as path from "path";
 import * as crypto from "crypto";
 
@@ -72,6 +73,7 @@ export class NewsFeedService {
     private readonly calendarEventModel: Model<CalendarEventDocument>,
     private readonly meetingsGateway: MeetingsGateway,
     private readonly supabaseService: SupabaseService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private getReactionStatsAndUserReaction(
@@ -331,7 +333,14 @@ export class NewsFeedService {
    * Tạo bài viết mới
    */
   async createPost(userId: string, dto: CreatePostDto) {
-    await this.checkChannelAccess(dto.roomId, dto.channelId, userId);
+    const { room } = await this.checkChannelAccess(
+      dto.roomId,
+      dto.channelId,
+      userId,
+    );
+    const channel = room.channels.find(
+      (c) => c._id?.toString() === dto.channelId,
+    );
 
     if (
       !dto.content?.trim() &&
@@ -369,6 +378,33 @@ export class NewsFeedService {
     this.meetingsGateway.server
       .to(`room_${dto.roomId}`)
       .emit("post_created", postWithCount);
+
+    // Gửi thông báo bất đồng bộ cho NotificationService xử lý (không làm chậm luồng chính)
+    try {
+      const authorName =
+        (populated as any)?.author?.displayName ||
+        (populated as any)?.author?.email?.split("@")[0] ||
+        "Người dùng";
+      const authorAvatarUrl = (populated as any)?.author?.avatarUrl || "";
+
+      const contentSnippet = dto.content?.trim()
+        ? dto.content.trim().length > 80
+          ? `${dto.content.trim().slice(0, 80)}...`
+          : dto.content.trim()
+        : "Đã đăng tệp đính kèm";
+
+      this.eventEmitter.emit("notification.post_created", {
+        roomId: dto.roomId,
+        channelId: dto.channelId,
+        authorId: userId,
+        authorName,
+        authorAvatarUrl,
+        summary: contentSnippet,
+        referenceId: post._id.toString(),
+      });
+    } catch (err) {
+      console.error("Lỗi khi phát thông báo bài viết mới:", err);
+    }
 
     return postWithCount;
   }

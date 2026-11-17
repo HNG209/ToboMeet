@@ -12,6 +12,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePathname } from "next/navigation";
+import { useHomeContext } from "@/app/[locale]/(home)/layout";
 import { axiosInstance } from "@/lib/axios";
 import { useDispatch } from "react-redux";
 import { calendarApi } from "@/lib/redux/api/calendarApi";
@@ -38,15 +40,17 @@ type Corner = "top-left" | "top-right" | "bottom-left" | "bottom-right";
 
 /**
  * Tính toán toạ độ (x, y) trên màn hình dựa theo góc được ghim (Corner).
- * - Phía bên trái chừa lề tối thiểu để không đè lên Sidebar chính.
+ * - Phía bên trái chừa lề tối thiểu để không đè lên Sidebar chính của dashboard khi ở ngoài room.
+ * - Khi ở trong Room (isInRoom), không có sidebar dashboard nên cho phép kéo sát vào góc trái (24px/16px).
  */
 function getCornerPosition(
   corner: Corner,
   w = typeof window !== "undefined" ? window.innerWidth : 1200,
   h = typeof window !== "undefined" ? window.innerHeight : 800,
+  isInRoom = false,
 ) {
   const isDesktop = w >= 768;
-  const leftMargin = isDesktop ? 96 : 80;
+  const leftMargin = isInRoom ? (isDesktop ? 24 : 16) : (isDesktop ? 96 : 80);
   const rightMargin = 24;
   const topMargin = 64; // Chừa đủ khoảng trống bên dưới header chính (h-12 = 48px + 16px padding)
   const bottomMargin = 24;
@@ -70,14 +74,18 @@ function getCornerPosition(
 /**
  * Xác định class vị trí mở khung chat theo góc hiện tại của button
  */
-function getDialogPositionClass(corner: Corner) {
+function getDialogPositionClass(corner: Corner, isInRoom = false) {
   switch (corner) {
     case "top-left":
-      return "fixed top-16 left-20 md:left-24 animate-in fade-in slide-in-from-top-4";
+      return isInRoom
+        ? "fixed top-16 left-6 animate-in fade-in slide-in-from-top-4"
+        : "fixed top-16 left-20 md:left-24 animate-in fade-in slide-in-from-top-4";
     case "top-right":
       return "fixed top-16 right-6 animate-in fade-in slide-in-from-top-4";
     case "bottom-left":
-      return "fixed bottom-6 left-20 md:left-24 animate-in fade-in slide-in-from-bottom-4";
+      return isInRoom
+        ? "fixed bottom-6 left-6 animate-in fade-in slide-in-from-bottom-4"
+        : "fixed bottom-6 left-20 md:left-24 animate-in fade-in slide-in-from-bottom-4";
     case "bottom-right":
     default:
       return "fixed bottom-6 right-6 animate-in fade-in slide-in-from-bottom-4";
@@ -87,6 +95,20 @@ function getDialogPositionClass(corner: Corner) {
 export default function ToboAgentChat() {
   const t = useTranslations("ai_agent");
   const dispatch = useDispatch();
+  const pathname = usePathname();
+
+  let isInRoom = false;
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const homeContext = useHomeContext();
+    isInRoom = Boolean(
+      homeContext?.isInRoom ||
+      homeContext?.selectedRoomId ||
+      pathname?.includes("/room/")
+    );
+  } catch {
+    isInRoom = Boolean(pathname?.includes("/room/"));
+  }
 
   const [mounted, setMounted] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -123,7 +145,14 @@ export default function ToboAgentChat() {
           ? savedCorner
           : "bottom-right";
       setCorner(initialCorner);
-      setPosition(getCornerPosition(initialCorner));
+      setPosition(
+        getCornerPosition(
+          initialCorner,
+          window.innerWidth,
+          window.innerHeight,
+          isInRoom,
+        ),
+      );
 
       const savedHistory = localStorage.getItem(STORAGE_KEY);
       if (savedHistory) {
@@ -133,21 +162,49 @@ export default function ToboAgentChat() {
         }
       }
     } catch {
-      setPosition(getCornerPosition("bottom-right"));
+      setPosition(
+        getCornerPosition(
+          "bottom-right",
+          window.innerWidth,
+          window.innerHeight,
+          isInRoom,
+        ),
+      );
     }
-  }, []);
+  }, [isInRoom]);
 
-  // Cập nhật lại toạ độ khi đổi kích thước màn hình
+  // Cập nhật lại toạ độ khi đổi kích thước màn hình hoặc đổi trạng thái phòng
   useEffect(() => {
     if (!mounted) return;
     const handleResize = () => {
       if (!isDragging) {
-        setPosition(getCornerPosition(corner));
+        setPosition(
+          getCornerPosition(
+            corner,
+            window.innerWidth,
+            window.innerHeight,
+            isInRoom,
+          ),
+        );
       }
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [corner, isDragging, mounted]);
+  }, [corner, isInRoom, isDragging, mounted]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (!isDragging) {
+      setPosition(
+        getCornerPosition(
+          corner,
+          window.innerWidth,
+          window.innerHeight,
+          isInRoom,
+        ),
+      );
+    }
+  }, [isInRoom, corner, isDragging, mounted]);
 
   // Lưu lịch sử chat
   useEffect(() => {
@@ -200,7 +257,7 @@ export default function ToboAgentChat() {
       }
 
       const isDesktop = window.innerWidth >= 768;
-      const minLeft = isDesktop ? 96 : 80;
+      const minLeft = isInRoom ? (isDesktop ? 24 : 16) : (isDesktop ? 96 : 80);
       const maxRight = window.innerWidth - BUTTON_SIZE - 16;
       const minTop = 64; // Bên dưới header (48px)
       const maxBottom = window.innerHeight - BUTTON_SIZE - 16;
@@ -245,7 +302,12 @@ export default function ToboAgentChat() {
           // Bỏ qua lỗi storage
         }
 
-        return getCornerPosition(targetCorner);
+        return getCornerPosition(
+          targetCorner,
+          window.innerWidth,
+          window.innerHeight,
+          isInRoom,
+        );
       });
     };
 

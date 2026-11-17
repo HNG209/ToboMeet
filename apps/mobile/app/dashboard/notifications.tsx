@@ -226,6 +226,72 @@ function NotificationCard({
           colorClass: "bg-emerald-100",
           iconColor: "#059669",
         };
+      case "CHANNEL_POST":
+        return {
+          title: t("notification.types.channel_post.title", {
+            channelName: metadata?.channelName || "",
+            defaultValue: `Bài viết mới trong #${metadata?.channelName || ""}`,
+          }),
+          content: metadata?.summary
+            ? `${metadata?.authorName ? metadata.authorName + ": " : ""}${metadata.summary}`
+            : t("notification.types.channel_post.content", {
+                authorName:
+                  metadata?.authorName ||
+                  t("notification.common.someone", "Ai đó"),
+                channelName: metadata?.channelName || "",
+                defaultValue: `${metadata?.authorName || "Ai đó"} đã đăng bài viết mới`,
+              }),
+          icon: "message-square",
+          colorClass: "bg-blue-100",
+          iconColor: "#2563eb",
+          roomId: metadata?.roomId,
+          channelId: metadata?.channelId,
+          channelName: metadata?.channelName,
+          isChannelRedirect: Boolean(metadata?.roomId && metadata?.channelId),
+        };
+      case "ASSIGNMENT_CREATED":
+        return {
+          title: t("notification.types.assignment_created.title", {
+            channelName: metadata?.channelName || "",
+            defaultValue: `Nhiệm vụ mới trong #${metadata?.channelName || ""}`,
+          }),
+          content: t("notification.types.assignment_created.content", {
+            authorName:
+              metadata?.authorName ||
+              t("notification.common.someone", "Ai đó"),
+            title: metadata?.title || "",
+            defaultValue: `${metadata?.authorName || "Ai đó"} đã giao nhiệm vụ: ${metadata?.title || ""}`,
+          }),
+          icon: "clipboard",
+          colorClass: "bg-emerald-100",
+          iconColor: "#059669",
+          roomId: metadata?.roomId,
+          channelId: metadata?.channelId,
+          channelName: metadata?.channelName,
+          assignmentId: metadata?.assignmentId,
+          isChannelRedirect: Boolean(metadata?.roomId && metadata?.channelId),
+        };
+      case "CHANNEL_EVENT_CREATED":
+        return {
+          title: t("notification.types.channel_event_created.title", {
+            channelName: metadata?.channelName || "",
+            defaultValue: `Lịch họp mới trong #${metadata?.channelName || ""}`,
+          }),
+          content: t("notification.types.channel_event_created.content", {
+            hostName:
+              metadata?.hostName ||
+              t("notification.common.someone", "Ai đó"),
+            title: metadata?.title || "",
+            defaultValue: `${metadata?.hostName || "Ai đó"} đã lên lịch cuộc họp: ${metadata?.title || ""}`,
+          }),
+          icon: "calendar",
+          colorClass: "bg-purple-100",
+          iconColor: "#7c3aed",
+          roomId: metadata?.roomId,
+          channelId: metadata?.channelId,
+          channelName: metadata?.channelName,
+          isChannelRedirect: Boolean(metadata?.roomId && metadata?.channelId),
+        };
       default:
         return {
           title: t("notification.types.system.title"),
@@ -250,7 +316,20 @@ function NotificationCard({
     isCalendarInvite,
     eventId,
     startDate,
+    roomId,
+    channelId,
+    channelName,
+    isChannelRedirect,
   } = getNotificationDetails(notification.type, notification.metadata || {});
+
+  const handleChannelPress = () => {
+    if (isChannelRedirect && roomId && channelId) {
+      router.push({
+        pathname: "/room/[id]",
+        params: { id: roomId, channelId },
+      });
+    }
+  };
 
   const handleActionClick = async () => {
     if (meetingCode) {
@@ -312,7 +391,9 @@ function NotificationCard({
   };
 
   return (
-    <View
+    <TouchableOpacity
+      activeOpacity={isChannelRedirect ? 0.7 : 1}
+      onPress={isChannelRedirect ? handleChannelPress : undefined}
       className={`p-4 rounded-2xl border ${
         notification.isRead
           ? "bg-white border-slate-100"
@@ -344,6 +425,17 @@ function NotificationCard({
               i18n,
             )}
           </Text>
+
+          {isChannelRedirect && channelName ? (
+            <View className="flex-row items-center gap-1.5 mt-2.5">
+              <View className="bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200">
+                <Text className="text-[11px] font-semibold text-blue-600">
+                  #{channelName}
+                </Text>
+              </View>
+              <Feather name="arrow-right" size={13} color="#2563eb" />
+            </View>
+          ) : null}
 
           {isActionable && (
             <TouchableOpacity
@@ -436,6 +528,6 @@ function NotificationCard({
           )}
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }

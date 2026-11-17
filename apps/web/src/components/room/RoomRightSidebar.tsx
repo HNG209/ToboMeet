@@ -58,13 +58,13 @@ export default function RoomRightSidebar({
       {/* Mobile Backdrop */}
       {isRightSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed top-12 bottom-0 inset-x-0 bg-black/40 z-30 lg:hidden"
           onClick={() => setIsRightSidebarOpen(false)}
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 right-0 z-40 flex flex-col bg-white border-l border-slate-200 shadow-xl lg:relative lg:translate-x-0 lg:shadow-none transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${isRightSidebarOpen
+        className={`fixed top-12 bottom-0 right-0 z-40 flex flex-col bg-white border-l border-slate-200 shadow-xl lg:relative lg:top-0 lg:translate-x-0 lg:shadow-none transition-all duration-300 ease-in-out overflow-hidden shrink-0 ${isRightSidebarOpen
             ? "translate-x-0 w-80 lg:w-80 lg:opacity-100"
             : "translate-x-full w-80 lg:w-0 lg:opacity-0 lg:border-none pointer-events-none lg:pointer-events-auto"
           }`}

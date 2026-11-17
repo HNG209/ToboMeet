@@ -899,6 +899,21 @@
         "title": "Report resolved",
         "content": "Your violation report has been resolved by an administrator."
       },
+      "channel_post": {
+        "title": "New post in #{{channelName}}",
+        "content": "{{authorName}} posted a new update.",
+        "toast": "{{authorName}} shared a new post in #{{channelName}}"
+      },
+      "assignment_created": {
+        "title": "New assignment in #{{channelName}}",
+        "content": "{{authorName}} assigned: {{title}}.",
+        "toast": "{{authorName}} created a new assignment: {{title}}"
+      },
+      "channel_event_created": {
+        "title": "New meeting in #{{channelName}}",
+        "content": "{{hostName}} scheduled a meeting: {{title}}.",
+        "toast": "{{hostName}} scheduled \"{{title}}\" in #{{channelName}}"
+      },
       "system": {
         "title": "System Notification",
         "content": "Event occurred ({{type}})."
@@ -909,7 +924,8 @@
       "accept": "Accept",
       "decline": "Decline",
       "accepted": "Accepted",
-      "declined": "Declined"
+      "declined": "Declined",
+      "view_channel": "View channel"
     },
     "rsvp": {
       "accept_success": "Invitation accepted and added to your calendar",

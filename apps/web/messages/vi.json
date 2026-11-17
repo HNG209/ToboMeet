@@ -827,7 +827,7 @@
         "opened": "Thời gian bắt đầu",
         "due": "Thời gian kết thúc",
         "overdue_label": "Nhiệm vụ quá hạn nộp: {time}",
-        "add_submission": "Thêm nhiệm vụ",
+        "add_submission": "Thêm bài nộp",
         "edit_submission": "Cập nhật nội dung nộp",
         "remove_submission": "Hủy nộp nhiệm vụ",
         "drop_zone_hint": "Kéo và thả tệp tin vào đây để nộp",
@@ -909,7 +909,7 @@
       }
     },
     "assignments": "Nhiệm vụ",
-    "class_feed": "Bảng tin chung",
+    "class_feed": "Feed",
     "files": "Tệp",
     "files_search_placeholder": "Tìm kiếm tệp và thư mục...",
     "files_upload_btn": "Tải tệp lên",
@@ -1081,6 +1081,7 @@
     "btn_join": "Tham gia",
     "start_now": "Họp ngay",
     "schedule_meeting": "Lên lịch cuộc họp",
+    "open_whiteboard": "Mở whiteboard",
     "join_current_tab": "Tham gia trên tab này",
     "join_new_tab": "Tham gia trên tab mới",
     "start_current_tab": "Bắt đầu trên tab này",
@@ -2202,6 +2203,21 @@
         "title": "Bị xóa khỏi cuộc họp",
         "content": "Bạn đã bị xoá khỏi cuộc họp {meetingCode}."
       },
+      "channel_post": {
+        "title": "Bài viết mới trong #{channelName}",
+        "content": "{authorName} đã đăng một bài viết mới.",
+        "toast_desc": "{authorName} đã đăng bài viết mới trong #{channelName}."
+      },
+      "assignment_created": {
+        "title": "Nhiệm vụ mới trong #{channelName}",
+        "content": "{authorName} đã giao nhiệm vụ: {title}.",
+        "toast_desc": "{authorName} đã giao nhiệm vụ mới: {title}."
+      },
+      "channel_event_created": {
+        "title": "Lịch họp mới trong #{channelName}",
+        "content": "{hostName} đã lên lịch cuộc họp: {title}.",
+        "toast_desc": "{hostName} đã lên lịch cuộc họp \"{title}\" trong #{channelName}."
+      },
       "system": {
         "title": "Thông báo hệ thống",
         "content": "Sự kiện diễn ra ({type})."
@@ -2212,14 +2228,18 @@
       "room_disbanded": "Phòng giải tán",
       "event_invite": "Tham gia sự kiện",
       "event_start": "Sự kiện bắt đầu",
-      "event_start_desc": "Sự kiện \"{title}\" đã đến giờ bắt đầu."
+      "event_start_desc": "Sự kiện \"{title}\" đã đến giờ bắt đầu.",
+      "channel_post": "Bài viết mới",
+      "assignment_created": "Nhiệm vụ mới",
+      "channel_event_created": "Lịch họp mới"
     },
     "actions": {
       "join": "Tham gia",
       "accept": "Chấp nhận",
       "decline": "Từ chối",
       "accepted": "Đã chấp nhận",
-      "declined": "Đã từ chối"
+      "declined": "Đã từ chối",
+      "view_channel": "Xem kênh"
     },
     "rsvp": {
       "accept_success": "Đã chấp nhận lời mời",

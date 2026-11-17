@@ -197,6 +197,27 @@ export class CalendarService {
       });
     }
 
+    // Gửi thông báo sự kiện kênh cho toàn bộ thành viên trong phòng (giao NotificationService xử lý bất đồng bộ)
+    if (isChannelMeeting && data.roomId && data.channelId) {
+      try {
+        this.eventEmitter.emit("notification.channel_event_created", {
+          roomId: data.roomId,
+          channelId: data.channelId,
+          hostId: userId,
+          hostName: hostDisplayName,
+          hostAvatarUrl: hostAvatarUrl,
+          title: event.title,
+          startDate: event.startDate.toISOString(),
+          endDate: event.endDate.toISOString(),
+          location: event.location,
+          roomType: event.roomType,
+          referenceId: event._id.toString(),
+        });
+      } catch (err) {
+        console.error("Lỗi khi phát thông báo lịch kênh mới:", err);
+      }
+    }
+
     // Đính kèm thông tin host để FE hiển thị ngay không cần fetch lại
     const eventWithHost = {
       ...event.toObject(),
@@ -428,10 +449,10 @@ export class CalendarService {
     const hostUsers =
       hostIds.length > 0
         ? await this.userModel
-            .find({ supabaseId: { $in: hostIds } })
-            .select("supabaseId email displayName avatarUrl")
-            .lean()
-            .exec()
+          .find({ supabaseId: { $in: hostIds } })
+          .select("supabaseId email displayName avatarUrl")
+          .lean()
+          .exec()
         : [];
     const hostUserMap = new Map<string, any>(
       hostUsers.map((u: any) => [u.supabaseId, u] as [string, any]),
@@ -485,10 +506,10 @@ export class CalendarService {
           .exec(),
         creatorIds.length > 0
           ? this.userModel
-              .find({ supabaseId: { $in: creatorIds } })
-              .select("supabaseId email displayName avatarUrl")
-              .lean()
-              .exec()
+            .find({ supabaseId: { $in: creatorIds } })
+            .select("supabaseId email displayName avatarUrl")
+            .lean()
+            .exec()
           : [],
       ]);
 

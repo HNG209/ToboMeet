@@ -44,6 +44,7 @@ interface HomeContextType {
   setShowCreateDialog: (show: boolean) => void;
   selectedRoomId: string | null;
   selectRoom: (roomId: string | null) => void;
+  isInRoom: boolean;
 }
 
 const HomeContext = createContext<HomeContextType>({} as HomeContextType);
@@ -217,6 +218,7 @@ function HomeLayoutInner({
         setShowCreateDialog,
         selectedRoomId,
         selectRoom,
+        isInRoom,
       }}
     >
       {/* Container chính với Top Header và Main Content */}

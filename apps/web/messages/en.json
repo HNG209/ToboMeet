@@ -840,7 +840,7 @@
         "opened": "Opened",
         "due": "Due",
         "overdue_label": "Assignment is overdue by: {time}",
-        "add_submission": "Add task",
+        "add_submission": "Add submission",
         "edit_submission": "Edit submission",
         "remove_submission": "Remove submission",
         "drop_zone_hint": "Drag and drop files here to submit",
@@ -922,7 +922,7 @@
       }
     },
     "assignments": "Assignments",
-    "class_feed": "Class Feed",
+    "class_feed": "Feed",
     "files": "Files",
     "files_search_placeholder": "Search files and folders...",
     "files_upload_btn": "Upload file",
@@ -1094,6 +1094,7 @@
     "btn_join": "Join",
     "start_now": "Start Now",
     "schedule_meeting": "Schedule Meeting",
+    "open_whiteboard": "Open Whiteboard",
     "join_current_tab": "Join on this tab",
     "join_new_tab": "Join in a new tab",
     "start_current_tab": "Start on this tab",
@@ -2217,6 +2218,21 @@
         "title": "Removed from meeting",
         "content": "You have been removed from meeting {meetingCode}."
       },
+      "channel_post": {
+        "title": "New post in #{channelName}",
+        "content": "{authorName} posted a new update.",
+        "toast_desc": "{authorName} shared a new post in #{channelName}."
+      },
+      "assignment_created": {
+        "title": "New assignment in #{channelName}",
+        "content": "{authorName} assigned: {title}.",
+        "toast_desc": "{authorName} created a new assignment: {title}."
+      },
+      "channel_event_created": {
+        "title": "New meeting in #{channelName}",
+        "content": "{hostName} scheduled a meeting: {title}.",
+        "toast_desc": "{hostName} scheduled \"{title}\" in #{channelName}."
+      },
       "system": {
         "title": "System Notification",
         "content": "Event occurred ({type})."
@@ -2227,14 +2243,18 @@
       "room_disbanded": "Room Disbanded",
       "event_invite": "Event Invitation",
       "event_start": "Event Started",
-      "event_start_desc": "Event \"{title}\" has started."
+      "event_start_desc": "Event \"{title}\" has started.",
+      "channel_post": "New post",
+      "assignment_created": "New assignment",
+      "channel_event_created": "New channel meeting"
     },
     "actions": {
       "join": "Join",
       "accept": "Accept",
       "decline": "Decline",
       "accepted": "Accepted",
-      "declined": "Declined"
+      "declined": "Declined",
+      "view_channel": "View channel"
     },
     "rsvp": {
       "accept_success": "Invitation accepted",

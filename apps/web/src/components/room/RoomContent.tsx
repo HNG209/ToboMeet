@@ -127,13 +127,42 @@ export default function RoomContent({ roomId, userId, onBack }: RoomContentProps
         }
       } else if (urlChannel && room?.channels) {
         const matchingChan = room.channels.find(
-          (c: any) => c.name === urlChannel || (c._id && c._id === urlChannel)
+          (c: any) =>
+            c.name === urlChannel ||
+            (c._id && c._id.toString() === urlChannel),
         );
         if (matchingChan) {
           setActiveChannel(matchingChan.name);
         }
       }
     }
+  }, [room?.channels]);
+
+  // Lắng nghe sự kiện chuyển kênh từ thông báo
+  useEffect(() => {
+    const handleNavigateToChannel = (e: any) => {
+      const targetChanId = e.detail?.channelId;
+      const targetChanName = e.detail?.channelName;
+      if (room?.channels) {
+        const matchingChan = room.channels.find(
+          (c: any) =>
+            (targetChanId &&
+              (c._id === targetChanId ||
+                c._id?.toString() === targetChanId)) ||
+            (targetChanName && c.name === targetChanName),
+        );
+        if (matchingChan) {
+          setActiveChannel(matchingChan.name);
+        }
+      }
+    };
+    window.addEventListener("navigate-to-channel", handleNavigateToChannel);
+    return () => {
+      window.removeEventListener(
+        "navigate-to-channel",
+        handleNavigateToChannel,
+      );
+    };
   }, [room?.channels]);
 
   // Lắng nghe sự kiện chuyển trang nhiệm vụ từ PostCard
@@ -356,9 +385,9 @@ export default function RoomContent({ roomId, userId, onBack }: RoomContentProps
       {/* ================= LEFT SIDEBAR (KÊNH) ================= */}
       <div
         className={`
-          fixed inset-y-0 left-0 z-40 shrink-0 transition-transform duration-300 ease-in-out
+          fixed top-12 bottom-0 left-0 z-40 shrink-0 transition-transform duration-300 ease-in-out
           ${isLeftSidebarOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:relative lg:translate-x-0
+          lg:relative lg:top-0 lg:translate-x-0
         `}
       >
         <Sidebar
@@ -376,7 +405,7 @@ export default function RoomContent({ roomId, userId, onBack }: RoomContentProps
       {/* Lớp phủ đen cho Left Sidebar trên Mobile & Tablet (sm & md) */}
       {isLeftSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/40 z-30 lg:hidden"
+          className="fixed top-12 bottom-0 inset-x-0 bg-black/40 z-30 lg:hidden"
           onClick={() => setIsLeftSidebarOpen(false)}
         />
       )}

@@ -26,9 +26,24 @@ let currentServerUrl = DEFAULT_SOCKET_URL;
 function showDesktopNotification(notif) {
   if (!Notification.isSupported()) return;
 
+  const meta = notif.metadata || {};
+  const win = getMainWindow();
+  const currentUrl = win && !win.isDestroyed() ? win.webContents.getURL() : "";
+  const roomId = meta.roomId;
+  const isCurrentlyInRoom = Boolean(roomId && currentUrl.includes(`/room/${roomId}`));
+
+  // Chỉ hiện popup thông báo về các bài đăng trong kênh nếu người dùng đang không ở trong phòng hiện tại
+  if (
+    isCurrentlyInRoom &&
+    (notif.type === "CHANNEL_POST" ||
+      notif.type === "ASSIGNMENT_CREATED" ||
+      notif.type === "CHANNEL_EVENT_CREATED")
+  ) {
+    return;
+  }
+
   let title = "ToboMeet";
   let body = "You have a new notification";
-  const meta = notif.metadata || {};
 
   switch (notif.type) {
     case "KICKED":
@@ -63,6 +78,20 @@ function showDesktopNotification(notif) {
       title = "Room Blocked";
       body = "Your room has been locked due to community guideline violations.";
       break;
+    case "CHANNEL_POST":
+      title = meta.channelName ? `New Post in #${meta.channelName}` : "New Post";
+      body = meta.summary
+        ? `${meta.authorName ? meta.authorName + ": " : ""}${meta.summary}`
+        : `${meta.authorName || "Someone"} posted in #${meta.channelName || "channel"}.`;
+      break;
+    case "ASSIGNMENT_CREATED":
+      title = meta.channelName ? `New Assignment in #${meta.channelName}` : "New Assignment";
+      body = `${meta.authorName || "Teacher"} assigned: ${meta.title || "New assignment"}`;
+      break;
+    case "CHANNEL_EVENT_CREATED":
+      title = meta.channelName ? `New Meeting in #${meta.channelName}` : "Channel Meeting";
+      body = `${meta.hostName || "Host"} scheduled: ${meta.title || "Meeting"}`;
+      break;
     default:
       body = notif.message || notif.title || "You have a new notification";
       break;
@@ -78,8 +107,9 @@ function showDesktopNotification(notif) {
   notification.on("click", () => {
     restoreAndFocus();
 
-    // If it's an event start notification with meeting code, navigate to room
-    if (notif.type === "CALENDAR_START" && meta.meetingCode) {
+    if (meta.roomId && meta.channelId) {
+      navigateTo(`/room/${meta.roomId}?channel=${meta.channelId}`);
+    } else if (notif.type === "CALENDAR_START" && meta.meetingCode) {
       navigateTo(`/meeting/${meta.meetingCode}`);
     }
   });

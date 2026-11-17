@@ -30,6 +30,17 @@ export function EventProvider({
       const cleanup = (window as any).electronAPI.onNavigate((targetUrl: string) => {
         if (targetUrl) {
           router.push(targetUrl);
+          try {
+            const urlObj = new URL(targetUrl, window.location.origin);
+            const channel = urlObj.searchParams.get("channel");
+            if (channel) {
+              window.dispatchEvent(
+                new CustomEvent("navigate-to-channel", {
+                  detail: { channelId: channel },
+                }),
+              );
+            }
+          } catch {}
         }
       });
       return () => {

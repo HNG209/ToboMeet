@@ -10,6 +10,7 @@ import {
   ChevronDown,
   Calendar,
   ExternalLink,
+  Presentation,
 } from "lucide-react";
 import { useEnsureChannelMeetingMutation } from "@/lib/redux/api/meetingsApi";
 
@@ -44,6 +45,29 @@ export default function ChannelMeetingButton({
   );
 
   const [ensureChannelMeeting] = useEnsureChannelMeetingMutation();
+  const [openingWhiteboard, setOpeningWhiteboard] = useState(false);
+
+  const handleOpenWhiteboard = async () => {
+    if (!roomId || !channelId) return;
+    try {
+      setOpeningWhiteboard(true);
+      const res = await ensureChannelMeeting({
+        roomId,
+        channelId,
+      }).unwrap();
+      if (res?.meetingCode) {
+        setIsJoinTooltipOpen(false);
+        setIsMeetingMenuOpen(false);
+        window.open(`/whiteboard/${res.meetingCode}`, "_blank");
+      }
+    } catch (err: any) {
+      toast.error(
+        err?.data?.message || err?.message || "Không thể mở whiteboard",
+      );
+    } finally {
+      setOpeningWhiteboard(false);
+    }
+  };
 
   const handleStartOrJoinMeeting = async (
     target: "current" | "new" = "current",
@@ -144,6 +168,23 @@ export default function ChannelMeetingButton({
                     {t("schedule_meeting")}
                   </span>
                 </button>
+                <button
+                  disabled={openingWhiteboard}
+                  onClick={handleOpenWhiteboard}
+                  className="w-full text-left px-3.5 py-2.5 text-sm text-slate-700 hover:bg-amber-50/60 hover:text-amber-900 rounded-xl flex items-center justify-between gap-2.5 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200">
+                      <Presentation size={16} />
+                    </div>
+                    <span className="font-medium text-slate-800">
+                      {t("open_whiteboard")}
+                    </span>
+                  </div>
+                  {openingWhiteboard && (
+                    <Loader2 size={14} className="animate-spin text-amber-600 shrink-0" />
+                  )}
+                </button>
               </div>
             </>
           )}
@@ -222,6 +263,23 @@ export default function ChannelMeetingButton({
                 <span className="font-medium text-slate-800">
                   {t("schedule_meeting")}
                 </span>
+              </button>
+              <button
+                disabled={openingWhiteboard}
+                onClick={handleOpenWhiteboard}
+                className="w-full text-left px-3.5 py-2.5 text-sm text-slate-700 hover:bg-amber-50/60 hover:text-amber-900 rounded-xl flex items-center justify-between gap-2.5 cursor-pointer transition-colors disabled:opacity-50"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200">
+                    <Presentation size={16} />
+                  </div>
+                  <span className="font-medium text-slate-800">
+                    {t("open_whiteboard")}
+                  </span>
+                </div>
+                {openingWhiteboard && (
+                  <Loader2 size={14} className="animate-spin text-amber-600 shrink-0" />
+                )}
               </button>
             </div>
           </>
@@ -317,6 +375,23 @@ export default function ChannelMeetingButton({
                     {t("schedule_meeting")}
                   </span>
                 </button>
+                <button
+                  disabled={openingWhiteboard}
+                  onClick={handleOpenWhiteboard}
+                  className="w-full text-left px-3.5 py-2.5 text-sm text-slate-700 hover:bg-amber-50/60 hover:text-amber-900 rounded-xl flex items-center justify-between gap-2.5 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200">
+                      <Presentation size={16} />
+                    </div>
+                    <span className="font-medium text-slate-800">
+                      {t("open_whiteboard")}
+                    </span>
+                  </div>
+                  {openingWhiteboard && (
+                    <Loader2 size={14} className="animate-spin text-amber-600 shrink-0" />
+                  )}
+                </button>
               </div>
             </>
           )}
@@ -402,6 +477,23 @@ export default function ChannelMeetingButton({
                   <span className="font-medium text-slate-800">
                     {t("schedule_meeting")}
                   </span>
+                </button>
+                <button
+                  disabled={openingWhiteboard}
+                  onClick={handleOpenWhiteboard}
+                  className="w-full text-left px-3.5 py-2.5 text-sm text-slate-700 hover:bg-amber-50/60 hover:text-amber-900 rounded-xl flex items-center justify-between gap-2.5 cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-200">
+                      <Presentation size={16} />
+                    </div>
+                    <span className="font-medium text-slate-800">
+                      {t("open_whiteboard")}
+                    </span>
+                  </div>
+                  {openingWhiteboard && (
+                    <Loader2 size={14} className="animate-spin text-amber-600 shrink-0" />
+                  )}
                 </button>
               </div>
             </>

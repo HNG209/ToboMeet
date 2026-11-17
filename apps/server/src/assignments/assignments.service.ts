@@ -20,6 +20,7 @@ import type { Response } from "express";
 import { Post, PostDocument } from "../news-feed/schemas/post.schema";
 import { User, UserDocument } from "../users/schemas/user.schema";
 import { AppGateway } from "../core/gateways/app.gateway";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 @Injectable()
 export class AssignmentsService {
@@ -35,6 +36,7 @@ export class AssignmentsService {
     private usersService: UsersService,
     private roomMemberService: RoomMemberService,
     private readonly appGateway: AppGateway,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   private async verifyUserRole(roomId: string, userId: string): Promise<{ isOwner: boolean; isOwnerOrAdmin: boolean; isMember: boolean }> {
@@ -262,6 +264,7 @@ export class AssignmentsService {
       this.assignmentsGateway.notifyAssignmentPublished(saved.roomId, saved.channelId, saved);
       await this.syncAssignmentPosts(saved, userId);
       this.appGateway.server.emit("calendar_event_created", saved);
+      this.emitAssignmentCreatedNotification(saved, userId);
     } else {
       this.assignmentsGateway.notifyAssignmentCreated(saved.roomId, saved.channelId, saved);
     }
@@ -323,6 +326,7 @@ export class AssignmentsService {
     if (wasDraft && saved.status === "published") {
       this.assignmentsGateway.notifyAssignmentPublished(saved.roomId, saved.channelId, saved);
       await this.syncAssignmentPosts(saved, userId);
+      this.emitAssignmentCreatedNotification(saved, userId);
     } else {
       this.assignmentsGateway.notifyAssignmentUpdated(saved.roomId, saved.channelId, saved);
       if (saved.status === "published") {
@@ -333,6 +337,25 @@ export class AssignmentsService {
       this.appGateway.server.emit("calendar_event_updated", saved);
     }
     return saved;
+  }
+
+  private emitAssignmentCreatedNotification(
+    assignment: AssignmentDocument,
+    userId: string,
+  ) {
+    try {
+      this.eventEmitter.emit("notification.assignment_created", {
+        roomId: assignment.roomId,
+        channelId: assignment.channelId || assignment.channelIds?.[0] || "",
+        channelIds: assignment.channelIds || (assignment.channelId ? [assignment.channelId] : []),
+        authorId: userId,
+        title: assignment.title,
+        deadline: assignment.deadline,
+        referenceId: assignment._id.toString(),
+      });
+    } catch (error) {
+      console.error("Lỗi khi phát sự kiện thông báo nhiệm vụ mới:", error);
+    }
   }
 
   async delete(id: string, userId: string) {

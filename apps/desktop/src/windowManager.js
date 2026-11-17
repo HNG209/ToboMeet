@@ -76,8 +76,8 @@ function createMainWindow({ onCloseRequested }) {
 
   // Handle popup windows and external links
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    // 1. Allow meeting rooms in a dedicated popup window
-    if (url.includes("/meeting")) {
+    // 1. Allow meeting rooms and whiteboards in a dedicated popup window
+    if (url.includes("/meeting") || url.includes("/whiteboard")) {
       return {
         action: "allow",
         overrideBrowserWindowOptions: {
@@ -85,7 +85,7 @@ function createMainWindow({ onCloseRequested }) {
           height: 800,
           minWidth: 800,
           minHeight: 600,
-          title: "ToboMeet Meeting Room",
+          title: url.includes("/whiteboard") ? "ToboMeet Whiteboard" : "ToboMeet Meeting Room",
           icon: ICON_PATH,
           autoHideMenuBar: true,
           webPreferences: {
