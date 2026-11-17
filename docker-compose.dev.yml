@@ -32,15 +32,25 @@ services:
   egress:
     image: livekit/egress:latest
     container_name: egress-dev
+    shm_size: "2gb" # Bắt buộc: Cấp đủ Shared Memory cho Chromium render Room Composite mượt mà
+    privileged: true # Cho phép Chromium chạy sandbox mượt mà không bị lỗi quyền
+    cap_add:
+      - SYS_ADMIN
     environment:
       - EGRESS_CONFIG_FILE=/etc/egress.yaml
+      - DISABLE_CUDA=true
+      - DISABLE_NVENC=true
     volumes:
       - ./egress.yaml:/etc/egress.yaml
-      # Mount thư mục ./recordings để video lưu ra máy thật
+      # Mount thư mục ./recordings để lưu tạm nếu cần
       - ./recordings:/out
+      - ./scripts/chrome-wrapper.sh:/opt/google/chrome/google-chrome:ro
     depends_on:
       - livekit
       - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
 
   # 4. WHITEBOARD SYNC SERVER (tldraw SQLite sync server)
   whiteboard:

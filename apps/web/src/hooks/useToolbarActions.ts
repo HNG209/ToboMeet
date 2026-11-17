@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { useLocalParticipant, useRoomContext } from "@livekit/components-react";
+import { ParticipantEvent, Track } from "livekit-client";
 import localforage from "localforage";
 import { toast } from "sonner";
 import { useSelectiveSubscription } from "@/hooks/useSelectiveSubscription";
@@ -78,22 +79,75 @@ export function useToolbarActions() {
       setIsScreenShareLoading(true);
       if (!isScreenShareEnabled) {
         await startScreenShare({ meetingCode: code }).unwrap();
-        await localParticipant.setScreenShareEnabled(true, {
-          audio: true,
-          selfBrowserSurface: "include",
-          systemAudio: "include",
-        });
+
+        // Đợi quyền SCREEN_SHARE được LiveKit Server đồng bộ xuống LocalParticipant
+        const hasScreenSharePerm = () => {
+          const sources = localParticipant.permissions?.canPublishSources;
+          if (!sources || sources.length === 0) return true;
+          return sources.some(
+            (s: any) =>
+              s === 3 ||
+              s === "screen_share" ||
+              s === Track.Source.ScreenShare
+          );
+        };
+
+        if (!hasScreenSharePerm()) {
+          await new Promise<void>((resolve) => {
+            const timeout = setTimeout(() => {
+              localParticipant.off(ParticipantEvent.ParticipantPermissionsChanged, onPermChange);
+              resolve();
+            }, 2500);
+
+            const onPermChange = () => {
+              if (hasScreenSharePerm()) {
+                clearTimeout(timeout);
+                localParticipant.off(ParticipantEvent.ParticipantPermissionsChanged, onPermChange);
+                resolve();
+              }
+            };
+
+            localParticipant.on(ParticipantEvent.ParticipantPermissionsChanged, onPermChange);
+          });
+        }
+
+        try {
+          await localParticipant.setScreenShareEnabled(true, {
+            audio: true,
+            selfBrowserSurface: "include",
+            systemAudio: "include",
+          });
+        } catch (shareErr) {
+          // Rollback nhả khóa trên server nếu người dùng hủy ở browser picker hoặc lỗi thiết bị
+          await stopScreenShare({ meetingCode: code }).unwrap().catch(() => { });
+          throw shareErr;
+        }
       } else {
         await localParticipant.setScreenShareEnabled(false);
         await stopScreenShare({ meetingCode: code }).unwrap();
       }
     } catch (error: any) {
-      const errorMessage =
-        (error?.code && tServer(String(error.code))) ||
-        error?.message ||
-        t("error_occurred") ||
-        "Không thể thực hiện thao tác này.";
-      toast.error(errorMessage);
+      const serverCode = error?.data?.code;
+      let errorMessage = "";
+      if (serverCode) {
+        try {
+          errorMessage = tServer(String(serverCode));
+        } catch {
+          errorMessage = error?.data?.message;
+        }
+      }
+      if (!errorMessage) {
+        errorMessage =
+          error?.message ||
+          t("error_occurred") ||
+          "Không thể thực hiện thao tác này.";
+      }
+      if (
+        error?.name !== "NotAllowedError" &&
+        !error?.message?.includes("Permission denied")
+      ) {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsScreenShareLoading(false);
     }
@@ -114,7 +168,7 @@ export function useToolbarActions() {
     toast(t("confirm_leave_title"), {
       description: t("confirm_leave_description"),
       action: { label: t("confirm_leave_action"), onClick: leaveMeeting },
-      cancel: { label: t("cancel"), onClick: () => {} },
+      cancel: { label: t("cancel"), onClick: () => { } },
       duration: 8000,
     });
   }, [t, leaveMeeting]);

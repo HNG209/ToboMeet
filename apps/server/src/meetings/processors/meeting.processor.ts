@@ -6,7 +6,7 @@ import { AttendanceService } from "../attendance.service";
 import { MeetingsService } from "../meetings.service";
 import { RecordingsService } from "../recordings.service";
 import { MeetingSummaryService } from "../meeting-summary.service";
-import { RecordingWebhookDto, TranscriptReadyWebhookDto } from "@tobomeet/shared/types";
+import { TranscriptReadyWebhookDto } from "@tobomeet/shared/types";
 
 export interface AutoEndBreakoutJobData {
   mainMeetingCode: string;
@@ -17,11 +17,6 @@ export interface AttendanceJobData {
   meetingCode: string;
   userId: string;
   displayName?: string;
-}
-
-export interface ProcessRecordingJobData {
-  meetingCode: string;
-  sessionId?: string;
 }
 
 @Processor("meeting", { concurrency: 10 })
@@ -75,18 +70,6 @@ export class MeetingProcessor extends WorkerHost {
         const { meetingCode } = job.data as { meetingCode: string };
         await this.attendanceService.closeAllOpenVisits(meetingCode);
         await this.meetingsService.endMeetingByCode(meetingCode);
-        break;
-      }
-
-      case "process-recording": {
-        const { meetingCode, sessionId } = job.data as ProcessRecordingJobData;
-        await this.recordingService.handlePostProcessing(meetingCode, sessionId);
-        break;
-      }
-
-      case "process-recording-webhook": {
-        const payload = job.data as RecordingWebhookDto;
-        await this.recordingService.handleWebhookPostProcessing(payload);
         break;
       }
 

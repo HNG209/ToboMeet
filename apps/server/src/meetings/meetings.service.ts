@@ -901,14 +901,15 @@ export class MeetingsService {
       identity,
       participant.metadata, // Giữ nguyên tên, avatar, role...
       {
-        canPublish: participant.permission?.canPublish,
-        canSubscribe: participant.permission?.canSubscribe,
-        canPublishData: participant.permission?.canPublishData,
-        canUpdateMetadata: participant.permission?.canUpdateMetadata,
+        canPublish: participant.permission?.canPublish ?? true,
+        canSubscribe: participant.permission?.canSubscribe ?? true,
+        canPublishData: participant.permission?.canPublishData ?? true,
+        canUpdateMetadata: participant.permission?.canUpdateMetadata ?? true,
         canPublishSources: [
           TrackSource.CAMERA,
           TrackSource.MICROPHONE,
           TrackSource.SCREEN_SHARE,
+          TrackSource.SCREEN_SHARE_AUDIO,
         ],
       },
     );

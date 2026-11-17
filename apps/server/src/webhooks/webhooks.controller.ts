@@ -10,11 +10,11 @@ import {
   Body,
   Logger,
 } from "@nestjs/common";
-import { TrackSource, WebhookReceiver } from "livekit-server-sdk";
+import { WebhookReceiver } from "livekit-server-sdk";
 import { InjectQueue } from "@nestjs/bullmq";
 import { Queue } from "bullmq";
 import { RecordingsService } from "../meetings/recordings.service";
-import { RecordingWebhookDto, TranscriptReadyWebhookDto } from "@tobomeet/shared/types";
+import { TranscriptReadyWebhookDto } from "@tobomeet/shared/types";
 
 @Controller("webhooks")
 export class WebhooksController {
@@ -29,28 +29,6 @@ export class WebhooksController {
       process.env.LIVEKIT_API_KEY!,
       process.env.LIVEKIT_API_SECRET!,
     );
-  }
-
-  @Post('recordings')
-  @HttpCode(HttpStatus.OK)
-  async handleRecordingWebhook(@Body() payload: RecordingWebhookDto) {
-    await this.meetingQueue.add(
-      "process-recording-webhook",
-      payload,
-      {
-        attempts: 3,
-        backoff: { type: "exponential", delay: 5000 },
-        removeOnComplete: 100,
-        removeOnFail: 50,
-      },
-    );
-
-    return {
-      received: true,
-      message: "Recording webhook queued for post-processing",
-      room_name: payload.room_name,
-      session_id: payload.session_id,
-    };
   }
 
   @Post("transcripts/ready")
@@ -100,6 +78,24 @@ export class WebhooksController {
       Boolean((event.participant as any)?.isAgent);
 
     switch (event.event) {
+      case "egress_started":
+        this.logger.log(
+          `[LiveKitWebhook] Egress started: ${event.egressInfo?.egressId} (room: ${event.egressInfo?.roomName})`,
+        );
+        break;
+
+      case "egress_updated":
+        this.logger.log(
+          `[LiveKitWebhook] Egress updated: ${event.egressInfo?.egressId} (status: ${event.egressInfo?.status})`,
+        );
+        break;
+
+      case "egress_ended":
+        if (event.egressInfo) {
+          await this.recordingsService.handleEgressEnded(event.egressInfo);
+        }
+        break;
+
       case "participant_joined":
         if (meetingCode && userId) {
           // Bỏ qua egress client và Agent
@@ -150,15 +146,6 @@ export class WebhooksController {
           );
         }
         break;
-
-      case "track_published":
-        if (event.track.source === TrackSource.SCREEN_SHARE) {
-          await this.recordingsService.handleNewScreenShareTrack(
-            event.room.name, // meetingCode
-            event.track.sid  // trackId
-          );
-
-        }
     }
 
     return { received: true };

@@ -1,7 +1,12 @@
 api_key: "devkey"
 api_secret: "secret"
-ws_url: "ws://livekit:7880" 
+ws_url: "ws://livekit:7880"
+insecure: true
+
 redis:
   address: "redis:6379"
 
-log_level: "info"
+log_level: "debug"
+
+debug:
+  enable_chrome_logging: true
