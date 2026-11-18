@@ -146,16 +146,16 @@ services:
     logging: *default-logging
     shm_size: 128m
     mem_swappiness: 0
-    mem_limit: 640m
-    mem_reservation: 300m
+    mem_limit: 900m
+    mem_reservation: 400m
     cpus: 1.00
     deploy:
       resources:
         limits:
           cpus: "1.00"
-          memory: 640M
+          memory: 900M
         reservations:
-          memory: 300M
+          memory: 400M
     networks:
       - tobomeet-network
 

@@ -112,8 +112,8 @@ TRANSCRIPT_DIR = Path("transcripts")
 TRANSCRIPT_DIR.mkdir(exist_ok=True)
 
 MAX_CONCURRENT_TRANSCRIBING = 3   # Tối đa 3 luồng transcribe cùng lúc trong 1 phòng
-SILENCE_TIMEOUT_SECONDS = 10.0    # Đóng stream Deepgram khi người dùng im lặng > 10.0s (cho phép ngắt nghỉ tự nhiên)
-PRE_ROLL_BUFFER_FRAMES = 20       # Giữ đệm ~400ms audio trước khi nói để không mất âm đầu
+SILENCE_TIMEOUT_SECONDS = 25.0    # Đóng stream Deepgram khi người dùng im lặng > 25.0s (tránh disconnect/reconnect liên tục)
+PRE_ROLL_BUFFER_FRAMES = 60       # Giữ đệm ~1.2s audio trước khi nói để không mất âm/từ đầu câu khi kết nối lại WebSocket
 
 
 def _sync_upload_to_r2(local_file: Path, s3_key: str) -> bool:
