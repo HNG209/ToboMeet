@@ -8,11 +8,44 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
-    "build": "electron-builder"
+    "build": "electron-builder",
+    "build:win": "electron-builder --win nsis"
   },
   "build": {
     "appId": "com.tobomeet.app",
-    "productName": "ToboMeet"
+    "productName": "ToboMeet",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "assets/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "ToboMeet",
+      "uninstallDisplayName": "ToboMeet",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    }
   },
   "devDependencies": {
     "electron": "^28.2.0",

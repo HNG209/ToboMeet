@@ -367,7 +367,10 @@
   "settings": {
     "title": "Cài đặt",
     "cancel": "Hủy bỏ",
+    "save": "Lưu thay đổi",
+    "saved_success": "Đã lưu cài đặt thành công!",
     "tabs": {
+      "general": "Cài đặt chung",
       "language": "Ngôn ngữ",
       "devices": "Quản lý thiết bị",
       "recording": "Ghi hình & Lưu trữ",

@@ -65,7 +65,7 @@ function MeetingPageContent() {
     }
 
     return (
-      <div className="flex flex-col h-screen items-center justify-center bg-[#111] text-white space-y-6">
+      <div className="flex flex-col h-full flex-1 items-center justify-center bg-[#111] text-white space-y-6">
         <style>{`
           @keyframes slideUpFade {
             0% { opacity: 0; transform: translateY(15px); }
@@ -128,6 +128,7 @@ function MeetingPageContent() {
 
   return (
     <LiveKitRoom
+      className="h-full w-full flex flex-col overflow-hidden"
       video={camOn}
       audio={micOn}
       token={meetingData.token}

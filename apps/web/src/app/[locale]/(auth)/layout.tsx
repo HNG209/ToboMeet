@@ -9,7 +9,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-white font-sans">
+    <div className="flex h-full min-h-0 flex-1 w-full overflow-hidden bg-white font-sans">
       <AuthLeftPanel />
 
       <div className="relative flex h-full w-full flex-col bg-[#FAFAFA] lg:w-[45%] xl:w-[40%] border-l border-gray-100">

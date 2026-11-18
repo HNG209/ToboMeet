@@ -19,6 +19,7 @@ import { ChatMessage } from "@tobomeet/shared/types";
 import { useTranslations } from "next-intl";
 import { useRoomSettings } from "@/hooks/useRoomSettings";
 import { useBreakoutTimer } from "@/hooks/useBreakoutTimer";
+import { useIsElectron } from "@/hooks/useIsElectron";
 
 export default function MeetingRoomContent({
   meetingCode,
@@ -36,6 +37,7 @@ export default function MeetingRoomContent({
     isCloudRecordingStopping,
     isHost,
   } = useRoomSettings({ meetingCode: meetingCode });
+  const isElectron = useIsElectron();
   const isBreakoutRoom = roomType === "breakout";
   const isRecording =
     !isCloudRecordingStopping &&
@@ -180,7 +182,11 @@ export default function MeetingRoomContent({
   }, [room]);
 
   return (
-    <div className="flex flex-row h-dvh w-screen bg-[#0d0d10] text-slate-100 overflow-hidden font-sans fixed inset-0">
+    <div
+      className={`flex flex-row w-screen bg-[#0d0d10] text-slate-100 overflow-hidden font-sans fixed inset-x-0 bottom-0 ${
+        isElectron ? "top-8" : "top-0"
+      }`}
+    >
       {/* MAIN MEETING COLUMN (Header, Video Grid, Toolbar) */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden transition-all duration-300">
         <header className="h-14 shrink-0 px-5 flex items-center justify-between bg-[#111113] border-b border-[#232328] z-10">

@@ -222,6 +222,7 @@ export class UsersService {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       email: user.email,
+      role: user.role,
       hasUnreadNotifications: user.hasUnreadNotifications,
     };
   }
@@ -1409,6 +1410,7 @@ export class UsersService {
       displayName: user.displayName,
       avatarUrl: user.avatarUrl,
       email: user.email,
+      role: user.role,
       hasUnreadNotifications: user.hasUnreadNotifications,
     };
   }

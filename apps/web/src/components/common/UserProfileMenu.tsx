@@ -10,12 +10,15 @@ import {
   Loader2,
   User,
   ExternalLink,
+  ShieldCheck,
 } from "lucide-react";
+import { useRouter } from "@/i18n/navigation";
 import UserAvatar from "./UserAvatar";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { useEnsurePersonalMeetingMutation } from "@/lib/redux/api/meetingsApi";
 import EditProfileModal from "./EditProfileModal";
+import { createClient } from "@/lib/supabase/client";
 
 interface UserProfileMenuProps {
   user?: UserResponse;
@@ -29,9 +32,31 @@ export default function UserProfileMenu({
   onLogout,
 }: UserProfileMenuProps) {
   const t = useTranslations("dashboard");
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
+  const [supabaseRole, setSupabaseRole] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data }) => {
+        const role =
+          data?.user?.app_metadata?.role ||
+          (data?.user as any)?.role ||
+          data?.user?.user_metadata?.role;
+        if (role) {
+          setSupabaseRole(role);
+        }
+      });
+    } catch { }
+  }, []);
+
+  const isAdmin =
+    (user as any)?.role === "admin" ||
+    (user as any)?.app_metadata?.role === "admin" ||
+    supabaseRole === "admin";
 
   const [ensurePersonalMeeting, { isLoading: isCopyingLink }] =
     useEnsurePersonalMeetingMutation();
@@ -124,6 +149,25 @@ export default function UserProfileMenu({
                   })}
                 </span>
               </button>
+
+              {/* Chế độ quản trị (chỉ hiển thị với tài khoản Admin) */}
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    router.push("/admin");
+                  }}
+                  className="flex items-center gap-3 px-4 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-brand-600 transition-colors w-full text-left cursor-pointer group"
+                >
+                  <ShieldCheck className="w-4 h-4 text-slate-400 group-hover:text-brand-500 transition-colors" />
+                  <span className="truncate">
+                    {t("admin_mode", {
+                      defaultValue: "Chế độ quản trị",
+                    })}
+                  </span>
+                </button>
+              )}
 
               {/* Sao chép link cuộc họp cá nhân */}
               <button

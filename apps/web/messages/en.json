@@ -380,7 +380,10 @@
   "settings": {
     "title": "Settings",
     "cancel": "Cancel",
+    "save": "Save Changes",
+    "saved_success": "Settings saved successfully!",
     "tabs": {
+      "general": "General Settings",
       "language": "Language",
       "devices": "Devices",
       "recording": "Recording & Storage",

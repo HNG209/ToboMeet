@@ -60,7 +60,10 @@ app.whenReady().then(() => {
   initMainSocket();
 
   // 4. Create primary window
+  const isHiddenStartup = process.argv.includes("--hidden") || process.argv.includes("--minimized");
+
   const mainWindow = createMainWindow({
+    startHidden: isHiddenStartup,
     onCloseRequested: (event) => {
       if (!isQuitting) {
         event.preventDefault();

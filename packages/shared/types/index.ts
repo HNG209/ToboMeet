@@ -6,6 +6,7 @@ export interface UserResponse {
   supabaseId: string;
   displayName?: string;
   avatarUrl?: string;
+  role?: string;
   hasUnreadNotifications?: boolean;
   createdAt?: string;
   updatedAt?: string;

@@ -14,11 +14,13 @@ import ReportManagement from "@/components/admin/reports/ReportManagement";
 import SettingsDialog from "@/components/dashboard/SettingsDialog";
 import { useRouter } from "next/navigation";
 import { useTranslations, useLocale } from "next-intl";
+import { useIsElectron } from "@/hooks/useIsElectron";
 
 function AdminDashboardContent() {
   const router = useRouter();
   const locale = useLocale();
   const t = useTranslations("admin");
+  const isElectron = useIsElectron();
   const [activeTab, setActiveTab] = useState<"overview" | "users" | "rooms" | "reports">("overview");
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [showSettingsDropdown, setShowSettingsDropdown] = useState(false);
@@ -45,9 +47,20 @@ function AdminDashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 flex flex-col md:flex-row">
-      {/* Mobile Top Header */}
-      <div className="md:hidden flex items-center justify-between px-4 py-3.5 bg-white border-b border-slate-200 sticky top-0 z-40">
+    <div
+      className={`flex flex-col md:flex-row overflow-hidden bg-slate-50/50 ${
+        isElectron ? "h-[calc(100vh-2rem)]" : "h-screen"
+      }`}
+    >
+      {/* Mobile Top Header (Dấu 3 gạch bên trái cùng chiều mở với Sidebar) */}
+      <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-slate-200 sticky top-0 z-40 shrink-0">
+        <button
+          onClick={() => setIsMobileOpen(!isMobileOpen)}
+          className="p-1.5 -ml-1 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors"
+          title="Menu"
+        >
+          {isMobileOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </button>
         <div className="flex items-center gap-2">
           <div className="relative flex h-8 w-8 items-center justify-center">
             <div className="absolute inset-0 bg-gradient-to-tr from-brand-600 to-indigo-500 rounded-lg transform rotate-3 shadow-sm"></div>
@@ -60,27 +73,27 @@ function AdminDashboardContent() {
             Tobo<span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-600 to-indigo-500">Meet</span>
           </span>
         </div>
-        <button
-          onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="p-1.5 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
-        >
-          {isMobileOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-        </button>
       </div>
 
       {/* Sidebar Drawer overlay on mobile */}
       {isMobileOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200"
+          className={`fixed inset-x-0 bottom-0 bg-slate-900/40 backdrop-blur-sm z-40 md:hidden animate-in fade-in duration-200 ${
+            isElectron ? "top-8" : "top-0"
+          }`}
           onClick={() => setIsMobileOpen(false)}
         />
       )}
 
-      {/* Sticky/Fixed Sidebar */}
+      {/* Sidebar: Giữ cố định trong khung nhìn, không bị che bởi title bar khi thu nhỏ */}
       <aside
-        className={`fixed md:sticky top-0 left-0 h-screen bg-white border-r border-slate-200 z-50 flex flex-col transition-all duration-300 ${
+        className={`fixed md:relative left-0 bg-white border-r border-slate-200 z-50 flex flex-col transition-all duration-300 shrink-0 ${
           isMobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-        } ${isCollapsed ? "w-16" : "w-60"}`}
+        } ${isCollapsed ? "w-16" : "w-60"} ${
+          isElectron
+            ? "top-8 h-[calc(100dvh-2rem)] md:top-0 md:h-full"
+            : "top-0 h-screen md:top-0 md:h-full"
+        }`}
       >
         {/* Sidebar Brand header */}
         <div className="relative flex items-center justify-center px-4 py-5 border-b border-slate-100 h-16 shrink-0">
@@ -256,7 +269,7 @@ function AdminDashboardContent() {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 min-h-screen py-8 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
+      <main className="flex-1 h-full overflow-y-auto py-8 px-4 sm:px-6 lg:px-8 overflow-x-hidden">
         <div className="max-w-7xl mx-auto">
           {activeTab === "overview" ? (
             <>

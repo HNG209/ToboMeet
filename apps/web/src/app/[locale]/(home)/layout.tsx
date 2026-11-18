@@ -15,6 +15,7 @@ import StoreProvider from "@/lib/redux/StoreProvider";
 import ToboAgentChat from "@/components/ai-agent/ToboAgentChat";
 import GlobalSearch from "@/components/common/GlobalSearch";
 import UserProfileMenu from "@/components/common/UserProfileMenu";
+import DesktopWindowControls from "@/components/common/DesktopWindowControls";
 
 // Persistent Tab Views
 import DashboardContent from "@/components/dashboard/DashboardContent";
@@ -224,9 +225,15 @@ function HomeLayoutInner({
       {/* Container chính với Top Header và Main Content */}
       <div className="h-screen h-[100dvh] bg-[#f5f5f5] font-sans flex flex-col overflow-hidden">
         {/* ── Global Top Bar (Teams Style) ── */}
-        <header className="h-12 bg-white border-b border-slate-200/80 px-3 md:px-5 flex items-center justify-between shrink-0 z-50 select-none">
+        <header
+          style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+          className="h-12 bg-white border-b border-slate-200/80 px-3 md:px-5 flex items-center justify-between shrink-0 z-50 select-none"
+        >
           {/* Góc trái: Logo ToboMeet */}
-          <div className="flex items-center gap-2.5 w-44 md:w-56 shrink-0">
+          <div
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+            className="flex items-center gap-2.5 w-44 md:w-56 shrink-0"
+          >
             <Link
               href="/dashboard"
               onClick={(e) => handleTabClick(e, "teams", "/dashboard")}
@@ -244,12 +251,18 @@ function HomeLayoutInner({
           </div>
 
           {/* Ở giữa: Thanh tìm kiếm chung (Global Search) */}
-          <div className="flex-1 max-w-xl mx-2 md:mx-4 flex justify-center">
+          <div
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+            className="flex-1 max-w-xl mx-2 md:mx-4 flex justify-center"
+          >
             <GlobalSearch />
           </div>
 
-          {/* Góc phải: Nút Chuông Thông báo + Menu Avatar User */}
-          <div className="flex items-center justify-end gap-1.5 sm:gap-2.5 w-44 md:w-56 shrink-0">
+          {/* Góc phải: Nút Chuông Thông báo + Menu Avatar User + Điều khiển cửa sổ Desktop */}
+          <div
+            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
+            className="flex items-center justify-end gap-1.5 sm:gap-2.5 shrink-0"
+          >
             {/* Cụm thông báo lơ lửng gắn liền với Icon chuông */}
             <div className="relative">
               <button
@@ -282,6 +295,9 @@ function HomeLayoutInner({
               onOpenSettings={() => setShowSettingsDialog(true)}
               onLogout={handleLogout}
             />
+
+            {/* Nút điều khiển cửa sổ Desktop */}
+            <DesktopWindowControls variant="header" />
           </div>
         </header>
 

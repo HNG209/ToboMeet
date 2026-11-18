@@ -10,6 +10,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google';
 import { routing } from '@/i18n/routing';
 import { GlobalSocketListeners } from '@/providers/GlobalSocketListeners';
 import TopLoadingBar from '@/components/common/TopLoadingBar';
+import DesktopTitleBar from '@/components/common/DesktopTitleBar';
 import '../globals.css';
 
 // ─── Viewport Configuration ───────────────────────────────────────────────────
@@ -91,13 +92,16 @@ export default async function LocaleLayout({ children, params }: LocaleLayoutPro
 
   return (
     <html lang={locale} className={`scroll-smooth ${plusJakartaSans.variable}`}>
-      <body className="antialiased">
+      <body className="antialiased min-h-screen flex flex-col">
         <NextIntlClientProvider messages={messages}>
+          <DesktopTitleBar />
           <Suspense fallback={null}>
             <TopLoadingBar />
           </Suspense>
           <GlobalSocketListeners />
-          {children}
+          <div className="flex-1 flex flex-col min-h-0">
+            {children}
+          </div>
         </NextIntlClientProvider>
       </body>
     </html>

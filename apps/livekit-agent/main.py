@@ -106,6 +106,7 @@ async def translate_text(text: str, source_lang: str, target_lang: str) -> str:
 
 logger = logging.getLogger("stt-agent")
 logger.setLevel(logging.INFO)
+logging.getLogger("deepl").setLevel(logging.WARNING)
 
 TRANSCRIPT_DIR = Path("transcripts")
 TRANSCRIPT_DIR.mkdir(exist_ok=True)

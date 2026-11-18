@@ -37,6 +37,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("navigate-to", listener);
   },
 
+  // Auto-start settings API
+  getAutoStart: () => ipcRenderer.invoke("app:get-auto-start"),
+  setAutoStart: (enable) => ipcRenderer.invoke("app:set-auto-start", enable),
+
+  // Window controls API for frameless title bar
+  windowControls: {
+    minimize: () => ipcRenderer.send("window:minimize"),
+    toggleMaximize: () => ipcRenderer.send("window:toggle-maximize"),
+    close: () => ipcRenderer.send("window:close"),
+    isMaximized: () => ipcRenderer.invoke("window:is-maximized"),
+    onMaximizeChange: (callback) => {
+      const listener = (_event, isMaximized) => callback(isMaximized);
+      ipcRenderer.on("window:maximize-change", listener);
+      return () => ipcRenderer.removeListener("window:maximize-change", listener);
+    },
+  },
+
   // Socket.IO Bridge API
   socket: {
     emit: (eventName, ...args) => {

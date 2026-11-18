@@ -19,13 +19,15 @@ function normalizeSocketUrl(url) {
 
 const DEFAULT_SOCKET_URL = isDev
   ? process.env.SOCKET_URL || "http://127.0.0.1:3001"
-  : "https://tobomeet.com";
+  : process.env.SOCKET_URL || "https://tobomeet.com";
+
+const PRODUCTION_URL = "https://tobo-meet.vercel.app";
 
 const TARGET_URL = isDev
-  ? "http://localhost:3000/login"
-  : "https://tobomeet.com/login";
+  ? "http://localhost:3000"
+  : PRODUCTION_URL;
 
-const CLIENT_ORIGIN = isDev ? "http://localhost:3000" : "https://tobomeet.com";
+const CLIENT_ORIGIN = isDev ? "http://localhost:3000" : PRODUCTION_URL;
 
 const APP_ID = "com.tobomeet.app";
 const APP_NAME = "ToboMeet";
