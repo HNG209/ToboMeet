@@ -3,13 +3,15 @@
   "productName": "ToboMeet",
   "version": "0.1.0",
   "description": "ToboMeet Desktop App - Electron wrapper for Next.js",
+  "author": "HueVuong",
   "main": "main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
     "dev": "electron .",
     "build": "electron-builder",
-    "build:win": "electron-builder --win nsis"
+    "build:win": "electron-builder --win nsis",
+    "release": "electron-builder --win nsis --publish always"
   },
   "build": {
     "appId": "com.tobomeet.app",
@@ -17,6 +19,13 @@
     "directories": {
       "output": "dist"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "HNG209",
+        "repo": "ToboMeet"
+      }
+    ],
     "files": [
       "main.js",
       "preload.js",
