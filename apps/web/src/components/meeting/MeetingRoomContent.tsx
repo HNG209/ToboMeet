@@ -33,10 +33,13 @@ export default function MeetingRoomContent({
     breakoutDuration,
     recordingInfo,
     isCloudRecordingActive,
+    isCloudRecordingStopping,
     isHost,
   } = useRoomSettings({ meetingCode: meetingCode });
   const isBreakoutRoom = roomType === "breakout";
-  const isRecording = isLivekitRecording || isCloudRecordingActive || !!recordingInfo?.isRecording;
+  const isRecording =
+    !isCloudRecordingStopping &&
+    (isLivekitRecording || isCloudRecordingActive || (!!recordingInfo?.isRecording && recordingInfo?.status !== "stopping"));
 
   const timeDisplay = useBreakoutTimer({
     startedAt: breakoutStartedAt,
@@ -196,14 +199,11 @@ export default function MeetingRoomContent({
             {/* Trạng thái ghi hình cạnh tên phòng chính */}
             {isRecording && !isBreakoutRoom && (
               <div
-                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold select-none shadow-sm shadow-red-500/10 animate-fade-in"
+                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-600 text-white text-xs font-bold select-none shadow-sm shadow-red-600/30 tracking-wider animate-fade-in"
                 title={t("toolbar.recording_in_progress")}
               >
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                </span>
-                <span className="tracking-wider">REC</span>
+                <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0"></span>
+                <span>REC</span>
               </div>
             )}
           </div>

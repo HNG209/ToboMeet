@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useIsRecording, useRoomContext } from "@livekit/components-react";
 import { toast } from "sonner";
 import {
@@ -17,12 +17,20 @@ export function useCloudRecorder({
   const room = useRoomContext();
   const targetCode = meetingCode || room?.name;
 
-  const isRecording = useIsRecording();
+  const isLivekitRecording = useIsRecording();
+  const [isFinalizingStop, setIsFinalizingStop] = useState(false);
 
   const [startCloudRecordingApi, { isLoading: isStarting }] =
     useStartCloudRecordingMutation();
-  const [stopCloudRecordingApi, { isLoading: isStopping }] =
+  const [stopCloudRecordingApi, { isLoading: isStoppingApi }] =
     useStopCloudRecordingMutation();
+
+  // Khi LiveKit room ghi nhận Egress đã thoát hẳn -> giải phóng cờ đang dừng
+  useEffect(() => {
+    if (!isLivekitRecording) {
+      setIsFinalizingStop(false);
+    }
+  }, [isLivekitRecording]);
 
   const startRecording = useCallback(async () => {
     if (!targetCode) return;
@@ -51,6 +59,7 @@ export function useCloudRecorder({
     if (!targetCode) return;
     try {
       await stopCloudRecordingApi({ meetingCode: targetCode }).unwrap();
+      setIsFinalizingStop(true);
       toast.success(t("cloud_recording_stopped"));
     } catch (error: any) {
       console.error("Lỗi khi dừng ghi hình trên cloud:", error);
@@ -69,6 +78,9 @@ export function useCloudRecorder({
       }
     }
   }, [targetCode, stopCloudRecordingApi, t, tServer]);
+
+  const isStopping = isStoppingApi || isFinalizingStop;
+  const isRecording = isLivekitRecording && !isFinalizingStop;
 
   const toggleRecording = useCallback(async () => {
     if (isRecording) {

@@ -160,6 +160,7 @@ export class RecordingsService {
             // 7. Cập nhật LiveKit Room Metadata để đồng bộ realtime trạng thái người quay
             roomMeta.recording = {
                 isRecording: true,
+                status: "recording",
                 recorderId: userId || "",
                 startedAt: timestamp,
                 egressId: egressInfo.egressId,
@@ -238,9 +239,10 @@ export class RecordingsService {
             await Promise.all(stopPromises);
             this.logger.log(`[RecordingsService] Đã gửi lệnh dừng ${activeEgresses.length} Egress cho phòng ${meetingCode}`);
 
-            // Cập nhật metadata xoá thông tin quay
+            // Cập nhật metadata: chuyển sang trạng thái đang dừng để tất cả client trong phòng đồng bộ
             if (this.livekitRoomService && roomMeta.recording) {
-                delete roomMeta.recording;
+                roomMeta.recording.isRecording = false;
+                roomMeta.recording.status = "stopping";
                 await this.livekitRoomService.updateRoomMetadata(
                     meetingCode,
                     JSON.stringify(roomMeta),
@@ -289,6 +291,25 @@ export class RecordingsService {
 
         const { egressId, roomName: meetingCode, status } = egressInfo;
         this.logger.log(`[RecordingsService] Nhận webhook egress_ended: ${egressId} (room: ${meetingCode}, status: ${status})`);
+
+        // Dọn dẹp cờ recording trong room metadata khi Egress đã thoát hẳn
+        if (this.livekitRoomService && meetingCode) {
+            try {
+                const rooms = await this.livekitRoomService.listRooms([meetingCode]);
+                if (rooms && rooms.length > 0 && rooms[0].metadata) {
+                    const meta = JSON.parse(rooms[0].metadata);
+                    if (meta.recording) {
+                        delete meta.recording;
+                        await this.livekitRoomService.updateRoomMetadata(
+                            meetingCode,
+                            JSON.stringify(meta),
+                        );
+                    }
+                }
+            } catch (e) {
+                this.logger.error(`[RecordingsService] Lỗi dọn dẹp metadata sau khi Egress kết thúc: ${meetingCode}`, e);
+            }
+        }
 
         if (status !== EgressStatus.EGRESS_COMPLETE && status !== 3) {
             this.logger.error(

@@ -297,6 +297,7 @@ export default function CustomToolbar({
   const {
     isRecording: isCloudRecording,
     isLoading: isCloudRecordingLoading,
+    isStopping: isStoppingCloudRecording,
     startRecording: startCloudRecording,
     stopRecording: stopCloudRecording,
   } = useCloudRecorder({
@@ -330,6 +331,7 @@ export default function CustomToolbar({
     isEndingBreakout,
     recordingInfo,
     isCloudRecordingActive,
+    isCloudRecordingStopping,
     isRecordingByMe,
     isRecordingByOther,
 
@@ -342,8 +344,16 @@ export default function CustomToolbar({
     meetingCode,
   });
 
+  const isAnyRecordingStopping =
+    isStoppingCloudRecording ||
+    isCloudRecordingStopping ||
+    recordingInfo?.status === "stopping";
+
   const isEffectiveCloudRecording =
-    isCloudRecording || isCloudRecordingActive || !!recordingInfo?.isRecording;
+    !isAnyRecordingStopping &&
+    (isCloudRecording || isCloudRecordingActive || (!!recordingInfo?.isRecording && recordingInfo?.status !== "stopping"));
+
+  const isRecordingActive = isEffectiveCloudRecording || isLocalRecording;
 
   const canShowCloudRecordOption = isEffectiveCloudRecording
     ? isRecordingByMe
@@ -711,259 +721,126 @@ export default function CustomToolbar({
           </span>
         </button>
 
-        {/* ================= NÚT GHI HÌNH VỚI TOOLTIP / POPOVER MENU ================= */}
+        {/* ================= NÚT GHI HÌNH (SPLIT BUTTON) ================= */}
         <div className="relative h-11 hidden md:flex items-center">
+          {/* NÚT CHÍNH */}
           <button
-            onClick={() => setIsRecordMenuOpen(!isRecordMenuOpen)}
-            disabled={isCloudRecordingLoading}
-            className={getBtnStyle(
-              isRecordMenuOpen || isEffectiveCloudRecording || isLocalRecording,
-              isEffectiveCloudRecording
-                ? "text-red-400"
-                : isLocalRecording
-                  ? "text-amber-400"
-                  : "text-blue-400",
-            )}
-            title={t("record")}
+            onClick={() => {
+              if (isRecordingActive) {
+                if (isEffectiveCloudRecording) {
+                  stopCloudRecording();
+                } else if (isLocalRecording) {
+                  stopLocalRecording();
+                }
+              } else if (!isAnyRecordingStopping) {
+                handleConfirmStartCloudRecording();
+              }
+            }}
+            disabled={isAnyRecordingStopping || (isRecordingActive ? isRecordingByOther : false)}
+            title={
+              isAnyRecordingStopping
+                ? (t("stopping_recording") || "Đang dừng...")
+                : isRecordingActive
+                  ? t("stop_recording")
+                  : t("record")
+            }
+            className={`hidden md:flex relative flex-col items-center justify-center min-w-[50px] sm:min-w-[58px] h-11 px-2 transition-all cursor-pointer ${
+              isRecordingActive
+                ? "bg-red-600 hover:bg-red-500 text-white rounded-lg shadow-sm"
+                : isAnyRecordingStopping
+                  ? "bg-red-800/80 text-white/80 rounded-lg cursor-wait"
+                  : `rounded-l-lg ${getBtnStyle(
+                      isRecordMenuOpen,
+                      "text-blue-400",
+                    )}`
+            } ${isRecordingByOther ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             <div className="relative flex items-center justify-center">
-              {isCloudRecordingLoading ? (
-                <Loader2 size={21} className="animate-spin text-red-500" />
-              ) : isEffectiveCloudRecording ? (
-                <div className="relative flex items-center justify-center">
-                  <Disc size={21} className="text-red-500 animate-spin" />
-                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                  </span>
-                </div>
-              ) : isLocalRecording ? (
-                <div className="relative flex items-center justify-center">
-                  <Disc size={21} className="text-amber-500 animate-pulse" />
-                  <span className="absolute -top-1 -right-1 flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                  </span>
-                </div>
+              {isCloudRecordingLoading || isAnyRecordingStopping ? (
+                <Loader2 size={21} className="animate-spin text-white" />
+              ) : isRecordingActive ? (
+                <Disc size={21} className="text-white" />
               ) : (
                 <Disc
                   size={21}
                   className={isRecordMenuOpen ? "text-blue-400" : "text-slate-300"}
                 />
               )}
-              <ChevronUp
-                size={11}
-                className={`absolute -top-1.5 -right-4.5 text-slate-400 transition-transform duration-200 ${isRecordMenuOpen ? "rotate-180 text-white" : ""
-                  }`}
-              />
             </div>
             <span
-              className={`text-[10px] mt-0.5 hidden sm:block font-medium ${isEffectiveCloudRecording
-                ? "text-red-500 font-semibold"
-                : isLocalRecording
-                  ? "text-amber-500 font-semibold"
+              className={`text-[10px] mt-0.5 hidden sm:block font-medium ${
+                isRecordingActive || isAnyRecordingStopping
+                  ? "text-white font-semibold"
                   : isRecordMenuOpen
                     ? "text-blue-400 font-medium"
                     : ""
-                }`}
+              }`}
             >
-              {t("record")}
+              {isAnyRecordingStopping
+                ? (t("stopping_recording") || "Đang dừng...")
+                : isRecordingActive
+                  ? t("stop_recording")
+                  : t("record")}
             </span>
           </button>
 
-          {/* MENU TOOLTIP / POPOVER TÙY CHỌN GHI HÌNH */}
-          {isRecordMenuOpen && (
+          {/* NÚT MŨI TÊN CHEVRON (SPLIT BUTTON): CHỈ HIỆN KHI CHƯA QUAY VÀ KHÔNG ĐANG DỪNG */}
+          {!isRecordingActive && !isAnyRecordingStopping && (
+            <button
+              onClick={() => {
+                setIsRecordMenuOpen(!isRecordMenuOpen);
+              }}
+              title={t("record_options")}
+              className={`h-11 px-1.5 rounded-r-lg flex items-center justify-center transition-all cursor-pointer text-slate-400 hover:bg-white/5 hover:text-white ${
+                isRecordMenuOpen ? "text-white bg-white/10" : ""
+              }`}
+            >
+              <ChevronUp
+                size={13}
+                className={`transition-transform duration-200 ${
+                  isRecordMenuOpen ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+          )}
+
+          {/* MENU POPOVER TÙY CHỌN GHI HÌNH TỐI GIẢN */}
+          {isRecordMenuOpen && !isRecordingActive && !isAnyRecordingStopping && (
             <>
               <div
                 className="fixed inset-0 z-40"
                 onClick={() => setIsRecordMenuOpen(false)}
-              ></div>
-              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-72 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl py-1.5 animate-in fade-in zoom-in-95 duration-150">
-                <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#232328] mb-1 flex items-center justify-between">
-                  <span>{t("record_options")}</span>
-                  {(isEffectiveCloudRecording || isLocalRecording) && (
-                    <span className="flex items-center gap-1 text-[9px] text-red-400 font-semibold lowercase bg-red-500/10 px-1.5 py-0.5 rounded border border-red-500/20">
-                      <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></span>
-                      {t("recording_in_progress")}
-                    </span>
-                  )}
-                </div>
-
-                {/* OPTION 1: GHI HÌNH TRÊN ĐÁM MÂY (CLOUD RECORDING) */}
+              />
+              <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 z-50 w-52 bg-[#161619] border border-[#232328] rounded-lg shadow-2xl p-1 animate-in fade-in zoom-in-95 duration-150">
+                {/* OPTION 1: GHI HÌNH TRÊN ĐÁM MÂY (CLOUD) */}
                 {canShowCloudRecordOption && (
-                  <div className="px-1.5 py-1">
-                    {isInBreakoutRoom ? (
-                      <div className="w-full text-left p-2 rounded-md bg-[#131315] border border-[#232328] opacity-50 cursor-not-allowed flex items-start gap-2.5 select-none">
-                        <div className="p-2 rounded-lg bg-slate-800 text-slate-500 shrink-0 mt-0.5">
-                          <Cloud size={16} />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-slate-400 flex items-center justify-between">
-                            <span>{t("record_cloud")}</span>
-                            <span className="text-[9px] px-1.5 py-0.2 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">
-                              Cloud
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                            {t("cannot_record_breakout")}
-                          </p>
-                        </div>
-                      </div>
-                    ) : !isEffectiveCloudRecording ? (
-                      <button
-                        type="button"
-                        disabled={isCloudRecordingLoading || isRecordingByOther}
-                        onClick={handleConfirmStartCloudRecording}
-                        className="w-full text-left p-2 rounded-md hover:bg-[#232328] flex items-start gap-2.5 transition-colors group cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <div className="p-2 rounded-lg bg-red-500/10 text-red-400 group-hover:bg-red-500/20 transition-colors shrink-0 mt-0.5">
-                          {isCloudRecordingLoading ? (
-                            <Loader2 size={16} className="animate-spin text-red-500" />
-                          ) : (
-                            <Cloud size={16} />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-slate-200 group-hover:text-white flex items-center justify-between">
-                            <span>{t("record_cloud")}</span>
-                            <span className="text-[9px] px-1.5 py-0.2 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">
-                              Cloud
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                            {isRecordingByOther
-                              ? t("recording_by_other")
-                              : t("record_cloud_desc")}
-                          </p>
-                        </div>
-                      </button>
-                    ) : (
-                      <div className="p-2 rounded-md bg-red-950/20 border border-red-900/30 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="relative flex items-center justify-center shrink-0">
-                            <Cloud size={16} className="text-red-400 animate-pulse" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold text-red-400 truncate">
-                              {t("record_cloud")}
-                            </div>
-                            <div className="text-[10px] text-slate-400">
-                              {`${t("recording_in_progress")}...`}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={isCloudRecordingLoading}
-                          onClick={() => {
-                            setIsRecordMenuOpen(false);
-                            stopCloudRecording();
-                          }}
-                          className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
-                        >
-                          {isCloudRecordingLoading ? (
-                            <Loader2 size={12} className="animate-spin" />
-                          ) : (
-                            <Square size={11} fill="currentColor" />
-                          )}
-                          <span>{t("stop_recording")}</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
+                  <button
+                    type="button"
+                    disabled={isCloudRecordingLoading || isRecordingByOther || isInBreakoutRoom}
+                    onClick={() => {
+                      setIsRecordMenuOpen(false);
+                      handleConfirmStartCloudRecording();
+                    }}
+                    className="w-full text-left px-2.5 py-2 rounded-md hover:bg-[#232328] flex items-center gap-2.5 text-xs font-medium text-slate-200 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Cloud size={16} className="text-blue-400 shrink-0" />
+                    <span className="truncate">{t("record_cloud")}</span>
+                  </button>
                 )}
 
-                {/* OPTION 2: GHI HÌNH CỤC BỘ (LOCAL RECORDING) */}
-                <div className="px-1.5 pb-1">
-                  {!isElectron ? (
-                    <div
-                      className="w-full text-left p-2 rounded-md bg-[#131315] border border-[#232328] opacity-40 cursor-not-allowed flex items-start gap-2.5 select-none"
-                      title={t("electron_only_badge")}
-                    >
-                      <div className="p-2 rounded-lg bg-slate-800 text-slate-500 shrink-0 mt-0.5">
-                        <Laptop size={16} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-slate-400 flex items-center justify-between">
-                          <span>{t("record_local")}</span>
-                          <span className="text-[9px] px-1.5 py-0.2 bg-slate-800 text-slate-400 rounded border border-slate-700">
-                            Local
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                          {t("record_local_desc")}
-                        </p>
-                        <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-500/80 font-medium">
-                          <Info size={11} />
-                          <span>{t("electron_only_badge")}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : !isLocalRecording ? (
-                    <button
-                      type="button"
-                      onClick={handleConfirmStartLocalRecording}
-                      className="w-full text-left p-2 rounded-md hover:bg-[#232328] flex items-start gap-2.5 transition-colors group cursor-pointer"
-                    >
-                      <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 group-hover:bg-amber-500/20 transition-colors shrink-0 mt-0.5">
-                        <Laptop size={16} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold text-slate-200 group-hover:text-white flex items-center justify-between">
-                          <span>{t("record_local")}</span>
-                          <span className="text-[9px] px-1.5 py-0.2 bg-amber-500/10 text-amber-400 rounded border border-amber-500/20">
-                            Desktop
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                          {t("record_local_desc")}
-                        </p>
-                      </div>
-                    </button>
-                  ) : (
-                    <div className="p-2 rounded-md bg-amber-950/20 border border-amber-900/30 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="relative flex items-center justify-center shrink-0">
-                          <Laptop size={16} className="text-amber-400 animate-pulse" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold text-amber-400 truncate">
-                            {t("record_local")}
-                          </div>
-                          <div className="text-[10px] text-slate-400">
-                            {isLocalPaused ? t("pause") : `${t("recording_in_progress")}...`}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={isLocalPaused ? resumeLocalRecording : pauseLocalRecording}
-                          className="p-1.5 text-xs text-amber-400 hover:bg-white/10 rounded transition-colors cursor-pointer"
-                          title={isLocalPaused ? t("resume") : t("pause")}
-                        >
-                          {isLocalPaused ? (
-                            <Play size={13} fill="currentColor" />
-                          ) : (
-                            <Pause size={13} fill="currentColor" />
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsRecordMenuOpen(false);
-                            stopLocalRecording();
-                          }}
-                          className="px-2 py-1 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded transition-colors flex items-center gap-1 cursor-pointer"
-                          title={t("stop_recording")}
-                        >
-                          <Square size={11} fill="currentColor" />
-                          <span>{t("stop_recording")}</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                {/* OPTION 2: GHI HÌNH CỤC BỘ (LOCAL) */}
+                <button
+                  type="button"
+                  disabled={!isElectron}
+                  onClick={() => {
+                    setIsRecordMenuOpen(false);
+                    handleConfirmStartLocalRecording();
+                  }}
+                  className="w-full text-left px-2.5 py-2 rounded-md hover:bg-[#232328] flex items-center gap-2.5 text-xs font-medium text-slate-200 hover:text-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Laptop size={16} className="text-amber-400 shrink-0" />
+                  <span className="truncate">{t("record_local")}</span>
+                </button>
               </div>
             </>
           )}

@@ -555,6 +555,7 @@ export interface MainRoomMetadata extends BaseRoomMetadata {
     isRecording: boolean;
     recorderId: string;
     startedAt?: number;
+    status?: "recording" | "stopping";
   };
 }
 

@@ -909,7 +909,7 @@
       }
     },
     "assignments": "Nhiệm vụ",
-    "class_feed": "Feed",
+    "class_feed": "Bảng tin",
     "files": "Tệp",
     "files_search_placeholder": "Tìm kiếm tệp và thư mục...",
     "files_upload_btn": "Tải tệp lên",
@@ -1784,6 +1784,7 @@
       "pause": "Tạm dừng",
       "resume": "Tiếp tục",
       "stop_recording": "Dừng ghi",
+      "stopping_recording": "Đang dừng...",
       "recording_saved": "Bản ghi đã được lưu tại {path}",
       "raise_hand": "Giơ tay",
       "active": "Đang mở",

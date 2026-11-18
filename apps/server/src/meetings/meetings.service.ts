@@ -96,7 +96,6 @@ export class MeetingsService {
       throw new AppException(ErrorCode.SERVER_ERROR);
     }
 
-    // Tối ưu hóa: Tìm meeting và user song song (Parallel execution)
     const [meeting, user] = await Promise.all([
       this.meetingModel.findOne({ meetingCode }).exec(),
       this.userModel
@@ -170,7 +169,7 @@ export class MeetingsService {
       }
     }
 
-    // Chặn user đang join ở thiết bị khác và kiểm tra phòng họp đã đầy (Tái sử dụng mảng participants, không gọi RPC LiveKit lần 2)
+    // Chặn user đang join ở thiết bị khác và kiểm tra phòng họp đã đầy
     if (livekitRoom && this.livekitRoomService && participants.length > 0) {
       try {
         const isAlreadyInThisRoom = participants.some((p) => p.identity === userId);

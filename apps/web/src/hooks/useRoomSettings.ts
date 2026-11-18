@@ -53,6 +53,7 @@ export function useRoomSettings({
     isRecording: boolean;
     recorderId: string;
     startedAt?: number;
+    status?: "recording" | "stopping";
   } | null>(null);
 
   // State quản lý quyền duyệt
@@ -211,13 +212,14 @@ export function useRoomSettings({
 
 
 
-  const isCloudRecordingActive = !!recordingInfo?.isRecording;
+  const isCloudRecordingStopping = recordingInfo?.status === "stopping";
+  const isCloudRecordingActive = !!recordingInfo?.isRecording && !isCloudRecordingStopping;
   const isRecordingByMe =
-    isCloudRecordingActive &&
+    (isCloudRecordingActive || isCloudRecordingStopping) &&
     !!recordingInfo?.recorderId &&
     recordingInfo.recorderId === localParticipant?.identity;
   const isRecordingByOther =
-    isCloudRecordingActive &&
+    (isCloudRecordingActive || isCloudRecordingStopping) &&
     !!recordingInfo?.recorderId &&
     recordingInfo.recorderId !== localParticipant?.identity;
 
@@ -239,6 +241,7 @@ export function useRoomSettings({
     isEndingBreakout,
     recordingInfo,
     isCloudRecordingActive,
+    isCloudRecordingStopping,
     isRecordingByMe,
     isRecordingByOther,
 
