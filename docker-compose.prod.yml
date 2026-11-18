@@ -14,16 +14,16 @@ services:
     volumes:
       - redis_data:/data
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 48mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 64mb --maxmemory-policy allkeys-lru
     logging: *default-logging
-    mem_limit: 64m
+    mem_limit: 80m
     mem_reservation: 32m
-    cpus: 0.15
+    cpus: 0.20
     deploy:
       resources:
         limits:
-          cpus: "0.15"
-          memory: 64M
+          cpus: "0.20"
+          memory: 80M
         reservations:
           memory: 32M
     networks:
@@ -43,7 +43,7 @@ services:
       - LOAD_TEST_MODE=false
       - WHITEBOARD_SERVER_URL=http://whiteboard:3002
       - SCHEDULER_SERVICE_URL=http://scheduler:2909
-      - NODE_OPTIONS=--max-old-space-size=256 --expose-gc
+      - NODE_OPTIONS=--max-old-space-size=384 --expose-gc
     env_file:
       - path: .env
         required: false
@@ -53,16 +53,16 @@ services:
       - ./uploads:/app/apps/server/uploads
     restart: unless-stopped
     logging: *default-logging
-    mem_limit: 320m
-    mem_reservation: 180m
-    cpus: 0.50
+    mem_limit: 480m
+    mem_reservation: 256m
+    cpus: 0.80
     deploy:
       resources:
         limits:
-          cpus: "0.50"
-          memory: 320M
+          cpus: "0.80"
+          memory: 480M
         reservations:
-          memory: 180M
+          memory: 256M
     networks:
       - tobomeet-network
 
@@ -75,7 +75,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3002
-      - NODE_OPTIONS=--max-old-space-size=128 --expose-gc
+      - NODE_OPTIONS=--max-old-space-size=160 --expose-gc
     env_file:
       - path: .env
         required: false
@@ -83,14 +83,14 @@ services:
       - ./data/whiteboard:/app/data/rooms
     restart: unless-stopped
     logging: *default-logging
-    mem_limit: 160m
+    mem_limit: 192m
     mem_reservation: 80m
-    cpus: 0.25
+    cpus: 0.30
     deploy:
       resources:
         limits:
-          cpus: "0.25"
-          memory: 160M
+          cpus: "0.30"
+          memory: 192M
         reservations:
           memory: 80M
     networks:
@@ -107,7 +107,7 @@ services:
       - PORT=2909
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - NODE_OPTIONS=--max-old-space-size=128 --expose-gc
+      - NODE_OPTIONS=--max-old-space-size=160 --expose-gc
     env_file:
       - path: .env
         required: false
@@ -115,14 +115,14 @@ services:
       - redis
     restart: unless-stopped
     logging: *default-logging
-    mem_limit: 160m
+    mem_limit: 192m
     mem_reservation: 80m
-    cpus: 0.25
+    cpus: 0.30
     deploy:
       resources:
         limits:
-          cpus: "0.25"
-          memory: 160M
+          cpus: "0.30"
+          memory: 192M
         reservations:
           memory: 80M
     networks:
@@ -145,16 +145,17 @@ services:
     restart: unless-stopped
     logging: *default-logging
     shm_size: 128m
-    mem_limit: 320m
-    mem_reservation: 100m
-    cpus: 0.40
+    mem_swappiness: 0
+    mem_limit: 640m
+    mem_reservation: 300m
+    cpus: 1.00
     deploy:
       resources:
         limits:
-          cpus: "0.40"
-          memory: 320M
+          cpus: "1.00"
+          memory: 640M
         reservations:
-          memory: 100M
+          memory: 300M
     networks:
       - tobomeet-network
 
@@ -175,16 +176,16 @@ services:
       - server
       - whiteboard
     logging: *default-logging
-    mem_limit: 64m
-    mem_reservation: 30m
-    cpus: 0.15
+    mem_limit: 80m
+    mem_reservation: 32m
+    cpus: 0.20
     deploy:
       resources:
         limits:
-          cpus: "0.15"
-          memory: 64M
+          cpus: "0.20"
+          memory: 80M
         reservations:
-          memory: 30M
+          memory: 32M
     networks:
       - tobomeet-network
 
