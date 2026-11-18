@@ -97,11 +97,10 @@ async def translate_text(text: str, source_lang: str, target_lang: str) -> str:
                 translated = res.text.strip()
                 if translated:
                     TRANSLATION_CACHE[cache_key] = translated
-                    logger.info("[DeepL Auto] [%s -> %s] '%s' => '%s'", "AUTO", tgt, clean, translated)
                     return translated
             except Exception:
                 pass
-        logger.error("[DeepL Error] Dịch thất bại [%s -> %s] cho '%s': %s", src, tgt, clean, e)
+        logger.error("[DeepL Error] Dịch thất bại [%s -> %s]: %s", src, tgt, e)
 
     return clean
 
@@ -112,8 +111,8 @@ TRANSCRIPT_DIR = Path("transcripts")
 TRANSCRIPT_DIR.mkdir(exist_ok=True)
 
 MAX_CONCURRENT_TRANSCRIBING = 3   # Tối đa 3 luồng transcribe cùng lúc trong 1 phòng
-SILENCE_TIMEOUT_SECONDS = 25.0    # Đóng stream Deepgram khi người dùng im lặng > 25.0s (tránh disconnect/reconnect liên tục)
-PRE_ROLL_BUFFER_FRAMES = 60       # Giữ đệm ~1.2s audio trước khi nói để không mất âm/từ đầu câu khi kết nối lại WebSocket
+SILENCE_TIMEOUT_SECONDS = 20.0    # Đóng stream Deepgram khi người dùng im lặng > 20.0s (tránh disconnect/reconnect liên tục)
+PRE_ROLL_BUFFER_FRAMES = 20       # Giữ đệm ~400ms audio trước khi nói để không mất âm đầu (tránh dồn đệm gây lag)
 
 
 def _sync_upload_to_r2(local_file: Path, s3_key: str) -> bool:
@@ -184,7 +183,6 @@ class ParticipantAudioTracker:
 
         self.audio_stream = rtc.AudioStream(audio_track, sample_rate=16000, num_channels=1)
         self.pre_roll_buffer: deque = deque(maxlen=PRE_ROLL_BUFFER_FRAMES)
-        self.frame_queue: asyncio.Queue = asyncio.Queue(maxsize=500)
 
         self.is_transcribing = False
         self._current_stt_stream = None
@@ -218,10 +216,12 @@ class ParticipantAudioTracker:
                             self._last_speech_trigger = now
                             self.on_speech_cb()
 
-                if self.is_transcribing:
+                # Đẩy frame trực tiếp vào stream Deepgram (non-blocking) nếu đang transcribe
+                # Không dùng hàng đợi frame_queue trung gian để tránh dồn đệm gây trễ/xếp hàng
+                if self.is_transcribing and self._current_stt_stream:
                     try:
-                        self.frame_queue.put_nowait(frame)
-                    except asyncio.QueueFull:
+                        self._current_stt_stream.push_frame(frame)
+                    except Exception:
                         pass
                 else:
                     self.pre_roll_buffer.append(frame)
@@ -277,14 +277,6 @@ class ParticipantAudioTracker:
             self.speaker_id,
             self.language,
         )
-
-        # Chuyển toàn bộ pre-roll buffer vào queue trước để Deepgram nhận trọn vẹn từ đầu câu
-        while self.pre_roll_buffer:
-            try:
-                self.frame_queue.put_nowait(self.pre_roll_buffer.popleft())
-            except asyncio.QueueFull:
-                break
-
         self.stt_task = asyncio.create_task(self._run_stt_session())
 
     async def _run_stt_session(self):
@@ -298,41 +290,32 @@ class ParticipantAudioTracker:
                 )
                 connect_start = time.monotonic()
                 stt_stream = self.stt_instance.stream(language=self.language)
+
+                # Chuyển pre-roll buffer (~400ms) vào stream mới để bắt trọn âm đầu câu
+                while self.pre_roll_buffer:
+                    try:
+                        stt_stream.push_frame(self.pre_roll_buffer.popleft())
+                    except Exception:
+                        break
+
                 self._current_stt_stream = stt_stream
                 current_utterance_id = None
                 last_interim_text = ""
-                first_result_time = None
-
-                async def push_frames_to_stt():
-                    try:
-                        while self.is_transcribing or not self.frame_queue.empty():
-                            try:
-                                frame = await asyncio.wait_for(self.frame_queue.get(), timeout=0.25)
-                                stt_stream.push_frame(frame)
-                            except asyncio.TimeoutError:
-                                if not self.is_transcribing:
-                                    break
-                                continue
-                    except asyncio.CancelledError:
-                        pass
-                    except Exception as e:
-                        logger.debug("Push frames finished for %s: %s", self.speaker_id, e)
-
-                push_task = asyncio.create_task(push_frames_to_stt())
+                session_start_time = time.monotonic()
+                speech_start_time: float | None = None
 
                 try:
                     async for stt_event in stt_stream:
                         now = time.monotonic()
 
+                        if stt_event.type == SpeechEventType.START_OF_SPEECH:
+                            speech_start_time = now
+                            continue
+
                         # 1. Xử lý khi Deepgram báo ngắt câu / kết thúc tiếng nói (END_OF_SPEECH)
                         if stt_event.type == SpeechEventType.END_OF_SPEECH:
                             if last_interim_text:
                                 seg_id = current_utterance_id or f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
-                                logger.info(
-                                    "[Deepgram END_OF_SPEECH] Chốt interim thành FINAL cho %s: '%s'",
-                                    self.speaker_name,
-                                    last_interim_text,
-                                )
                                 final_text = last_interim_text
                                 self.last_final_text = final_text
                                 self.last_final_time = now
@@ -348,14 +331,21 @@ class ParticipantAudioTracker:
                                         self.language,
                                     )
                                 )
+                            speech_start_time = None
                             continue
 
                         # Lấy nội dung transcript nếu có
                         has_alts = bool(stt_event.alternatives)
-                        text = stt_event.alternatives[0].text.strip() if has_alts else ""
+                        sd = stt_event.alternatives[0] if has_alts else None
+                        text = sd.text.strip() if sd else ""
+
+                        # Tính độ trễ audio lag so với thời gian thực
+                        audio_lag_ms = None
+                        if sd and sd.end_time > 0:
+                            elapsed_wall = now - session_start_time
+                            audio_lag_ms = max(0, int((elapsed_wall - sd.end_time) * 1000))
 
                         # 2. Xử lý FINAL_TRANSCRIPT:
-                        # Deepgram có thể trả text rỗng khi dứt câu, khi đó ta lấy last_interim_text để chốt
                         if stt_event.type == SpeechEventType.FINAL_TRANSCRIPT:
                             final_text = text if text else last_interim_text
                             if not final_text:
@@ -366,16 +356,20 @@ class ParticipantAudioTracker:
                             if not had_interim and final_text == self.last_final_text and (now - self.last_final_time) < 2.0:
                                 continue
 
-                            logger.info(
-                                "[Deepgram Event] %s | FINAL: '%s'",
-                                self.speaker_name,
-                                final_text[:70],
-                            )
+                            # Log độ trễ của câu Final (không in nội dung transcript)
+                            if audio_lag_ms is not None:
+                                logger.info(
+                                    "[Deepgram Latency] %s | FINAL latency: %dms",
+                                    self.speaker_name,
+                                    audio_lag_ms,
+                                )
+
                             self.last_final_text = final_text
                             self.last_final_time = now
                             seg_id = current_utterance_id or f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
                             current_utterance_id = None
                             last_interim_text = ""
+                            speech_start_time = None
                             asyncio.create_task(
                                 self.broadcast_cb(
                                     final_text,
@@ -391,19 +385,23 @@ class ParticipantAudioTracker:
                         elif stt_event.type == SpeechEventType.INTERIM_TRANSCRIPT:
                             if not text:
                                 continue
-                            if first_result_time is None:
-                                first_result_time = now
-                                latency = first_result_time - connect_start
+
+                            # Log độ trễ Time-to-First-Transcript (TTFT)
+                            if speech_start_time is not None:
+                                ttft_ms = int((now - speech_start_time) * 1000)
                                 logger.info(
-                                    "[Deepgram Latency] %s first interim after %.2fs | text='%s'",
-                                    self.speaker_name, latency, text[:60]
+                                    "[Deepgram Latency] %s | TTFT: %dms",
+                                    self.speaker_name,
+                                    ttft_ms,
+                                )
+                                speech_start_time = None
+                            elif audio_lag_ms is not None and audio_lag_ms > 1200:
+                                logger.warning(
+                                    "[Deepgram Latency] %s | High interim lag: %dms",
+                                    self.speaker_name,
+                                    audio_lag_ms,
                                 )
 
-                            logger.info(
-                                "[Deepgram Event] %s | INTERIM: '%s'",
-                                self.speaker_name,
-                                text[:70],
-                            )
                             last_interim_text = text
                             if current_utterance_id is None:
                                 current_utterance_id = f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
@@ -421,11 +419,6 @@ class ParticipantAudioTracker:
                     # Khi kết thúc stream stt_stream: nếu còn interim chưa kịp chốt thì chốt nốt
                     if last_interim_text:
                         seg_id = current_utterance_id or f"seg_{int(datetime.now(timezone.utc).timestamp() * 1000)}"
-                        logger.info(
-                            "[Deepgram Stream End] Chốt interim dở dang cho %s: '%s'",
-                            self.speaker_name,
-                            last_interim_text,
-                        )
                         final_text = last_interim_text
                         self.last_final_text = final_text
                         self.last_final_time = time.monotonic()
@@ -452,22 +445,15 @@ class ParticipantAudioTracker:
                         )
                         await asyncio.sleep(0.5)
                 finally:
-                    if not push_task.done():
-                        push_task.cancel()
-                    await stt_stream.aclose()
                     self._current_stt_stream = None
+                    await stt_stream.aclose()
 
                 if not self.is_transcribing:
                     break
         finally:
             self.is_transcribing = False
             self._current_stt_stream = None
-            # Xóa các frame cũ còn tồn đọng trong queue
-            while not self.frame_queue.empty():
-                try:
-                    self.frame_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
+            self.pre_roll_buffer.clear()
             logger.info("Deepgram STT session closed for speaker: %s", self.speaker_name)
 
     async def stop_transcribing_gracefully(self):
@@ -477,6 +463,8 @@ class ParticipantAudioTracker:
         self.is_transcribing = False
 
         stt_stream = self._current_stt_stream
+        self._current_stt_stream = None
+
         if stt_stream:
             try:
                 stt_stream.flush()
@@ -486,8 +474,8 @@ class ParticipantAudioTracker:
 
         if self.stt_task and not self.stt_task.done():
             try:
-                # Đợi tối đa 1.5s để Deepgram kịp trả nốt kết quả final transcript
-                await asyncio.wait_for(asyncio.shield(self.stt_task), timeout=1.5)
+                # Đợi tối đa 1.0s để Deepgram kịp trả nốt kết quả final transcript
+                await asyncio.wait_for(asyncio.shield(self.stt_task), timeout=1.0)
             except (asyncio.TimeoutError, Exception):
                 if self.stt_task and not self.stt_task.done():
                     self.stt_task.cancel()
@@ -497,7 +485,6 @@ class ParticipantAudioTracker:
                 await stt_stream.aclose()
             except Exception:
                 pass
-        self._current_stt_stream = None
         self.stt_task = None
 
     async def cleanup(self):
@@ -568,8 +555,9 @@ async def entrypoint(ctx: JobContext):
         interim_results=True,
         punctuate=True,
         smart_format=True,
-        endpointing_ms=250,
-        utterance_end_ms=1000,
+        no_delay=True,
+        endpointing_ms=150,
+        utterance_end_ms=None,
         http_session=http_session,
     )
 
@@ -651,12 +639,6 @@ async def entrypoint(ctx: JobContext):
                 txt,
                 topic="lk.transcription",
                 attributes=attributes,
-            )
-            logger.info(
-                "[Async Translation] Sent translation update for seg '%s' (%s): %s",
-                seg_id,
-                spk_name,
-                list(new_translations.keys()),
             )
         except Exception as e:
             logger.debug("send_text update failed for seg '%s': %s", seg_id, e)
