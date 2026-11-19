@@ -11,7 +11,8 @@ import MeetingRoomContent from "@/components/meeting/MeetingRoomContent";
 import { Loader2, Smartphone, Clock, Users, LogOut } from "lucide-react";
 import MeetingLobby from "@/components/meeting/MeetingLobby";
 import { useEffect, useState, useMemo } from "react";
-import { RoomEvent } from "livekit-client";
+import { RoomEvent, Room } from "livekit-client";
+import { MLSE2EESync } from "@/components/meeting/MLSE2EESync";
 import { toast } from "sonner";
 import { useParticipantManager } from "@/hooks/useParticipantManager";
 import { useLiveKitMLS } from "@/hooks/useLiveKitMLS";
@@ -183,51 +184,74 @@ function ActiveLiveKitRoom({
     participantMeta?.role === "owner" || participantMeta?.role === "admin";
 
   // Hook điều phối khóa MLS và LiveKit External Key Provider
-  const { e2eeConfig } = useLiveKitMLS({
+  const { e2eeConfig, isMlsReady } = useLiveKitMLS({
     meetingCode,
     userId,
     isHost,
     enabled: isE2EERoom,
   });
 
+  // Khởi tạo LiveKit Room instance với cấu hình E2EE ngay từ đầu
+  const room = useMemo(() => {
+    if (typeof window === "undefined") return undefined;
+    const r = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      ...(e2eeConfig && { e2ee: e2eeConfig }),
+      videoCaptureDefaults: {
+        deviceId: hardwareConfig.parsedCameraConfig?.deviceId,
+        resolution: {
+          width: hardwareConfig.parsedCameraConfig?.width ?? 1280,
+          height: hardwareConfig.parsedCameraConfig?.height ?? 720,
+          frameRate: 30,
+        },
+      },
+      ...(hardwareConfig.micId && {
+        audioCaptureDefaults: {
+          deviceId: hardwareConfig.micId,
+          echoCancellation: true,
+          noiseSuppression: false,
+          autoGainControl: false,
+        },
+      }),
+      ...(hardwareConfig.speakerId && {
+        audioOutput: { deviceId: hardwareConfig.speakerId },
+      }),
+    });
+
+    if (isE2EERoom) {
+      r.setE2EEEnabled(true).catch((err) => {
+        console.error("[MLS] Lỗi r.setE2EEEnabled(true) ban đầu:", err);
+      });
+    }
+
+    return r;
+  }, [
+    e2eeConfig,
+    isE2EERoom,
+    hardwareConfig.parsedCameraConfig?.deviceId,
+    hardwareConfig.parsedCameraConfig?.width,
+    hardwareConfig.parsedCameraConfig?.height,
+    hardwareConfig.micId,
+    hardwareConfig.speakerId,
+  ]);
+
   return (
     <LiveKitRoom
+      room={room}
       className="h-full w-full flex flex-col overflow-hidden"
-      video={camOn}
-      audio={micOn}
+      video={isE2EERoom ? isMlsReady && camOn : camOn}
+      audio={isE2EERoom ? isMlsReady && micOn : micOn}
       token={meetingData.token}
       serverUrl={LIVEKIT_URL}
       connect={true}
       connectOptions={{
         autoSubscribe: false, // chỉ subscribe những track dùng để hiển thị
       }}
-      options={{
-        adaptiveStream: true,
-        dynacast: true,
-        ...(e2eeConfig && { e2ee: e2eeConfig }),
-        videoCaptureDefaults: {
-          deviceId: hardwareConfig.parsedCameraConfig?.deviceId,
-          resolution: {
-            width: hardwareConfig.parsedCameraConfig?.width ?? 1280,
-            height: hardwareConfig.parsedCameraConfig?.height ?? 720,
-            frameRate: 30,
-          },
-        },
-        ...(hardwareConfig.micId && {
-          audioCaptureDefaults: {
-            deviceId: hardwareConfig.micId,
-            echoCancellation: true,
-            noiseSuppression: false,
-            autoGainControl: false,
-          },
-        }),
-        ...(hardwareConfig.speakerId && {
-          audioOutput: { deviceId: hardwareConfig.speakerId },
-        }),
-      }}
       onDisconnected={handleDisconnect}
     >
       <RoomAudioRenderer volume={1.0} />
+      <MLSE2EESync enabled={isE2EERoom} isMlsReady={isMlsReady} />
       <RoomContentGuard meetingData={meetingData} meetingCode={meetingCode} />
     </LiveKitRoom>
   );

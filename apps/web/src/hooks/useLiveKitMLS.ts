@@ -1,6 +1,6 @@
 // apps/web/src/hooks/useLiveKitMLS.ts
 import { useEffect, useRef, useMemo, useState } from "react";
-import { ExternalE2EEKeyProvider } from "livekit-client";
+import { ExternalE2EEKeyProvider, Room } from "livekit-client";
 import { socket } from "@/lib/socket";
 import {
   MeetingMlsClient,
@@ -21,6 +21,7 @@ interface UseLiveKitMLSProps {
   userId: string;
   isHost: boolean;
   enabled: boolean;
+  room?: Room | null;
 }
 
 export function useLiveKitMLS({
@@ -28,6 +29,7 @@ export function useLiveKitMLS({
   userId,
   isHost,
   enabled,
+  room,
 }: UseLiveKitMLSProps) {
   const t = useTranslations("meeting");
   const mlsClientRef = useRef<MeetingMlsClient>(new MeetingMlsClient());
@@ -46,6 +48,37 @@ export function useLiveKitMLS({
     if (!enabled || !keyProvider || typeof window === "undefined") return undefined;
     try {
       const worker = new Worker("/livekit-client.e2ee.worker.js");
+
+      // Bọc bộ lắng nghe onmessage để ngăn lỗi race-condition của LiveKit SDK:
+      // "couldn't set encryption status, participant not found" khi remote participant vừa ngắt kết nối hoặc chưa đồng bộ xong map
+      let internalOnMessage: ((ev: MessageEvent) => void) | null = null;
+      Object.defineProperty(worker, "onmessage", {
+        get() {
+          return internalOnMessage;
+        },
+        set(fn) {
+          internalOnMessage = (ev: MessageEvent) => {
+            try {
+              if (fn) fn.call(worker, ev);
+            } catch (err: any) {
+              if (
+                err &&
+                err.message &&
+                (err.message.includes("couldn't set encryption status") ||
+                  err.message.includes("participant not found"))
+              ) {
+                console.warn(
+                  "[MLS-E2EE] Bỏ qua race-condition cập nhật encryption status cho participant:",
+                  err.message,
+                );
+                return;
+              }
+              throw err;
+            }
+          };
+        },
+      });
+
       return {
         keyProvider,
         worker,
@@ -56,6 +89,23 @@ export function useLiveKitMLS({
     }
   }, [enabled, keyProvider]);
 
+  // Hàm tiện ích nạp khóa vào keyProvider và kích hoạt E2EE trên room nếu cần
+  const applyEpochKey = async (rawKey: Uint8Array, contextLabel: string) => {
+    if (!keyProvider) return;
+    try {
+      console.log(`[MLS] Đang nạp khóa giải mã (${contextLabel})...`);
+      await keyProvider.setKey(toArrayBuffer(rawKey));
+      setIsMlsReady(true);
+
+      if (room && !room.isE2EEEnabled) {
+        console.log(`[MLS] Kích hoạt room.setE2EEEnabled(true) sau khi có khóa (${contextLabel})...`);
+        await room.setE2EEEnabled(true);
+      }
+    } catch (err) {
+      console.error(`[MLS] Lỗi nạp khóa (${contextLabel}):`, err);
+    }
+  };
+
   useEffect(() => {
     if (!enabled || !meetingCode || !userId || !keyProvider) return;
 
@@ -64,6 +114,10 @@ export function useLiveKitMLS({
 
     async function initMLS() {
       try {
+        if (!socket.connected) {
+          socket.connect();
+        }
+
         console.log(`[MLS] Đang sinh KeyPackage cho user ${userId}...`);
         const publicPkg = await mlsClient.init(userId);
 
@@ -86,8 +140,7 @@ export function useLiveKitMLS({
       try {
         console.log("[MLS] Được chỉ định làm Creator, khởi tạo Group...");
         const initialKey = await mlsClient.createGroup(meetingCode);
-        await keyProvider.setKey(toArrayBuffer(initialKey));
-        setIsMlsReady(true);
+        await applyEpochKey(initialKey, "Creator initial group");
         console.log("[MLS] Khởi tạo phòng MLS thành công!");
       } catch (err) {
         console.error("[MLS] Lỗi tạo Group MLS:", err);
@@ -108,7 +161,7 @@ export function useLiveKitMLS({
         const { welcome, commit, newKey } = await mlsClient.addMember(
           data.keyPackage,
         );
-        await keyProvider.setKey(toArrayBuffer(newKey));
+        await applyEpochKey(newKey, `Add member ${data.userId}`);
 
         // Gửi kết quả Commit & Welcome lên Backend Relay
         socket.emit("mls:submit_add_commit", {
@@ -127,8 +180,7 @@ export function useLiveKitMLS({
       try {
         console.log("[MLS Member] Nhận tin nhắn Welcome, đang nạp trạng thái...");
         const newKey = await mlsClient.joinFromWelcome(data.welcomeMessage);
-        await keyProvider.setKey(toArrayBuffer(newKey));
-        setIsMlsReady(true);
+        await applyEpochKey(newKey, "Join from Welcome");
         console.log("[MLS Member] Tham gia nhóm thành công, đã nạp khóa giải mã!");
         toast.success(
           t("e2ee_connected", {
@@ -145,7 +197,7 @@ export function useLiveKitMLS({
       try {
         console.log("[MLS Member] Nhận Commit mới, đang cập nhật Epoch...");
         const newKey = await mlsClient.applyCommit(data.commitMessage);
-        await keyProvider.setKey(toArrayBuffer(newKey));
+        await applyEpochKey(newKey, "Commit received rotation");
         console.log("[MLS Member] Xoay Epoch thành công!");
       } catch (err) {
         console.error("[MLS Member] Lỗi khi áp dụng Commit:", err);
@@ -164,7 +216,7 @@ export function useLiveKitMLS({
         const { commit, newKey } = await mlsClient.removeMember(
           data.removedLeafIndex,
         );
-        await keyProvider.setKey(toArrayBuffer(newKey));
+        await applyEpochKey(newKey, `Remove member ${data.removedUserId}`);
 
         socket.emit("mls:submit_remove_commit", {
           meetingCode,
@@ -191,7 +243,7 @@ export function useLiveKitMLS({
       socket.off("mls:commit_received", handleCommitReceived);
       socket.off("mls:request_remove_member", handleRequestRemoveMember);
     };
-  }, [enabled, meetingCode, userId, isHost, keyProvider]);
+  }, [enabled, meetingCode, userId, isHost, keyProvider, room]);
 
   return {
     keyProvider,
@@ -199,4 +251,3 @@ export function useLiveKitMLS({
     isMlsReady,
   };
 }
-
