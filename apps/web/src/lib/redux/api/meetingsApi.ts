@@ -37,6 +37,7 @@ export const meetingsApi = baseApi.injectEndpoints({
         displayName?: string;
         forceSwitch?: boolean;
         allowStart?: boolean;
+        isE2EE?: boolean;
       }
     >({
       query: (body) => ({

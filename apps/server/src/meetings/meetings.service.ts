@@ -84,6 +84,7 @@ export class MeetingsService {
     forceSwitch = false,
     allowStart = false,
     skipWaitingRoom = false,
+    isE2EE = false,
   ): Promise<MeetingJoinResponse> {
     const apiKey =
       process.env.LIVEKIT_API_KEY ||
@@ -233,6 +234,38 @@ export class MeetingsService {
       currentSessionId = ongoing._id.toString();
     }
 
+    // Xác định tên phòng/kênh và người tạo
+    let channelName: string | undefined;
+    let ownerName: string | undefined;
+    let roomTitle = "";
+
+    if (meeting.type === "personal") {
+      if (meeting.ownerId) {
+        const ownerUser = await this.userModel
+          .findOne({ supabaseId: meeting.ownerId })
+          .select("displayName")
+          .lean()
+          .exec();
+        ownerName = ownerUser?.displayName || "Người dùng";
+      }
+      roomTitle = ownerName ? `Cuộc họp cá nhân của ${ownerName}` : "Cuộc họp cá nhân";
+    } else if (meeting.type === "channel") {
+      if (meeting.roomId) {
+        const roomDoc = await this.roomModel
+          .findById(meeting.roomId)
+          .select("name channels")
+          .lean()
+          .exec();
+        if (roomDoc) {
+          const channel = roomDoc.channels?.find(
+            (c: any) => c._id?.toString() === meeting.channelId?.toString(),
+          );
+          channelName = channel?.name || roomDoc.name || "Kênh";
+        }
+      }
+      roomTitle = channelName || "Cuộc họp kênh";
+    }
+
     // Eager create LiveKit room nếu chưa có
     if (!livekitRoom && this.livekitRoomService) {
       try {
@@ -241,24 +274,67 @@ export class MeetingsService {
           emptyTimeout: 5 * 60,
           departureTimeout: 5 * 60,
           metadata: JSON.stringify({
+            roomName: roomTitle,
             roomType: "main",
             meetingType: meeting.type === "personal" ? "personal" : "channel",
             sessionId: currentSessionId,
             isWaitingRoomEnabled: false,
             isChatEnabled: true,
             approvalPermission: "admin_only",
+            isE2EE: Boolean(isE2EE),
+            channelName,
+            ownerName,
           } as MainRoomMetadata),
         });
 
-        await this.dispatchSttAgent(meeting.meetingCode, currentSessionId);
+        if (!isE2EE) {
+          await this.dispatchSttAgent(meeting.meetingCode, currentSessionId);
+        }
       } catch (e) {
         console.error("Lỗi tạo phòng LiveKit:", e);
       }
     } else if (livekitRoom) {
-      // Đảm bảo STT agent luôn có mặt trong phòng khi có người tham gia
-      this.dispatchSttAgent(meeting.meetingCode, currentSessionId).catch((err) => {
-        console.warn("Lỗi ensure STT agent khi join:", err?.message);
-      });
+      // Đảm bảo STT agent luôn có mặt trong phòng khi có người tham gia (trừ khi là phòng E2EE)
+      let roomIsE2EE = false;
+      try {
+        let meta: any = {};
+        if (livekitRoom.metadata) {
+          meta = JSON.parse(livekitRoom.metadata);
+          roomIsE2EE = Boolean(meta.isE2EE);
+        }
+
+        let needsUpdate = false;
+        if (!meta.roomName && roomTitle) {
+          meta.roomName = roomTitle;
+          needsUpdate = true;
+        }
+        if (!meta.channelName && channelName) {
+          meta.channelName = channelName;
+          needsUpdate = true;
+        }
+        if (!meta.ownerName && ownerName) {
+          meta.ownerName = ownerName;
+          needsUpdate = true;
+        }
+        if (!meta.meetingType) {
+          meta.meetingType = meeting.type === "personal" ? "personal" : "channel";
+          needsUpdate = true;
+        }
+
+        if (needsUpdate && this.livekitRoomService) {
+          const newMetaStr = JSON.stringify(meta);
+          await this.livekitRoomService.updateRoomMetadata(meeting.meetingCode, newMetaStr);
+          livekitRoom.metadata = newMetaStr;
+        }
+      } catch (err) {
+        console.warn("Lỗi kiểm tra/cập nhật metadata phòng:", err);
+      }
+
+      if (!roomIsE2EE) {
+        this.dispatchSttAgent(meeting.meetingCode, currentSessionId).catch((err) => {
+          console.warn("Lỗi ensure STT agent khi join:", err?.message);
+        });
+      }
     }
 
     // Thông báo status (chỉ khi start mới + là channel meeting)
@@ -284,6 +360,14 @@ export class MeetingsService {
     const isWaiting = !skipWaitingRoom && isWaitingRoomEnabled && !hasAdminPowers;
     const participantStatus = isWaiting ? "waiting" : "joined";
 
+    let isRoomE2EE = Boolean(isE2EE);
+    if (livekitRoom?.metadata) {
+      try {
+        const parsed = JSON.parse(livekitRoom.metadata);
+        if (parsed.isE2EE) isRoomE2EE = true;
+      } catch {}
+    }
+
     const at = new AccessToken(apiKey, apiSecret, {
       identity: userId,
       name: finalDisplayName,
@@ -294,7 +378,8 @@ export class MeetingsService {
         hasAdminPowers,
         role,
         status: participantStatus,
-      } as ParticipantMetadata),
+        isE2EE: isRoomE2EE,
+      } as any),
     });
 
     at.addGrant({
@@ -311,6 +396,11 @@ export class MeetingsService {
       meetingCode: meeting.meetingCode,
       status: "ongoing",
       displayName: finalDisplayName,
+      isE2EE: isRoomE2EE,
+      roomName: roomTitle,
+      channelName,
+      ownerName,
+      meetingType: meeting.type === "personal" ? "personal" : "channel",
 
       // Chỉ trả về khi người dùng là thành viên trong kênh
       roomId: role !== "guest" && meeting.roomId?.toString(),
@@ -421,7 +511,14 @@ export class MeetingsService {
   async canStartMeeting(
     meetingCode: string,
     userId: string,
-  ): Promise<{ canStart: boolean; reason?: string }> {
+  ): Promise<{
+    canStart: boolean;
+    reason?: string;
+    meetingType?: "personal" | "channel";
+    roomName?: string;
+    channelName?: string;
+    ownerName?: string;
+  }> {
     const meeting = await this.meetingModel.findOne({ meetingCode }).exec();
     if (!meeting) {
       return { canStart: false, reason: "MEETING_NOT_FOUND" };
@@ -452,9 +549,21 @@ export class MeetingsService {
     // Kiểm tra quyền theo type
     if (meeting.type === "personal") {
       const isOwner = meeting.ownerId === userId;
+      let ownerName: string | undefined;
+      if (meeting.ownerId) {
+        const ownerUser = await this.userModel
+          .findOne({ supabaseId: meeting.ownerId })
+          .select("displayName")
+          .lean()
+          .exec();
+        ownerName = ownerUser?.displayName;
+      }
       return {
         canStart: isOwner,
         reason: isOwner ? undefined : "NOT_OWNER",
+        meetingType: "personal",
+        ownerName,
+        roomName: ownerName ? `Cuộc họp cá nhân của ${ownerName}` : "Cuộc họp cá nhân",
       };
     }
 
@@ -465,7 +574,7 @@ export class MeetingsService {
 
     const room = await this.roomModel
       .findById(meeting.roomId)
-      .select("ownerId channels members")
+      .select("name ownerId channels members")
       .lean()
       .exec();
     if (!room) {
@@ -475,9 +584,17 @@ export class MeetingsService {
     const role = this.getUserRoleInChannel(room as any, meeting.channelId, userId);
     const allowed = role === "owner" || role === "admin" || role === "member";
 
+    const channel = room.channels?.find(
+      (c: any) => c._id?.toString() === meeting.channelId?.toString(),
+    );
+    const channelName = channel?.name || room.name;
+
     return {
       canStart: allowed,
       reason: allowed ? undefined : "INVALID_PERMISSION",
+      meetingType: "channel",
+      channelName,
+      roomName: channelName || "Cuộc họp kênh",
     };
   }
 

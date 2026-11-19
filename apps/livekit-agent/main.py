@@ -516,6 +516,17 @@ async def entrypoint(ctx: JobContext):
 
     await ctx.connect()
 
+    # Kiểm tra phòng có bật E2EE không - nếu có thì Agent không thể giải mã âm thanh
+    try:
+        room_meta_str = ctx.room.metadata or ""
+        if room_meta_str:
+            room_meta = json.loads(room_meta_str)
+            if room_meta.get("isE2EE"):
+                logger.info("Room %s has E2EE enabled. Agent cannot decrypt media. Exiting.", room_name)
+                return
+    except Exception as e:
+        logger.warning("Failed to check E2EE metadata: %s", e)
+
     # Bỏ qua warning `ignoring text stream with topic 'lk.transcription'` khi LiveKit agent nhận lại broadcast
     def _noop_text_stream(reader, participant_identity):
         pass

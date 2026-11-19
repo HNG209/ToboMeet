@@ -10,10 +10,11 @@ import "@livekit/components-styles";
 import MeetingRoomContent from "@/components/meeting/MeetingRoomContent";
 import { Loader2, Smartphone, Clock, Users, LogOut } from "lucide-react";
 import MeetingLobby from "@/components/meeting/MeetingLobby";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { RoomEvent } from "livekit-client";
 import { toast } from "sonner";
 import { useParticipantManager } from "@/hooks/useParticipantManager";
+import { useLiveKitMLS } from "@/hooks/useLiveKitMLS";
 import { useTranslations } from "next-intl";
 import {
   MeetingSessionProvider,
@@ -127,6 +128,69 @@ function MeetingPageContent() {
   if (!meetingData || !LIVEKIT_URL) return null;
 
   return (
+    <ActiveLiveKitRoom
+      meetingData={meetingData}
+      meetingCode={meetingCode}
+      LIVEKIT_URL={LIVEKIT_URL}
+      camOn={camOn}
+      micOn={micOn}
+      hardwareConfig={hardwareConfig}
+      handleDisconnect={handleDisconnect}
+    />
+  );
+}
+
+function ActiveLiveKitRoom({
+  meetingData,
+  meetingCode,
+  LIVEKIT_URL,
+  camOn,
+  micOn,
+  hardwareConfig,
+  handleDisconnect,
+}: any) {
+  // Giải mã token payload để lấy danh tính và metadata
+  const tokenPayload = useMemo(() => {
+    if (!meetingData?.token) return null;
+    try {
+      const base64Url = meetingData.token.split(".")[1];
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const json = decodeURIComponent(
+        window
+          .atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join(""),
+      );
+      return JSON.parse(json);
+    } catch {
+      return null;
+    }
+  }, [meetingData?.token]);
+
+  const participantMeta = useMemo(() => {
+    if (!tokenPayload?.metadata) return null;
+    try {
+      return JSON.parse(tokenPayload.metadata);
+    } catch {
+      return null;
+    }
+  }, [tokenPayload?.metadata]);
+
+  const isE2EERoom = Boolean(meetingData?.isE2EE || participantMeta?.isE2EE);
+  const userId = tokenPayload?.sub || "";
+  const isHost =
+    participantMeta?.role === "owner" || participantMeta?.role === "admin";
+
+  // Hook điều phối khóa MLS và LiveKit External Key Provider
+  const { e2eeConfig } = useLiveKitMLS({
+    meetingCode,
+    userId,
+    isHost,
+    enabled: isE2EERoom,
+  });
+
+  return (
     <LiveKitRoom
       className="h-full w-full flex flex-col overflow-hidden"
       video={camOn}
@@ -140,6 +204,7 @@ function MeetingPageContent() {
       options={{
         adaptiveStream: true,
         dynacast: true,
+        ...(e2eeConfig && { e2ee: e2eeConfig }),
         videoCaptureDefaults: {
           deviceId: hardwareConfig.parsedCameraConfig?.deviceId,
           resolution: {
@@ -386,7 +451,10 @@ function RoomContentGuard({ meetingData, meetingCode }: any) {
 
   return (
     <MeetingWhiteboardProvider meetingCode={meetingCode}>
-      <MeetingRoomContent meetingCode={meetingCode} />
+      <MeetingRoomContent
+        meetingCode={meetingCode}
+        initialMeetingData={meetingData}
+      />
     </MeetingWhiteboardProvider>
   );
 }

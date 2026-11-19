@@ -3,8 +3,8 @@
 
 import { useIsRecording, useRoomContext } from "@livekit/components-react";
 import { RoomEvent } from "livekit-client";
-import { Grid2X2, X, Users, MessageSquare, BarChart2, Captions } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { Grid2X2, X, Users, MessageSquare, BarChart2, Captions, ShieldCheck } from "lucide-react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import localforage from "localforage";
 import "@livekit/components-styles";
 import ParticipantList from "@/components/meeting/ParticipantList";
@@ -23,6 +23,7 @@ import { useIsElectron } from "@/hooks/useIsElectron";
 
 export default function MeetingRoomContent({
   meetingCode,
+  initialMeetingData,
 }: any) {
   const t = useTranslations("meeting");
   const room = useRoomContext();
@@ -30,15 +31,61 @@ export default function MeetingRoomContent({
   const {
     roomName,
     roomType,
+    meetingType,
+    channelName,
+    ownerName,
     breakoutStartedAt,
     breakoutDuration,
     recordingInfo,
     isCloudRecordingActive,
     isCloudRecordingStopping,
     isHost,
+    isE2EE,
   } = useRoomSettings({ meetingCode: meetingCode });
   const isElectron = useIsElectron();
   const isBreakoutRoom = roomType === "breakout";
+
+  const displayTitle = useMemo(() => {
+    if (isBreakoutRoom) {
+      return roomName || "";
+    }
+    const effectiveMeetingType =
+      meetingType || initialMeetingData?.meetingType;
+    const effectiveOwnerName = ownerName || initialMeetingData?.ownerName;
+    const effectiveChannelName =
+      channelName || initialMeetingData?.channelName;
+    const effectiveRoomName = roomName || initialMeetingData?.roomName;
+
+    if (effectiveMeetingType === "personal") {
+      const name =
+        effectiveOwnerName ||
+        (effectiveRoomName
+          ? effectiveRoomName.replace(/^Cuộc họp cá nhân của\s*/i, "")
+          : "");
+      if (name) {
+        return t("personal_meeting_title", {
+          name,
+          defaultValue: `Cuộc họp cá nhân của ${name}`,
+        });
+      }
+      return t("personal_meeting_default", {
+        defaultValue: "Cuộc họp cá nhân",
+      });
+    }
+    return (
+      effectiveChannelName ||
+      effectiveRoomName ||
+      t("channel_meeting_default", { defaultValue: "Cuộc họp kênh" })
+    );
+  }, [
+    isBreakoutRoom,
+    roomName,
+    meetingType,
+    ownerName,
+    channelName,
+    initialMeetingData,
+    t,
+  ]);
   const isRecording =
     !isCloudRecordingStopping &&
     (isLivekitRecording || isCloudRecordingActive || (!!recordingInfo?.isRecording && recordingInfo?.status !== "stopping"));
@@ -189,23 +236,50 @@ export default function MeetingRoomContent({
     >
       {/* MAIN MEETING COLUMN (Header, Video Grid, Toolbar) */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden transition-all duration-300">
-        <header className="h-14 shrink-0 px-5 flex items-center justify-between bg-[#111113] border-b border-[#232328] z-10">
-          <div className="flex items-center gap-3">
-            {isBreakoutRoom && <Grid2X2 size={16} className="text-blue-400" />}
+        <header className="relative z-50 h-10 shrink-0 px-4 flex items-center justify-between bg-[#111113] border-b border-[#232328]">
+          <div className="flex items-center gap-2">
+            {isBreakoutRoom && <Grid2X2 size={15} className="text-blue-400 shrink-0" />}
 
-            <span className="text-sm font-semibold tracking-wide flex items-center gap-2">
-              {roomName || ""}
-              {isBreakoutRoom && timeDisplay && (
-                <span className="ml-1 px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs">
-                  {timeDisplay}
-                </span>
+            {/* Cụm tên phòng / kênh và biểu tượng khiên an toàn */}
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-semibold tracking-wide flex items-center gap-1.5 text-slate-100">
+                {displayTitle}
+                {isBreakoutRoom && timeDisplay && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs">
+                    {timeDisplay}
+                  </span>
+                )}
+              </span>
+
+              {/* Biểu tượng khiên mã hoá an toàn - kéo gần lại tên */}
+              {isE2EE && (
+                <div className="relative group flex items-center">
+                  <button
+                    type="button"
+                    className="p-1 rounded-md text-emerald-400 hover:text-emerald-300 hover:bg-white/5 transition-colors cursor-pointer focus:outline-none flex items-center justify-center"
+                    aria-label={t("e2ee_aria_label", {
+                      defaultValue: "Mã hoá đầu cuối an toàn",
+                    })}
+                  >
+                    <ShieldCheck size={16} className="text-emerald-400" />
+                  </button>
+
+                  {/* Tooltip hiển thị khi hover */}
+                  <div className="absolute left-0 top-full mt-1.5 hidden group-hover:flex items-center px-2.5 py-1 bg-[#1c1c1f] border border-[#2e2e34] rounded-lg shadow-xl z-50 pointer-events-none whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
+                    <span className="text-[11px] text-slate-200">
+                      {t("e2ee_tooltip", {
+                        defaultValue: "Cuộc họp đã được mã hoá đầu cuối an toàn",
+                      })}
+                    </span>
+                  </div>
+                </div>
               )}
-            </span>
+            </div>
 
             {/* Trạng thái ghi hình cạnh tên phòng chính */}
             {isRecording && !isBreakoutRoom && (
               <div
-                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-red-600 text-white text-xs font-bold select-none shadow-sm shadow-red-600/30 tracking-wider animate-fade-in"
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-bold select-none shadow-sm shadow-red-600/30 tracking-wider animate-fade-in ml-1"
                 title={t("toolbar.recording_in_progress")}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0"></span>

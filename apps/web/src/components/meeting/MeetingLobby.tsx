@@ -9,6 +9,8 @@ import {
   MicOff,
   Loader2,
   ChevronDown,
+  ShieldCheck,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslations } from "next-intl";
@@ -84,6 +86,8 @@ export default function MeetingLobby({
     width: 640,
     height: 480,
   });
+
+  const [isE2EE, setIsE2EE] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isPermissionChecked, setIsPermissionChecked] = useState(false);
@@ -197,7 +201,7 @@ export default function MeetingLobby({
         cameraConfig: cameraResolution,
       }),
     );
-    handleJoinByCode(canStart);
+    handleJoinByCode(canStart, false, isE2EE);
   };
 
   return (
@@ -417,6 +421,43 @@ export default function MeetingLobby({
                     <ChevronDown size={15} />
                   </div>
                 </div>
+
+                {/* TÙY CHỌN MÃ HÓA ĐẦU CUỐI (CHỈ HIỂN THỊ KHI BẮT ĐẦU CUỘC HỌP) */}
+                {canStart && (
+                  <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex flex-col gap-2.5 transition-all">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isE2EE}
+                        onChange={(e) => setIsE2EE(e.target.checked)}
+                        className="h-4 w-4 rounded border-white/20 bg-white/5 text-emerald-500 focus:ring-emerald-500/30 accent-emerald-500 cursor-pointer"
+                      />
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
+                        <ShieldCheck size={15} className="text-emerald-400" />
+                        <span>
+                          {t("e2ee_label", {
+                            defaultValue: "Mã hoá đầu cuối an toàn",
+                          })}
+                        </span>
+                      </div>
+                    </label>
+
+                    {isE2EE && (
+                      <div className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-[11px] leading-tight animate-fade-in">
+                        <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-400" />
+                        <span>
+                          <strong>
+                            {t("e2ee_warning_prefix", { defaultValue: "Lưu ý:" })}
+                          </strong>{" "}
+                          {t("e2ee_warning", {
+                            defaultValue:
+                              "Ghi hình đám mây (Cloud Recording) và phụ đề trực tiếp sẽ không khả dụng khi bật tính năng này.",
+                          })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="pt-2">
                   <button

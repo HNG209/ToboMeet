@@ -51,7 +51,7 @@ export default function CustomVideoGrid() {
   if (currentData.type === "whiteboard") {
     return (
       <div className="relative w-full h-full flex flex-col bg-[#0a0a0a] overflow-hidden">
-        <div className="flex-1 flex flex-row w-full h-full min-h-0">
+        <div className="flex-1 flex flex-row w-full min-h-0">
           {/* Nút lùi trang nằm ở cột riêng bên ngoài, không đè lên whiteboard */}
           {hasPagination && (
             <div className="w-10 md:w-14 shrink-0 flex items-center justify-center z-10 bg-[#0a0a0a]">
@@ -93,20 +93,22 @@ export default function CustomVideoGrid() {
           )}
         </div>
 
-        {/* Dấu chấm trang nổi ở cạnh dưới */}
+        {/* Dấu chấm trang nằm độc lập ở giữa khung vẽ và toolbar */}
         {hasPagination && (
-          <div className="absolute bottom-3 left-0 right-0 flex items-center justify-center gap-2 z-30 pointer-events-none">
-            <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10">
+          <div className="shrink-0 py-2.5 flex items-center justify-center select-none bg-[#0a0a0a]">
+            <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
               {pages.map((p, idx) => (
-                <div
+                <button
                   key={idx}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${
-                    currentPage === idx
-                      ? p.type === "whiteboard"
-                        ? "w-6 bg-blue-500"
-                        : "w-5 bg-emerald-400"
-                      : "w-1.5 bg-white/30"
-                  }`}
+                  type="button"
+                  onClick={() => setCurrentPage(idx)}
+                  className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${currentPage === idx
+                    ? p.type === "whiteboard"
+                      ? "w-6 bg-blue-500"
+                      : "w-5 bg-emerald-400"
+                    : "w-1.5 bg-white/30 hover:bg-white/60"
+                    }`}
+                  aria-label={`Trang ${idx + 1}`}
                 />
               ))}
             </div>
@@ -143,7 +145,7 @@ export default function CustomVideoGrid() {
 
   return (
     <div className="relative w-full h-full flex flex-col bg-[#0a0a0a] overflow-hidden">
-      <div className="flex-1 flex flex-row w-full h-full min-h-0">
+      <div className="flex-1 flex flex-row w-full min-h-0">
         {hasPagination && (
           <div className="w-10 md:w-14 shrink-0 flex items-center justify-center z-10">
             {currentPage > 0 && (
@@ -198,17 +200,20 @@ export default function CustomVideoGrid() {
         )}
       </div>
 
+      {/* Dấu chấm trang nằm độc lập ở giữa các tile và toolbar, không đè lên tile */}
       {hasPagination && (
-        <div className="absolute bottom-5 left-0 right-0 flex items-center justify-center gap-2 z-30 pointer-events-none">
-          <div className="flex items-center gap-1.5 bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10">
+        <div className="shrink-0 pb-2.5 flex items-center justify-center select-none">
+          <div className="flex items-center gap-1.5 bg-black/60 px-3 py-1.5 rounded-full backdrop-blur-md border border-white/10 shadow-lg">
             {pages.map((_, idx) => (
-              <div
+              <button
                 key={idx}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  currentPage === idx
-                    ? "w-5 bg-emerald-400"
-                    : "w-1.5 bg-white/30"
-                }`}
+                type="button"
+                onClick={() => setCurrentPage(idx)}
+                className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${currentPage === idx
+                  ? "w-5 bg-emerald-400"
+                  : "w-1.5 bg-white/30 hover:bg-white/60"
+                  }`}
+                aria-label={`Trang ${idx + 1}`}
               />
             ))}
           </div>

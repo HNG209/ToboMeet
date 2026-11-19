@@ -1747,6 +1747,12 @@
     "participant_header": "Participants",
     "polls_header": "Polls",
     "captions_header": "Captions",
+    "e2ee_tooltip": "This meeting is secured with end-to-end encryption",
+    "e2ee_aria_label": "End-to-end encrypted",
+    "e2ee_connected": "End-to-end encryption connected successfully",
+    "personal_meeting_title": "{name}'s Personal Meeting",
+    "personal_meeting_default": "Personal Meeting",
+    "channel_meeting_default": "Channel Meeting",
     "meeting_page": {
       "loading_wait": "Please wait for a moment",
       "loading_prepare_room": "Preparing meeting room",
@@ -2056,7 +2062,10 @@
       "start_button": "Start meeting",
       "privacy_notice": "Camera & microphone are only used when you turn them on",
       "permission_error": "Please grant Camera and Microphone permissions to continue!",
-      "media_access_error": "Unable to access media devices"
+      "media_access_error": "Unable to access media devices",
+      "e2ee_label": "Secure end-to-end encryption",
+      "e2ee_warning_prefix": "Note:",
+      "e2ee_warning": "Cloud recording and live captions will not be available when this feature is enabled."
     },
     "participant_tile": {
       "raised_hand": "Hand raised",
@@ -2309,6 +2318,7 @@
       "4032": "You do not have sufficient permissions to perform this action",
       "4033": "Recording is already in progress for this meeting",
       "4034": "Only the participant who started recording can stop it",
+      "4036": "Cannot record end-to-end encrypted meeting",
       "4041": "User or room/channel not found",
       "4042": "Session not found",
       "4043": "User is not in the meeting",

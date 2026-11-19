@@ -97,6 +97,11 @@ export class RecordingsService {
             throw new AppException(ErrorCode.CANNOT_RECORD_BREAKOUT_ROOM);
         }
 
+        // Chặn phòng đã bật mã hóa đầu cuối (E2EE) vì Egress không thể giải mã
+        if (roomMeta.isE2EE) {
+            throw new AppException(ErrorCode.CANNOT_RECORD_E2EE_ROOM);
+        }
+
         // 3. Đảm bảo chỉ 1 người quay duy nhất (chặn người khác)
         if (roomMeta.recording?.isRecording) {
             throw new AppException(ErrorCode.RECORDING_ALREADY_IN_PROGRESS);

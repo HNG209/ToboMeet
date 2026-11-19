@@ -313,6 +313,11 @@ export const ErrorCode: Record<string, ErrorDetail> = {
     message: "Chỉ người bắt đầu ghi hình mới có quyền dừng ghi hình",
     statusCode: 403,
   },
+  CANNOT_RECORD_E2EE_ROOM: {
+    code: 4036,
+    message: "Không thể ghi hình cuộc họp được mã hóa đầu cuối an toàn",
+    statusCode: 400,
+  },
 
   // Calendar errors
   CALENDAR_EVENT_NOT_FOUND: {
@@ -422,9 +427,14 @@ export interface MeetingJoinResponse {
   meetingCode: string;
   status: string;
   displayName: string;
+  isE2EE?: boolean;
 
   roomId?: string;
   channelId?: string;
+  roomName?: string;
+  channelName?: string;
+  ownerName?: string;
+  meetingType?: "personal" | "channel";
 }
 
 export interface ActiveMeetingResponse {
@@ -536,6 +546,9 @@ export interface WhiteboardJwtPayload {
 export interface BaseRoomMetadata {
   roomName: string;
   meetingType: "personal" | "channel";
+  isE2EE?: boolean;
+  channelName?: string;
+  ownerName?: string;
 }
 
 // Dành riêng cho phòng họp chính

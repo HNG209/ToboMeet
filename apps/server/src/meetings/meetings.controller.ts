@@ -124,6 +124,7 @@ export class MeetingsController {
       displayName?: string;
       forceSwitch?: boolean;
       allowStart?: boolean;
+      isE2EE?: boolean;
     },
     @Req() req: AuthenticatedRequest,
   ) {
@@ -134,6 +135,8 @@ export class MeetingsController {
       body.displayName,
       body.forceSwitch ?? false,
       body.allowStart ?? false,
+      false,
+      body.isE2EE ?? false,
     );
   }
 

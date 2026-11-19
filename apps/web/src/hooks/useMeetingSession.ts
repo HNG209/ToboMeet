@@ -44,6 +44,11 @@ export function useMeetingSession() {
     roomId?: string;
     channelId?: string;
     ownerId?: string;
+    isE2EE?: boolean;
+    roomName?: string;
+    channelName?: string;
+    ownerName?: string;
+    meetingType?: "personal" | "channel";
   } | null>(null);
 
   // Trạng thái kết nối
@@ -250,7 +255,7 @@ export function useMeetingSession() {
   );
 
   // Tham gia/bắt đầu cuộc họp
-  const handleJoinByCode = useCallback(async (allowStart = false, forceSwitch = false) => {
+  const handleJoinByCode = useCallback(async (allowStart = false, forceSwitch = false, isE2EE = false) => {
     if (!meetingCode) return;
     if (!deviceId) {
       console.log("[Meeting] Waiting for deviceId...");
@@ -267,6 +272,7 @@ export function useMeetingSession() {
         displayName: finalName,
         allowStart: allowStart,
         forceSwitch: forceSwitch,
+        isE2EE: isE2EE,
       }).unwrap();
 
       sessionStorage.setItem(`is_joined_${meetingCode}`, "true");
@@ -290,6 +296,11 @@ export function useMeetingSession() {
         token: response.token,
         roomId: response.roomId,
         channelId: response.channelId,
+        isE2EE: response.isE2EE,
+        roomName: response.roomName,
+        channelName: response.channelName,
+        ownerName: response.ownerName,
+        meetingType: response.meetingType,
       });
 
       setStatus("JOINED");

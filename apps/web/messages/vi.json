@@ -1732,6 +1732,12 @@
     "participant_header": "Thành viên",
     "polls_header": "Bình chọn",
     "captions_header": "Phụ đề",
+    "e2ee_tooltip": "Cuộc họp đã được mã hoá đầu cuối an toàn",
+    "e2ee_aria_label": "Mã hoá đầu cuối an toàn",
+    "e2ee_connected": "Đã kết nối mã hóa đầu cuối an toàn",
+    "personal_meeting_title": "Cuộc họp cá nhân của {name}",
+    "personal_meeting_default": "Cuộc họp cá nhân",
+    "channel_meeting_default": "Cuộc họp kênh",
     "meeting_page": {
       "loading_wait": "Vui lòng đợi trong giây lát",
       "loading_prepare_room": "Chuẩn bị không gian phòng họp",
@@ -2041,7 +2047,10 @@
       "start_button": "Bắt đầu cuộc họp",
       "privacy_notice": "Camera & micro chỉ được dùng khi bạn bật tương ứng",
       "permission_error": "Vui lòng cấp quyền Camera và Micro để tiếp tục!",
-      "media_access_error": "Không thể truy cập thiết bị media"
+      "media_access_error": "Không thể truy cập thiết bị media",
+      "e2ee_label": "Mã hoá đầu cuối an toàn",
+      "e2ee_warning_prefix": "Lưu ý:",
+      "e2ee_warning": "Ghi hình đám mây (Cloud Recording) và phụ đề trực tiếp sẽ không khả dụng khi bật tính năng này."
     },
     "participant_tile": {
       "raised_hand": "Giơ tay",
@@ -2294,6 +2303,7 @@
       "4032": "Bạn không đủ quyền thực hiện chức năng này",
       "4033": "Cuộc họp đã có người đang ghi hình",
       "4034": "Chỉ người bắt đầu ghi hình mới có quyền dừng ghi hình",
+      "4036": "Không thể ghi hình cuộc họp được mã hóa đầu cuối an toàn",
       "4041": "Người dùng hoặc phòng/kênh không tồn tại",
       "4042": "Không tìm thấy phiên họp này",
       "4043": "Người dùng không tồn tại trong cuộc họp",

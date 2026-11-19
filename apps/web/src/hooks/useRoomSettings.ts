@@ -49,6 +49,9 @@ export function useRoomSettings({
   const [breakoutStartedAt, setBreakoutStartedAt] = useState<number>(0);
   const [breakoutDuration, setBreakoutDuration] = useState<number>(0);
   const [roomName, setRoomName] = useState<string>("");
+  const [channelName, setChannelName] = useState<string>("");
+  const [ownerName, setOwnerName] = useState<string>("");
+  const [isE2EE, setIsE2EE] = useState(false);
   const [recordingInfo, setRecordingInfo] = useState<{
     isRecording: boolean;
     recorderId: string;
@@ -86,7 +89,10 @@ export function useRoomSettings({
     try {
       const meta: LivekitRoomMetadata = JSON.parse(roomMetadata);
 
-      setRoomName(meta.roomName);
+      setRoomName(meta.roomName || "");
+      if (meta.channelName) setChannelName(meta.channelName);
+      if (meta.ownerName) setOwnerName(meta.ownerName);
+      setIsE2EE(Boolean(meta.isE2EE));
       if (meta.meetingType) {
         setMeetingType(meta.meetingType);
       }
@@ -98,6 +104,12 @@ export function useRoomSettings({
           setApprovalPermission(meta.parentMetadata.approvalPermission);
           if (meta.parentMetadata.meetingType) {
             setMeetingType(meta.parentMetadata.meetingType);
+          }
+          if (meta.parentMetadata.channelName) {
+            setChannelName(meta.parentMetadata.channelName);
+          }
+          if (meta.parentMetadata.ownerName) {
+            setOwnerName(meta.parentMetadata.ownerName);
           }
         }
 
@@ -238,7 +250,10 @@ export function useRoomSettings({
     meetingType,
     isPersonalMeeting: meetingType === "personal",
     roomName,
+    channelName,
+    ownerName,
     isEndingBreakout,
+    isE2EE,
     recordingInfo,
     isCloudRecordingActive,
     isCloudRecordingStopping,

@@ -47,6 +47,7 @@ import CreateBreakoutModal from "./CreateBreakoutModal";
 import JoinBreakoutModal from "./JoinBreakoutModal";
 import { useSafeMeetingWhiteboard } from "./contexts/MeetingWhiteboardContext";
 import { useMediaDeviceSelect, useRoomContext } from "@livekit/components-react";
+import { ConnectionState, RoomEvent } from "livekit-client";
 
 const DEEPGRAM_LANGUAGES = [
   { code: "vi", label: "Tiếng Việt", native: "Vietnamese" },
@@ -161,11 +162,6 @@ export default function CustomToolbar({
   useEffect(() => {
     const saved = localStorage.getItem("tobomeet_transcribe_language") || "vi";
     setTranscribeLanguage(saved);
-    if (room?.localParticipant) {
-      room.localParticipant.setAttributes({
-        transcribe_language: saved,
-      });
-    }
 
     // Khi vào meeting mới: mặc định luôn là không dịch ("off")
     setTranslateTargetLanguage("off");
@@ -174,20 +170,47 @@ export default function CustomToolbar({
         localStorage.removeItem("tobomeet_translate_target_language");
       } catch {}
     }
-    if (room?.localParticipant) {
-      room.localParticipant.setAttributes({
-        translate_target_language: "off",
-      });
+
+    const syncInitialAttributes = () => {
+      if (room?.state === ConnectionState.Connected && room?.localParticipant) {
+        room.localParticipant
+          .setAttributes({
+            transcribe_language: saved,
+            translate_target_language: "off",
+          })
+          .catch((err) => {
+            console.warn(
+              "[CustomToolbar] Lỗi setAttributes ban đầu:",
+              err?.message || err,
+            );
+          });
+      }
+    };
+
+    if (room) {
+      if (room.state === ConnectionState.Connected) {
+        syncInitialAttributes();
+      } else {
+        room.once(RoomEvent.Connected, syncInitialAttributes);
+      }
     }
+
+    return () => {
+      room?.off(RoomEvent.Connected, syncInitialAttributes);
+    };
   }, [room]);
 
   const handleSelectLanguage = (langCode: string) => {
     setTranscribeLanguage(langCode);
     localStorage.setItem("tobomeet_transcribe_language", langCode);
-    if (room?.localParticipant) {
-      room.localParticipant.setAttributes({
-        transcribe_language: langCode,
-      });
+    if (room?.localParticipant && room.state === ConnectionState.Connected) {
+      room.localParticipant
+        .setAttributes({
+          transcribe_language: langCode,
+        })
+        .catch((e) => {
+          console.warn("[CustomToolbar] Lỗi setAttributes transcribe_language:", e?.message || e);
+        });
       try {
         room.localParticipant.sendText(
           JSON.stringify({ type: "SET_LANGUAGE", language: langCode }),
@@ -210,10 +233,14 @@ export default function CustomToolbar({
         new CustomEvent("tobomeet_translate_target_changed", { detail: langCode })
       );
     }
-    if (room?.localParticipant) {
-      room.localParticipant.setAttributes({
-        translate_target_language: langCode,
-      });
+    if (room?.localParticipant && room.state === ConnectionState.Connected) {
+      room.localParticipant
+        .setAttributes({
+          translate_target_language: langCode,
+        })
+        .catch((e) => {
+          console.warn("[CustomToolbar] Lỗi setAttributes translate_target_language:", e?.message || e);
+        });
       try {
         room.localParticipant.sendText(
           JSON.stringify({ type: "SET_TRANSLATE_TARGET", language: langCode }),
@@ -334,6 +361,7 @@ export default function CustomToolbar({
     isCloudRecordingStopping,
     isRecordingByMe,
     isRecordingByOther,
+    isE2EE,
 
     // Actions
     handleToggleChat,
@@ -667,27 +695,29 @@ export default function CustomToolbar({
           </span>
         </button>
 
-        <button
-          onClick={() => {
-            if (!isLiveCaptionEnabled) {
-              onToggleLiveCaption?.();
-            } else {
-              onToggleSidebar("captions");
-            }
-          }}
-          className={getBtnStyle(activeTab === "captions")}
-          title="Phụ đề"
-        >
-          <div className="relative flex items-center justify-center">
-            <Captions
-              size={21}
-              className={activeTab === "captions" ? "text-brand-400" : ""}
-            />
-          </div>
-          <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
-            Phụ đề
-          </span>
-        </button>
+        {!isE2EE && (
+          <button
+            onClick={() => {
+              if (!isLiveCaptionEnabled) {
+                onToggleLiveCaption?.();
+              } else {
+                onToggleSidebar("captions");
+              }
+            }}
+            className={getBtnStyle(activeTab === "captions")}
+            title="Phụ đề"
+          >
+            <div className="relative flex items-center justify-center">
+              <Captions
+                size={21}
+                className={activeTab === "captions" ? "text-brand-400" : ""}
+              />
+            </div>
+            <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
+              Phụ đề
+            </span>
+          </button>
+        )}
 
         <button
           onClick={toggleScreenShare}
@@ -721,7 +751,8 @@ export default function CustomToolbar({
           </span>
         </button>
 
-        {/* ================= NÚT GHI HÌNH (SPLIT BUTTON) ================= */}
+        {/* ================= NÚT GHI HÌNH (SPLIT BUTTON - CHỈ HIỂN THỊ KHI KHÔNG BẬT E2EE) ================= */}
+        {!isE2EE && (
         <div className="relative h-11 hidden md:flex items-center">
           {/* NÚT CHÍNH */}
           <button
@@ -845,6 +876,7 @@ export default function CustomToolbar({
             </>
           )}
         </div>
+        )}
 
         <button
           onClick={toggleHandRaise}
@@ -966,22 +998,24 @@ export default function CustomToolbar({
                 </div>
 
                 {/* PHỤ ĐỀ (CLICK ĐỂ MỞ TAB VÀ KÍCH HOẠT AGENT) */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsMoreMenuOpen(false);
-                    if (!isLiveCaptionEnabled) {
-                      onToggleLiveCaption?.();
-                    } else {
-                      onToggleSidebar("captions");
-                    }
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center gap-2.5 transition-colors cursor-pointer rounded"
-                >
-                  <Captions size={16} className="text-slate-300" />
-                  <span>Phụ đề</span>
-                </button>
+                {!isE2EE && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsMoreMenuOpen(false);
+                      if (!isLiveCaptionEnabled) {
+                        onToggleLiveCaption?.();
+                      } else {
+                        onToggleSidebar("captions");
+                      }
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center gap-2.5 transition-colors cursor-pointer rounded"
+                  >
+                    <Captions size={16} className="text-slate-300" />
+                    <span>Phụ đề</span>
+                  </button>
+                )}
 
                 {isHost && (
                   <>
