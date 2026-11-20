@@ -94,5 +94,10 @@ load-tests/*.html
 load-tests/report.html
 report.html
 
+# E2EE Benchmark generated results & artifacts
+scripts/e2ee_benchmark/results/
+**/scripts/e2ee_benchmark/results/
+
+
 
 

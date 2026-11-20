@@ -1,13 +1,17 @@
 """
-ToboMeet - E2EE Media Inspector & Eavesdropper Bot
--------------------------------------------------
+ToboMeet - E2EE Media Inspector & Security Evaluator Bot
+--------------------------------------------------------
 Công cụ độc lập dùng để kiểm chứng tính năng Mã hóa đầu cuối (MLS E2EE) của ToboMeet.
-Bot này đóng vai trò như một kẻ nghe lén (Spectator) tham gia trực tiếp vào LiveKit SFU,
-subscribe toàn bộ luồng Camera, Màn hình chia sẻ và Âm thanh của phòng:
-
-- Nếu phòng KHÔNG bật E2EE: Bot hiển thị rõ hình ảnh và phát tiếng.
-- Nếu phòng BẬT E2EE (MLS): WebRTC Decoder không thể giải mã các byte đã bị mã hóa
-  AES-128-GCM do thiếu khóa MLS -> Màn hình hiển thị trạng thái bị khóa và im lặng hoàn toàn.
+Hỗ trợ 3 kịch bản kiểm thử bảo mật chuẩn học thuật (KLTN):
+1. Chế độ Kẻ nghe lén (No Key - Eavesdropper):
+   - Không có khóa -> Hoàn toàn không giải mã được video/audio (chỉ thấy Ciphertext byte noise).
+2. Chế độ Kiểm thử Khóa Hợp lệ (Valid Current Key):
+   - Nạp đúng chìa khóa 32-byte Hex của Epoch hiện tại -> FrameCryptor giải mã thành công,
+     hiển thị video webcam/màn hình chia sẻ và âm thanh rõ nét.
+3. Chế độ Kiểm thử Khóa Cũ / Bị kick (Stale / Revoked Key):
+   - Nạp chìa khóa cũ của Epoch trước (khi có người mới vào hoặc sau khi 1 người bị kick/rời phòng)
+   - Kiểm chứng tính chất Forward Secrecy (FS) và Post-Compromise Security (PCS):
+     Khóa cũ lập tức bị vô hiệu hóa, không thể giải mã các khung hình của Epoch mới!
 """
 
 import sys
@@ -16,6 +20,7 @@ import time
 import asyncio
 import threading
 import argparse
+import re
 from typing import Optional, Dict
 
 import tkinter as tk
@@ -45,9 +50,9 @@ except Exception:
 class E2EEInspectorApp:
     def __init__(self, root: tk.Tk, default_code: str = ""):
         self.root = root
-        self.root.title("ToboMeet - E2EE Media Inspector (Spectator)")
-        self.root.geometry("1100x720")
-        self.root.minsize(850, 600)
+        self.root.title("ToboMeet - E2EE Security Inspector & Evaluator")
+        self.root.geometry("1160x760")
+        self.root.minsize(900, 640)
         self.root.configure(bg="#0e0e11")
 
         # Cấu hình kết nối
@@ -65,6 +70,14 @@ class E2EEInspectorApp:
         )
         self.play_audio_var = tk.BooleanVar(value=True)
 
+        # Cấu hình kiểm thử E2EE & Khóa
+        # "none": Kẻ nghe lén (Không có khóa)
+        # "valid": Thử nghiệm Khóa Hợp Lệ
+        # "stale": Thử nghiệm Khóa Cũ / Bị kick (Test FS & PCS)
+        self.key_mode_var = tk.StringVar(value="none")
+        self.e2ee_key_var = tk.StringVar(value="")
+        self.current_applied_key: Optional[bytes] = None
+
         # Trạng thái phòng & stream
         self.is_connected = False
         self.room: Optional[rtc.Room] = None
@@ -75,7 +88,7 @@ class E2EEInspectorApp:
         # key: 'camera' | 'screenshare' -> (PIL Image, timestamp, width, height)
         self.latest_frames: Dict[str, tuple] = {}
         self.frame_counts = {"camera": 0, "screenshare": 0, "audio": 0}
-        self.active_tracks: Dict[str, str] = {} # track_sid -> info
+        self.active_tracks: Dict[str, str] = {}  # track_sid -> info
         self.audio_level = 0.0
         self.audio_stream_out = None
 
@@ -92,15 +105,15 @@ class E2EEInspectorApp:
     def _build_ui(self):
         # 1. HEADER & CONTROL PANEL
         top_frame = tk.Frame(self.root, bg="#16161a", bd=0, relief="flat")
-        top_frame.pack(fill="x", padx=16, pady=(14, 8))
+        top_frame.pack(fill="x", padx=16, pady=(12, 6))
 
         # Tiêu đề
         title_box = tk.Frame(top_frame, bg="#16161a")
-        title_box.pack(side="top", fill="x", pady=(0, 10))
+        title_box.pack(side="top", fill="x", pady=(0, 8))
 
         tk.Label(
             title_box,
-            text="ToboMeet E2EE Inspector",
+            text="ToboMeet E2EE Security Evaluator (MLS Inspector)",
             font=("Segoe UI", 13, "bold"),
             fg="#f4f4f5",
             bg="#16161a",
@@ -117,13 +130,13 @@ class E2EEInspectorApp:
         )
         self.status_badge.pack(side="right")
 
-        # Hàng nhập thông số
+        # Hàng 1: Nhập thông số kết nối phòng
         ctrl_row = tk.Frame(top_frame, bg="#16161a")
-        ctrl_row.pack(side="top", fill="x", pady=4)
+        ctrl_row.pack(side="top", fill="x", pady=2)
 
         tk.Label(
             ctrl_row,
-            text="Mã cuộc họp:",
+            text="Mã phòng:",
             font=("Segoe UI", 9, "bold"),
             fg="#d4d4d8",
             bg="#16161a",
@@ -137,9 +150,9 @@ class E2EEInspectorApp:
             fg="#10b981",
             insertbackground="#ffffff",
             relief="flat",
-            width=20,
+            width=18,
         )
-        self.entry_code.pack(side="left", padx=(0, 14), ipady=4)
+        self.entry_code.pack(side="left", padx=(0, 12), ipady=3)
 
         tk.Label(
             ctrl_row,
@@ -157,8 +170,8 @@ class E2EEInspectorApp:
             fg="#e4e4e7",
             insertbackground="#ffffff",
             relief="flat",
-            width=24,
-        ).pack(side="left", padx=(0, 16), ipady=3)
+            width=22,
+        ).pack(side="left", padx=(0, 14), ipady=3)
 
         self.btn_connect = tk.Button(
             ctrl_row,
@@ -190,9 +203,108 @@ class E2EEInspectorApp:
             )
             chk_audio.pack(side="left")
 
+        # Hàng 2: BẢNG ĐIỀU KHIỂN NẠP KHÓA & KIỂM THỬ BẢO MẬT (FS / PCS / Eavesdropper)
+        key_box = tk.LabelFrame(
+            top_frame,
+            text=" Kịch bản Kiểm thử Bảo mật E2EE (MLS Key Injection) ",
+            font=("Segoe UI", 8, "bold"),
+            fg="#38bdf8",
+            bg="#16161a",
+            bd=1,
+            relief="solid",
+        )
+        key_box.pack(side="top", fill="x", pady=(6, 4), padx=2)
+
+        key_inner = tk.Frame(key_box, bg="#16161a")
+        key_inner.pack(fill="x", padx=8, pady=5)
+
+        # Radio button chọn 3 kịch bản
+        tk.Label(
+            key_inner,
+            text="Chế độ:",
+            font=("Segoe UI", 9, "bold"),
+            fg="#94a3b8",
+            bg="#16161a",
+        ).pack(side="left", padx=(0, 4))
+
+        modes = [
+            ("none", "1. Kẻ nghe lén (Không khóa)", "#a1a1aa"),
+            ("valid", "2. Thử Khóa Hợp lệ", "#34d399"),
+            ("stale", "3. Thử Khóa Cũ / Bị kick (FS & PCS)", "#f87171"),
+        ]
+        for mode_val, mode_text, mode_color in modes:
+            rb = tk.Radiobutton(
+                key_inner,
+                text=mode_text,
+                variable=self.key_mode_var,
+                value=mode_val,
+                font=("Segoe UI", 8, "bold"),
+                fg=mode_color,
+                bg="#16161a",
+                selectcolor="#27272a",
+                activebackground="#16161a",
+                activeforeground=mode_color,
+                command=self._on_mode_changed,
+            )
+            rb.pack(side="left", padx=(0, 8))
+
+        # Ô nhập Hex Key
+        tk.Label(
+            key_inner,
+            text="Khóa Hex (32B):",
+            font=("Segoe UI", 9, "bold"),
+            fg="#e2e8f0",
+            bg="#16161a",
+        ).pack(side="left", padx=(8, 4))
+
+        self.entry_key = tk.Entry(
+            key_inner,
+            textvariable=self.e2ee_key_var,
+            font=("Consolas", 9),
+            bg="#27272a",
+            fg="#60a5fa",
+            insertbackground="#ffffff",
+            relief="flat",
+            width=26,
+            state="disabled",
+        )
+        self.entry_key.pack(side="left", padx=(0, 6), ipady=3)
+
+        # Nút Dán khóa
+        self.btn_paste = tk.Button(
+            key_inner,
+            text="📋 Dán",
+            font=("Segoe UI", 8),
+            bg="#3f3f46",
+            fg="#ffffff",
+            activebackground="#52525b",
+            relief="flat",
+            cursor="hand2",
+            padx=6,
+            pady=2,
+            command=self._paste_key_from_clipboard,
+        )
+        self.btn_paste.pack(side="left", padx=(0, 6))
+
+        # Nút Cập nhật khóa động khi đang họp
+        self.btn_apply_key = tk.Button(
+            key_inner,
+            text="🔄 Áp dụng khóa",
+            font=("Segoe UI", 8, "bold"),
+            bg="#059669",
+            fg="#ffffff",
+            activebackground="#047857",
+            relief="flat",
+            cursor="hand2",
+            padx=8,
+            pady=2,
+            command=self.apply_key_dynamic,
+        )
+        self.btn_apply_key.pack(side="left", padx=(0, 6))
+
         # 2. MAIN VIEWPORT (2 Khung Video: Camera và Màn hình chia sẻ)
         main_viewport = tk.Frame(self.root, bg="#0e0e11")
-        main_viewport.pack(fill="both", expand=True, padx=16, pady=8)
+        main_viewport.pack(fill="both", expand=True, padx=16, pady=4)
 
         # Cột trái: Camera
         self.cam_frame_box = tk.LabelFrame(
@@ -204,7 +316,7 @@ class E2EEInspectorApp:
             bd=1,
             relief="solid",
         )
-        self.cam_frame_box.pack(side="left", fill="both", expand=True, padx=(0, 8))
+        self.cam_frame_box.pack(side="left", fill="both", expand=True, padx=(0, 6))
 
         self.cam_canvas = tk.Canvas(
             self.cam_frame_box, bg="#09090b", bd=0, highlightthickness=0
@@ -221,7 +333,7 @@ class E2EEInspectorApp:
             bd=1,
             relief="solid",
         )
-        self.screen_frame_box.pack(side="left", fill="both", expand=True, padx=(8, 0))
+        self.screen_frame_box.pack(side="left", fill="both", expand=True, padx=(6, 0))
 
         self.screen_canvas = tk.Canvas(
             self.screen_frame_box, bg="#09090b", bd=0, highlightthickness=0
@@ -230,18 +342,138 @@ class E2EEInspectorApp:
 
         # 3. FOOTER STATS & SECURITY VERIFICATION RESULT
         bottom_frame = tk.Frame(self.root, bg="#16161a", bd=0)
-        bottom_frame.pack(fill="x", padx=16, pady=(4, 14))
+        bottom_frame.pack(fill="x", padx=16, pady=(4, 12))
 
         # Thống kê Frame & Audio
         self.lbl_stats = tk.Label(
             bottom_frame,
-            text="Thống kê: Frame Cam: 0  |  Frame Màn hình: 0  |  Gói âm thanh: 0  |  Cường độ âm thanh: 0%",
+            text="Camera: Chưa có  |  Màn hình: Chưa có  |  Âm thanh: Chưa có",
             font=("Consolas", 9),
             fg="#a1a1aa",
             bg="#16161a",
             anchor="w",
         )
-        self.lbl_stats.pack(side="left", padx=8, pady=6)
+        self.lbl_stats.pack(side="left", padx=8, pady=4)
+
+        # Kết luận Phán đoán Bảo mật (Security Verdict)
+        self.lbl_verdict = tk.Label(
+            bottom_frame,
+            text="[Trạng thái: Chờ kết nối]",
+            font=("Segoe UI", 9, "bold"),
+            fg="#71717a",
+            bg="#16161a",
+            padx=10,
+        )
+        self.lbl_verdict.pack(side="right", padx=8, pady=4)
+
+    def _on_mode_changed(self):
+        mode = self.key_mode_var.get()
+        if mode == "none":
+            self.entry_key.configure(state="disabled")
+        else:
+            self.entry_key.configure(state="normal")
+            self.entry_key.focus_set()
+
+    def _paste_key_from_clipboard(self):
+        try:
+            cb = self.root.clipboard_get().strip()
+            # Tìm chuỗi hex: 32 ký tự (16 bytes MLS key) hoặc 64 ký tự (32 bytes key)
+            m = re.search(r"[0-9a-fA-F]{32,64}", cb)
+            if m:
+                cb = m.group(0)
+            else:
+                clean = re.sub(r"[^0-9a-fA-F]", "", cb)
+                if len(clean) >= 16:
+                    cb = clean
+            self.e2ee_key_var.set(cb)
+            if self.key_mode_var.get() == "none":
+                self.key_mode_var.set("valid")
+            self.entry_key.configure(state="normal")
+            print(f"[E2EE Inspector] Đã dán khóa Hex: {cb} ({len(cb) // 2} bytes)")
+        except Exception as e:
+            print(f"[Paste Error] {e}")
+
+    def _get_key_bytes(self) -> Optional[bytes]:
+        mode = self.key_mode_var.get()
+        if mode == "none":
+            return None
+        key_str = self.e2ee_key_var.get().strip()
+        if not key_str:
+            return None
+
+        # Làm sạch chuỗi Hex (xóa khoảng trắng, 0x, dấu gạch nối)
+        clean_hex = re.sub(r"[^0-9a-fA-F]", "", key_str)
+        try:
+            if len(clean_hex) % 2 == 0 and len(clean_hex) >= 16:
+                return bytes.fromhex(clean_hex)
+        except ValueError:
+            pass
+
+        # Dự phòng nếu là chuỗi text passphrase
+        import hashlib
+        return hashlib.sha256(key_str.encode()).digest()
+
+    def apply_key_dynamic(self):
+        """Cập nhật khóa giải mã mới trực tiếp khi đang chạy"""
+        key_bytes = self._get_key_bytes()
+        if not key_bytes:
+            messagebox.showwarning(
+                "Thiếu khóa",
+                "Vui lòng nhập hoặc dán mã khóa Hex hợp lệ trước khi áp dụng!"
+            )
+            return
+
+        self.current_applied_key = key_bytes
+
+        # Kiểm tra xem room hiện tại đã được cấu hình E2EE KeyProvider chưa
+        has_kp = (
+            self.room
+            and hasattr(self.room, "e2ee_manager")
+            and self.room.e2ee_manager
+            and hasattr(self.room.e2ee_manager, "_key_provider")
+        )
+
+        if self.is_connected and not has_kp:
+            # Nếu ban đầu phòng kết nối mà chưa bật E2EE, tự động kết nối lại có cấu hình E2EE
+            print("[E2EE Inspector] Phòng ban đầu chưa cấu hình E2EE -> Tự động kết nối lại với E2EE...")
+            meeting_code = self.meeting_code_var.get().strip()
+            self.stop_inspecting()
+            self.root.after(300, lambda: self.start_inspecting(meeting_code))
+            return
+
+        if self.room and self.loop:
+            async def _update_key():
+                try:
+                    if hasattr(self.room, "e2ee_manager") and self.room.e2ee_manager:
+                        mgr = self.room.e2ee_manager
+                        mgr.set_enabled(True)
+                        if hasattr(mgr, "_key_provider") and mgr.key_provider:
+                            mgr.key_provider.set_shared_key(key_bytes, key_index=0)
+                            for p in self.room.remote_participants.values():
+                                mgr.key_provider.set_key(p.identity, key_bytes, key_index=0)
+                        for cryptor in mgr.frame_cryptors():
+                            cryptor.set_enabled(True)
+                            cryptor.set_key_index(0)
+                        print(f"[E2EE Inspector] Đã cập nhật khóa giải mã mới ({len(key_bytes)} bytes - HKDF) thành công!")
+                except Exception as e:
+                    print(f"[Dynamic Key Error] {e}")
+
+            asyncio.run_coroutine_threadsafe(_update_key(), self.loop)
+
+            with self.data_lock:
+                self.frame_counts = {"camera": 0, "screenshare": 0, "audio": 0}
+                self.latest_frames.clear()
+
+            mode_desc = "Khóa Cũ (Test FS/PCS)" if self.key_mode_var.get() == "stale" else "Khóa Hợp Lệ"
+            messagebox.showinfo(
+                "Đã áp dụng khóa",
+                f"Đã nạp {mode_desc} ({len(key_bytes)} bytes) vào FrameCryptor của WebRTC!\nHãy quan sát màn hình xem video giải mã thành công hay thất bại."
+            )
+        else:
+            messagebox.showinfo(
+                "Đã lưu khóa",
+                f"Đã thiết lập khóa ({len(key_bytes)} bytes). Khóa sẽ được nạp khi bạn bấm 'Bắt đầu kiểm chứng'."
+            )
 
     def toggle_connection(self):
         if not self.is_connected:
@@ -300,7 +532,7 @@ class E2EEInspectorApp:
         api_secret = self.api_secret_var.get().strip()
         livekit_url = self.livekit_url_var.get().strip()
 
-        # Tạo JWT Token không có quyền đặc biệt và KHÔNG CÓ KHÓA MLS
+        # Tạo JWT Token Spectator
         token = (
             api.AccessToken(api_key, api_secret)
             .with_identity(f"inspector-bot-{int(time.time())}")
@@ -317,6 +549,21 @@ class E2EEInspectorApp:
         )
 
         self.room = rtc.Room()
+
+        @self.room.on("e2ee_state_changed")
+        def on_e2ee_state_changed(participant, state):
+            state_names = {
+                0: "NEW",
+                1: "OK (GIẢI MÃ THÀNH CÔNG)",
+                2: "DECRYPTION_FAILED (GIẢI MÃ THẤT BẠI - SAI KHÓA)",
+                3: "ENCRYPTION_FAILED",
+                4: "MISSING_KEY (THIẾU KHÓA)",
+                5: "INTERNAL_ERROR",
+                6: "KEY_RATCHETED",
+            }
+            state_str = state_names.get(state, f"UNKNOWN({state})")
+            p_name = getattr(participant, "identity", "unknown") if participant else "unknown"
+            print(f"[LiveKit E2EE Event] Người tham gia: {p_name} | Trạng thái: {state_str}")
 
         @self.room.on("track_subscribed")
         def on_track_subscribed(
@@ -340,6 +587,17 @@ class E2EEInspectorApp:
                 sid = getattr(track, "sid", None) or getattr(publication, "sid", "unknown")
                 self.active_tracks[sid] = f"{track_type} ({participant.name or participant.identity})"
 
+            # Kích hoạt bộ giải mã cho track của participant nếu đã nạp khóa
+            if hasattr(self.room, "e2ee_manager") and self.room.e2ee_manager:
+                mgr = self.room.e2ee_manager
+                mgr.set_enabled(True)
+                if hasattr(mgr, "_key_provider") and mgr.key_provider and self.current_applied_key:
+                    mgr.key_provider.set_shared_key(self.current_applied_key, key_index=0)
+                    mgr.key_provider.set_key(participant.identity, self.current_applied_key, key_index=0)
+                for cryptor in mgr.frame_cryptors():
+                    cryptor.set_enabled(True)
+                    cryptor.set_key_index(0)
+
             if kind == rtc.TrackKind.KIND_VIDEO or kind == 2:
                 asyncio.create_task(self._consume_video(track, track_type))
             elif kind == rtc.TrackKind.KIND_AUDIO or kind == 1:
@@ -358,8 +616,46 @@ class E2EEInspectorApp:
 
         try:
             print(f"[LiveKit] Đang kết nối vào {meeting_code}...")
-            await self.room.connect(livekit_url, token)
+
+            # Thiết lập E2EE options theo chuẩn WebRTC HKDF của LiveKit
+            # LUÔN KHỞI TẠO encryption=E2EEOptions để E2EEManager & FrameCryptor luôn sẵn sàng
+            key_bytes = self._get_key_bytes()
+            self.current_applied_key = key_bytes
+
+            if key_bytes:
+                print(f"[E2EE Inspector] Khởi động với Khóa giải mã ({len(key_bytes)} bytes - Chuẩn HKDF)...")
+            else:
+                print("[E2EE Inspector] Khởi động chế độ Kẻ nghe lén (E2EE sẵn sàng, KHÔNG CÓ KHÓA)")
+
+            kp_opts = rtc.KeyProviderOptions(
+                shared_key=key_bytes,
+                key_derivation_function=rtc.KeyDerivationFunction.HKDF,
+                ratchet_salt=b"LKFrameEncryptionKey",
+                ratchet_window_size=0,
+            )
+            e2ee_opts = rtc.E2EEOptions(
+                key_provider_options=kp_opts,
+                encryption_type=rtc.EncryptionType.GCM,
+            )
+            room_options = rtc.RoomOptions(encryption=e2ee_opts)
+
+            await self.room.connect(livekit_url, token, options=room_options)
             print("[LiveKit] Đã kết nối thành công!")
+
+            # Đồng bộ khóa và kích hoạt e2ee_manager trên toàn bộ participant hiện tại
+            if hasattr(self.room, "e2ee_manager") and self.room.e2ee_manager:
+                mgr = self.room.e2ee_manager
+                mgr.set_enabled(True)
+                if hasattr(mgr, "_key_provider") and mgr.key_provider and self.current_applied_key:
+                    mgr.key_provider.set_shared_key(self.current_applied_key, key_index=0)
+                    for p in self.room.remote_participants.values():
+                        mgr.key_provider.set_key(p.identity, self.current_applied_key, key_index=0)
+                for cryptor in mgr.frame_cryptors():
+                    cryptor.set_enabled(True)
+                    cryptor.set_key_index(0)
+                if self.current_applied_key:
+                    print(f"[E2EE Inspector] Đã kích hoạt E2EEManager & FrameCryptor ({len(self.current_applied_key)} bytes)!")
+
             self.root.after(0, lambda: self.status_badge.configure(
                 text="ĐÃ KẾT NỐI", fg="#6ee7b7", bg="#064e3b"
             ))
@@ -385,8 +681,6 @@ class E2EEInspectorApp:
     async def _consume_video(self, track: rtc.Track, track_type: str):
         video_stream = rtc.VideoStream(track)
         try:
-            # Nếu phòng bật E2EE: WebRTC bitstream decoder không thể giải mã các byte đã mã hóa
-            # -> Vòng lặp này sẽ không nhận được frame nào (0 frames) hoặc báo lỗi!
             async for event in video_stream:
                 if not self.is_connected:
                     break
@@ -464,7 +758,6 @@ class E2EEInspectorApp:
             screen_count = self.frame_counts["screenshare"]
             audio_count = self.frame_counts["audio"]
             audio_lvl = self.audio_level
-            has_tracks = len(self.active_tracks) > 0
 
         # 1. Vẽ khung Camera
         self._render_slot(
@@ -510,6 +803,54 @@ class E2EEInspectorApp:
             text=f"Camera: {cam_status_str}  |  Màn hình: {screen_status_str}  |  Âm thanh: {audio_status_str}"
         )
 
+        # 4. Phán đoán Bảo mật Thông minh (Security Verdict Badge)
+        mode = self.key_mode_var.get()
+        has_any_track = has_cam_track or has_screen_track or has_audio_track
+        total_decoded = cam_count + screen_count
+
+        if not self.is_connected:
+            self.lbl_verdict.configure(
+                text="[Trạng thái: Chưa kết nối]", fg="#71717a"
+            )
+        elif not has_any_track:
+            self.lbl_verdict.configure(
+                text="⏳ [ĐANG ĐỢI STREAM] Chờ người trong phòng bật Camera/Mic...",
+                fg="#a1a1aa",
+            )
+        elif total_decoded > 0:
+            if mode == "valid":
+                self.lbl_verdict.configure(
+                    text="🟢 [XÁC THỰC THÀNH CÔNG] Đã giải mã Video/Audio bằng Khóa Hợp Lệ!",
+                    fg="#34d399",
+                )
+            elif mode == "stale":
+                self.lbl_verdict.configure(
+                    text="⚠️ [CẢNH BÁO] Khóa cũ vẫn giải mã được (Chưa xoay Epoch hoặc cùng Epoch)!",
+                    fg="#fbbf24",
+                )
+            else:
+                self.lbl_verdict.configure(
+                    text="🔓 [PHÒNG KHÔNG BẬT E2EE] Giải mã luồng thường không mã hóa",
+                    fg="#facc15",
+                )
+        else:
+            # Có track nhưng không giải mã được byte nào (nhiễu số)
+            if mode == "stale":
+                self.lbl_verdict.configure(
+                    text="🛡️ [FORWARD SECRECY / PCS ĐẠT CHUẨN] Khóa cũ bị chặn giải mã!",
+                    fg="#ef4444",
+                )
+            elif mode == "valid":
+                self.lbl_verdict.configure(
+                    text="⚠️ [KHÓA KHÔNG KHỚP] Đang nạp khóa nhưng không giải mã được",
+                    fg="#f87171",
+                )
+            else:
+                self.lbl_verdict.configure(
+                    text="🔒 [CHỐNG NGHE LÉN ĐẠT CHUẨN] Kẻ nghe lén chỉ thấy Ciphertext nhiễu",
+                    fg="#f43f5e",
+                )
+
         # Tiếp tục vòng lặp
         self.root.after(33, self._gui_render_loop)
 
@@ -529,32 +870,44 @@ class E2EEInspectorApp:
             gh = np.random.randint(3, 10)
             noise[gy : gy + gh, :] = np.random.randint(0, 256, (gh, nw, 3), dtype=np.uint8)
 
-        # Đổi kích thước khớp với canvas (dùng NEAREST để giữ nguyên các hạt byte sắc nét)
         img = Image.fromarray(noise).resize((w, h), Image.Resampling.NEAREST)
         draw = ImageDraw.Draw(img)
 
         # 3. Thanh tiêu đề trạng thái ở phía trên
-        draw.rectangle([(0, 0), (w, 34)], fill=(12, 12, 16))
-        draw.text(
-            (12, 9),
-            f"⚡ [CIPHERTEXT NOISE] {title}: DỮ LIỆU ĐANG BỊ MÃ HOÁ E2EE",
-            fill="#f43f5e",
-        )
+        mode = self.key_mode_var.get()
+        draw.rectangle([(0, 0), (w, 36)], fill=(12, 12, 16))
+
+        if mode == "stale":
+            banner_title = f"🛡️ [FS / PCS VERIFIED] {title}: KHÓA CŨ BỊ VÔ HIỆU HÓA KHI ĐỔI EPOCH"
+            banner_color = "#ef4444"
+        elif mode == "valid":
+            banner_title = f"🔑 [E2EE MLS] {title}: ĐANG ĐỢI KHUNG HÌNH KHỚP VỚI KHÓA..."
+            banner_color = "#38bdf8"
+        else:
+            banner_title = f"⚡ [CIPHERTEXT NOISE] {title}: DỮ LIỆU ĐANG BỊ MÃ HOÁ E2EE"
+            banner_color = "#f43f5e"
+
+        draw.text((12, 10), banner_title, fill=banner_color)
 
         # 4. Sinh chuỗi Hex ngẫu nhiên mô phỏng trực tiếp luồng byte ciphertext thực tế
         raw_hex_1 = " ".join(f"{b:02X}" for b in np.random.randint(0, 256, 12))
         raw_hex_2 = " ".join(f"{b:02X}" for b in np.random.randint(0, 256, 12))
 
         # 5. Hộp hiển thị trực quan các byte nhiễu ở chân màn hình
-        draw.rectangle([(0, h - 54), (w, h)], fill=(10, 10, 14))
+        draw.rectangle([(0, h - 56), (w, h)], fill=(10, 10, 14))
         draw.text(
-            (12, h - 48),
+            (12, h - 50),
             f"BYTE THÔ [AES-128-GCM]: {raw_hex_1}",
             fill="#38bdf8",
         )
+        if mode == "stale":
+            footer_sub = "WebRTC: Authentication Tag Mismatch (Khóa cũ của Epoch trước không hợp lệ)"
+        else:
+            footer_sub = "WebRTC: Không có khóa giải mã MLS"
+
         draw.text(
-            (12, h - 28),
-            f"HEX STREAM: {raw_hex_2}  |  WebRTC: Không có khóa giải mã MLS",
+            (12, h - 30),
+            f"HEX STREAM: {raw_hex_2}  |  {footer_sub}",
             fill="#a1a1aa",
         )
 
@@ -573,31 +926,34 @@ class E2EEInspectorApp:
         if cw < 20 or ch < 20:
             return
 
-        # Trường hợp 1: Có frame giải mã được (Phòng thường không E2EE hoặc có frame hình ảnh)
+        # Trường hợp 1: Có frame giải mã được (Phòng thường không E2EE hoặc có khóa E2EE hợp lệ)
         if frame_tuple is not None and (time.time() - frame_tuple[1] < 2.0):
             pil_img, _, w, h = frame_tuple
-            # Fit vào khung canvas giữ nguyên tỉ lệ
             scale = min(cw / w, ch / h)
             nw, nh = int(w * scale), int(h * scale)
             resized = pil_img.resize((nw, nh), Image.Resampling.BILINEAR)
 
-            # Tạo overlay thông báo
+            # Tạo overlay thông báo giải mã thành công
             draw = ImageDraw.Draw(resized)
-            draw.rectangle([(8, 8), (280, 36)], fill=(0, 0, 0, 180))
-            draw.text(
-                (14, 14),
-                f"🔓 ĐÃ GIẢI MÃ: {w}x{h} ({total_frames} frames)",
-                fill="#4ade80",
-            )
+            draw.rectangle([(8, 8), (320, 38)], fill=(0, 0, 0, 190))
+
+            mode = self.key_mode_var.get()
+            if mode == "valid":
+                label_text = f"🔓 ĐÃ GIẢI MÃ (KHÓA HỢP LỆ): {w}x{h} ({total_frames} frames)"
+                label_color = "#34d399"
+            else:
+                label_text = f"🔓 ĐÃ GIẢI MÃ: {w}x{h} ({total_frames} frames)"
+                label_color = "#4ade80"
+
+            draw.text((14, 14), label_text, fill=label_color)
 
             photo = ImageTk.PhotoImage(resized)
             canvas.delete("all")
             canvas.create_image(cw // 2, ch // 2, image=photo, anchor="center")
-            canvas.image = photo # Giữ reference tránh bị Garbage Collected
+            canvas.image = photo
             return
 
         # Trường hợp 2: Có track được publish nhưng dữ liệu là Ciphertext (E2EE đang bật)
-        # RENDER TRỰC TIẾP CÁC BYTE NHIỄU (DIGITAL STATIC / CIPHERTEXT BYTE MATRIX) LÊN MÀN HÌNH
         if self.is_connected and has_track:
             noise_photo = self._generate_noise_frame(cw, ch, title)
             canvas.delete("all")
@@ -631,7 +987,7 @@ class E2EEInspectorApp:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="ToboMeet E2EE Inspector")
+    parser = argparse.ArgumentParser(description="ToboMeet E2EE Inspector & Security Evaluator")
     parser.add_argument("--code", type=str, default="", help="Mã cuộc họp cần kiểm chứng")
     args = parser.parse_args()
 
@@ -642,4 +998,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

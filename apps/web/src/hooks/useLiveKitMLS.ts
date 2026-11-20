@@ -93,6 +93,40 @@ export function useLiveKitMLS({
   const applyEpochKey = async (rawKey: Uint8Array, contextLabel: string) => {
     if (!keyProvider) return;
     try {
+      const hexKey = Array.from(rawKey)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      console.log(
+        `%c[MLS Epoch Key] %c${hexKey} %c(${contextLabel})`,
+        "color: #10b981; font-weight: bold; background: #064e3b; padding: 2px 6px; border-radius: 4px;",
+        "color: #60a5fa; font-weight: bold; font-family: monospace; font-size: 13px;",
+        "color: #a1a1aa; font-style: italic;",
+      );
+      console.log(
+        `%c👉 Gõ copy(__MLS_CURRENT_EPOCH_KEY__) trong Console để copy khóa Hex (${hexKey.length / 2} bytes)!`,
+        "color: #fbbf24; font-size: 11px;",
+      );
+
+      if (typeof window !== "undefined") {
+        (window as any).__MLS_CURRENT_EPOCH_KEY__ = hexKey;
+        (window as any).copyMlsKey = () => {
+          if (navigator.clipboard) {
+            navigator.clipboard.writeText(hexKey);
+            console.log("Đã copy MLS Key:", hexKey);
+          }
+          return hexKey;
+        };
+        if (!(window as any).__MLS_EPOCH_KEYS_HISTORY__) {
+          (window as any).__MLS_EPOCH_KEYS_HISTORY__ = [];
+        }
+        (window as any).__MLS_EPOCH_KEYS_HISTORY__.push({
+          time: new Date().toLocaleTimeString(),
+          label: contextLabel,
+          key: hexKey,
+        });
+      }
+
       console.log(`[MLS] Đang nạp khóa giải mã (${contextLabel})...`);
       await keyProvider.setKey(toArrayBuffer(rawKey));
       setIsMlsReady(true);
