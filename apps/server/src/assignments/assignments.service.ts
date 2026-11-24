@@ -121,6 +121,7 @@ export class AssignmentsService {
 
     if (targetChannelIds.length === 0) return;
 
+    const createdPosts: any[] = [];
     try {
       const authorUser = await this.userModel.findOne({ supabaseId: authorId }).exec();
       const authorInfo = {
@@ -156,6 +157,7 @@ export class AssignmentsService {
 
         const postWithAuthor = {
           ...p.toObject(),
+          _id: p._id.toString(),
           author: authorInfo,
           commentsCount: 0,
           reactionStats: [],
@@ -185,16 +187,19 @@ export class AssignmentsService {
 
         const postWithAuthor = {
           ...newPost.toObject(),
+          _id: newPost._id.toString(),
           author: authorInfo,
           commentsCount: 0,
           reactionStats: [],
           userReaction: null,
         };
+        createdPosts.push(postWithAuthor);
         this.appGateway.server.to(`room_${assignment.roomId}`).emit("post_created", postWithAuthor);
       }
     } catch (err) {
       console.error("Lỗi khi đồng bộ bài đăng nhiệm vụ vào bảng tin:", err);
     }
+    return createdPosts;
   }
 
   /**
@@ -262,9 +267,9 @@ export class AssignmentsService {
 
     if (saved.status === "published") {
       this.assignmentsGateway.notifyAssignmentPublished(saved.roomId, saved.channelId, saved);
-      await this.syncAssignmentPosts(saved, userId);
+      const createdPosts = await this.syncAssignmentPosts(saved, userId);
       this.appGateway.server.emit("calendar_event_created", saved);
-      this.emitAssignmentCreatedNotification(saved, userId);
+      this.emitAssignmentCreatedNotification(saved, userId, createdPosts?.[0]);
     } else {
       this.assignmentsGateway.notifyAssignmentCreated(saved.roomId, saved.channelId, saved);
     }
@@ -325,8 +330,8 @@ export class AssignmentsService {
 
     if (wasDraft && saved.status === "published") {
       this.assignmentsGateway.notifyAssignmentPublished(saved.roomId, saved.channelId, saved);
-      await this.syncAssignmentPosts(saved, userId);
-      this.emitAssignmentCreatedNotification(saved, userId);
+      const createdPosts = await this.syncAssignmentPosts(saved, userId);
+      this.emitAssignmentCreatedNotification(saved, userId, createdPosts?.[0]);
     } else {
       this.assignmentsGateway.notifyAssignmentUpdated(saved.roomId, saved.channelId, saved);
       if (saved.status === "published") {
@@ -342,8 +347,15 @@ export class AssignmentsService {
   private emitAssignmentCreatedNotification(
     assignment: AssignmentDocument,
     userId: string,
+    postData?: any,
   ) {
     try {
+      const raw = assignment.toObject ? assignment.toObject() : assignment;
+      const assignmentData = {
+        ...raw,
+        _id: assignment._id.toString(),
+      };
+
       this.eventEmitter.emit("notification.assignment_created", {
         roomId: assignment.roomId,
         channelId: assignment.channelId || assignment.channelIds?.[0] || "",
@@ -352,6 +364,8 @@ export class AssignmentsService {
         title: assignment.title,
         deadline: assignment.deadline,
         referenceId: assignment._id.toString(),
+        assignmentData,
+        postData,
       });
     } catch (error) {
       console.error("Lỗi khi phát sự kiện thông báo nhiệm vụ mới:", error);

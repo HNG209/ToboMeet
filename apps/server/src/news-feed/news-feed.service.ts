@@ -393,6 +393,11 @@ export class NewsFeedService {
           : dto.content.trim()
         : "Đã đăng tệp đính kèm";
 
+      const postData = {
+        ...postWithCount,
+        _id: post._id.toString(),
+      };
+
       this.eventEmitter.emit("notification.post_created", {
         roomId: dto.roomId,
         channelId: dto.channelId,
@@ -401,6 +406,7 @@ export class NewsFeedService {
         authorAvatarUrl,
         summary: contentSnippet,
         referenceId: post._id.toString(),
+        postData,
       });
     } catch (err) {
       console.error("Lỗi khi phát thông báo bài viết mới:", err);

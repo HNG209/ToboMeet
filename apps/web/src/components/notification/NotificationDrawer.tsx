@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useNotifications } from "@/hooks/useNotifications";
-import { Bell, Loader2, X } from "lucide-react";
+import { Bell, Loader2, RotateCw, X } from "lucide-react";
 import NotificationCard from "./NotificationCard";
 import { useTranslations } from "next-intl";
 
@@ -16,7 +16,7 @@ export default function NotificationDrawer({
   onClose,
 }: NotificationPopoverProps) {
   const t = useTranslations("notification");
-  const { notifications, isLoading, isFetching, hasNext, loadMore } =
+  const { notifications, isLoading, isFetching, hasNext, loadMore, refresh } =
     useNotifications({ limit: 15, markAsRead: !isOpen });
 
   if (!isOpen) return null;
@@ -48,12 +48,24 @@ export default function NotificationDrawer({
               {t("drawer.title", { defaultValue: "Thông báo" })}
             </span>
           </div>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => refresh()}
+              disabled={isFetching}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
+              title={t("drawer.refresh", { defaultValue: "Làm mới" })}
+            >
+              <RotateCw
+                className={`w-3.5 h-3.5 ${isFetching ? "animate-spin text-brand-600" : ""}`}
+              />
+            </button>
+            <button
+              onClick={onClose}
+              className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Scrollable List */}

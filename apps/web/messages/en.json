@@ -2192,7 +2192,8 @@
     "drawer": {
       "title": "Notifications",
       "loading": "Loading notifications...",
-      "empty": "You have no notifications"
+      "empty": "You have no notifications",
+      "refresh": "Refresh"
     },
     "types": {
       "kicked": {

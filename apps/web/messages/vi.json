@@ -2177,7 +2177,8 @@
     "drawer": {
       "title": "Thông báo",
       "loading": "Đang tải thông báo...",
-      "empty": "Bạn chưa có thông báo nào"
+      "empty": "Bạn chưa có thông báo nào",
+      "refresh": "Làm mới"
     },
     "types": {
       "kicked": {

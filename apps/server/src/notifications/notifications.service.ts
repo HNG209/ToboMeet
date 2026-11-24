@@ -541,6 +541,7 @@ export class NotificationsService {
     summary?: string;
     userIds?: string[];
     referenceId?: string;
+    postData?: Record<string, any>;
     metadata?: Record<string, unknown>;
   }) {
     try {
@@ -578,6 +579,7 @@ export class NotificationsService {
           (payload.metadata?.authorAvatarUrl as string) ||
           "",
         summary: payload.summary || (payload.metadata?.summary as string) || "",
+        postData: payload.postData || (payload.metadata?.postData as any),
         ...(payload.metadata || {}),
       };
 
@@ -618,6 +620,8 @@ export class NotificationsService {
     deadline?: Date;
     userIds?: string[];
     referenceId?: string;
+    assignmentData?: Record<string, any>;
+    postData?: Record<string, any>;
     metadata?: Record<string, unknown>;
   }) {
     try {
@@ -668,6 +672,9 @@ export class NotificationsService {
         authorAvatarUrl,
         title: payload.title || (payload.metadata?.title as string) || "",
         deadline: payload.deadline || (payload.metadata?.deadline as any),
+        assignmentData:
+          payload.assignmentData || (payload.metadata?.assignmentData as any),
+        postData: payload.postData || (payload.metadata?.postData as any),
         ...(payload.metadata || {}),
       };
 
@@ -712,6 +719,8 @@ export class NotificationsService {
     roomType?: string;
     userIds?: string[];
     referenceId?: string;
+    eventData?: Record<string, any>;
+    postData?: Record<string, any>;
     metadata?: Record<string, unknown>;
   }) {
     try {
@@ -758,6 +767,8 @@ export class NotificationsService {
           payload.roomType ||
           (payload.metadata?.roomType as string) ||
           "channel_meeting",
+        eventData: payload.eventData || (payload.metadata?.eventData as any),
+        postData: payload.postData || (payload.metadata?.postData as any),
         ...(payload.metadata || {}),
       };
 

@@ -176,6 +176,15 @@ export class CalendarService {
     const hostAvatarUrl = hostUser?.avatarUrl || "";
     const hostEmail = hostUser?.email || "";
 
+    // Đính kèm thông tin host để FE hiển thị ngay không cần fetch lại
+    const eventWithHost = {
+      ...event.toObject(),
+      _id: event._id.toString(),
+      hostEmail,
+      hostDisplayName,
+      hostAvatarUrl,
+    };
+
     // Gửi thông báo lời mời cho những người được mời riêng lẻ (không gửi thông báo riêng cho thành viên kênh nếu là cuộc họp kênh)
     if (!isChannelMeeting && inviteeUserIds.length > 0) {
       this.eventEmitter.emit("notification.calendar_invite", {
@@ -193,38 +202,12 @@ export class CalendarService {
           location: event.location,
           description: event.description,
           roomType: event.roomType,
+          eventData: eventWithHost,
         },
       });
     }
 
-    // Gửi thông báo sự kiện kênh cho toàn bộ thành viên trong phòng (giao NotificationService xử lý bất đồng bộ)
-    if (isChannelMeeting && data.roomId && data.channelId) {
-      try {
-        this.eventEmitter.emit("notification.channel_event_created", {
-          roomId: data.roomId,
-          channelId: data.channelId,
-          hostId: userId,
-          hostName: hostDisplayName,
-          hostAvatarUrl: hostAvatarUrl,
-          title: event.title,
-          startDate: event.startDate.toISOString(),
-          endDate: event.endDate.toISOString(),
-          location: event.location,
-          roomType: event.roomType,
-          referenceId: event._id.toString(),
-        });
-      } catch (err) {
-        console.error("Lỗi khi phát thông báo lịch kênh mới:", err);
-      }
-    }
-
-    // Đính kèm thông tin host để FE hiển thị ngay không cần fetch lại
-    const eventWithHost = {
-      ...event.toObject(),
-      hostEmail,
-      hostDisplayName,
-      hostAvatarUrl,
-    };
+    let channelMeetingPost: any = null;
 
     // Nếu tạo trong Group/Channel, gửi cho mọi thành viên trong kênh qua Socket
     if (data.channelId && data.roomType === "channel_meeting" && data.roomId) {
@@ -250,6 +233,7 @@ export class CalendarService {
         // Tái sử dụng hostUser đã fetch ở trên
         const postWithAuthor = {
           ...meetingPost.toObject(),
+          _id: meetingPost._id.toString(),
           author: {
             userId: userId,
             displayName: hostDisplayName,
@@ -277,8 +261,40 @@ export class CalendarService {
         this.appGateway.server
           .to(`room_${data.roomId}`)
           .emit("post_created", postWithAuthor);
+
+        channelMeetingPost = {
+          ...postWithAuthor,
+          calendarEvent: {
+            ...postWithAuthor.calendarEvent,
+            isJoined: false,
+            isHost: false,
+          },
+        };
       } catch (err) {
         console.error("Lỗi khi tự động tạo post lịch họp kênh:", err);
+      }
+
+      // Gửi thông báo sự kiện kênh cho toàn bộ thành viên trong phòng (giao NotificationService xử lý bất đồng bộ)
+      if (isChannelMeeting && data.roomId && data.channelId) {
+        try {
+          this.eventEmitter.emit("notification.channel_event_created", {
+            roomId: data.roomId,
+            channelId: data.channelId,
+            hostId: userId,
+            hostName: hostDisplayName,
+            hostAvatarUrl: hostAvatarUrl,
+            title: event.title,
+            startDate: event.startDate.toISOString(),
+            endDate: event.endDate.toISOString(),
+            location: event.location,
+            roomType: event.roomType,
+            referenceId: event._id.toString(),
+            eventData: eventWithHost,
+            postData: channelMeetingPost,
+          });
+        } catch (err) {
+          console.error("Lỗi khi phát thông báo lịch kênh mới:", err);
+        }
       }
 
       // Chỉ emit cho các thành viên trong phòng họp kênh

@@ -8,15 +8,18 @@ import { NotificationResponse } from "@tobomeet/shared/types";
 import { useNotificationCacheManager } from "../useNotificationCacheManager";
 import { useTranslations } from "next-intl";
 
-import { useDispatch } from "react-redux";
+import { useDispatch, useStore } from "react-redux";
 import { notificationsApi } from "@/lib/redux/api/notificationsApi";
 import { usersApi } from "@/lib/redux/api/usersApi";
-import { AppDispatch } from "@/lib/redux/store";
+import { newsFeedApi } from "@/lib/redux/api/newsFeedApi";
+import { assignmentsApi } from "@/lib/redux/api/assignmentsApi";
+import { AppDispatch, RootState } from "@/lib/redux/store";
 
 export function useNotificationSocketEvents() {
   const socket = useSocket();
   const router = useRouter();
   const dispatch = useDispatch<AppDispatch>();
+  const store = useStore<RootState>();
   const t = useTranslations("notification");
   const { removeRoomFromMyList } = useRoomCacheManager();
   const { addNotificationsToCache, updateUnreadNotificationBadge } =
@@ -38,6 +41,85 @@ export function useNotificationSocketEvents() {
 
       // Cập nhật badge unread của người dùng
       updateUnreadNotificationBadge(true);
+
+      // Tự động đồng bộ vào RTK Query cache nếu client đã fetch cache trước đó (bỏ qua nếu chưa fetch lần nào)
+      sortedNotifications.forEach((notif) => {
+        const state = store.getState() as any;
+        const queries = state.api?.queries || {};
+
+        // Cập nhật bảng tin kênh (feed) cho bài viết mới, sự kiện lịch kênh và bài tập mới
+        if (
+          notif.type === "CHANNEL_POST" ||
+          notif.type === "CHANNEL_EVENT_CREATED" ||
+          notif.type === "ASSIGNMENT_CREATED"
+        ) {
+          const post = notif.metadata?.postData;
+          const roomId = notif.metadata?.roomId;
+          const channelId = notif.metadata?.channelId;
+
+          if (post && roomId && channelId) {
+            const hasFetchedPosts = Object.values(queries).some(
+              (q: any) =>
+                q?.endpointName === "getPosts" &&
+                q?.originalArgs?.roomId === roomId &&
+                q?.originalArgs?.channelId === channelId &&
+                q?.status === "fulfilled",
+            );
+
+            if (hasFetchedPosts) {
+              dispatch(
+                newsFeedApi.util.updateQueryData(
+                  "getPosts",
+                  { roomId, channelId },
+                  (draft) => {
+                    const exists = draft.some((p) => p._id === post._id);
+                    if (!exists) {
+                      draft.unshift(post);
+                    }
+                  },
+                ),
+              );
+            }
+          }
+        }
+
+        // Cập nhật danh sách bài tập nếu đã từng fetch tab bài tập của phòng này
+        if (notif.type === "ASSIGNMENT_CREATED") {
+          const assignment = notif.metadata?.assignmentData;
+          const roomId = notif.metadata?.roomId;
+
+          if (assignment && roomId) {
+            const assignmentQueries = Object.values(queries).filter(
+              (q: any) =>
+                q?.endpointName === "getRoomAssignments" &&
+                q?.originalArgs?.roomId === roomId &&
+                q?.status === "fulfilled",
+            );
+
+            assignmentQueries.forEach((q: any) => {
+              dispatch(
+                assignmentsApi.util.updateQueryData(
+                  "getRoomAssignments",
+                  q.originalArgs,
+                  (draft) => {
+                    const exists = draft.some(
+                      (a: any) => a._id === assignment._id,
+                    );
+                    if (!exists) {
+                      if (
+                        !q.originalArgs.status ||
+                        q.originalArgs.status === assignment.status
+                      ) {
+                        draft.unshift(assignment);
+                      }
+                    }
+                  },
+                ),
+              );
+            });
+          }
+        }
+      });
 
       sortedNotifications.forEach((notif, index) => {
         const roomId = notif.metadata?.roomId;
@@ -302,6 +384,7 @@ export function useNotificationSocketEvents() {
     };
   }, [
     dispatch,
+    store,
     t,
     router,
     removeRoomFromMyList,

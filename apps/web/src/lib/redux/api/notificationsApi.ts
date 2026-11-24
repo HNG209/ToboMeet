@@ -19,6 +19,8 @@ export const notificationsApi = baseApi.injectEndpoints({
         params: args,
       }),
 
+      keepUnusedDataFor: Infinity,
+
       // Chỉ tạo khoá (Cache Key) dựa trên các trường lọc, bỏ qua cursor và limit
       serializeQueryArgs: ({ endpointName, queryArgs }) => {
         const typeKey = queryArgs.type || "all";

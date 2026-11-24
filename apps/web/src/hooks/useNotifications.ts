@@ -24,7 +24,7 @@ export function useNotifications({
   // ID thông báo chưa đọc
   const unreadIdsRef = useRef<Set<string>>(new Set());
 
-  // Tự động reset cursor mỗi khi các tham số lọc thay đổi
+  // Tự động reset cursor mỗi khi các tham số lọc thay đổi hoặc khi đóng drawer (markAsRead = true)
   useEffect(() => {
     setCursor(undefined);
   }, [type, isRead]);
@@ -76,9 +76,12 @@ export function useNotifications({
 
   // Hàm làm mới danh sách (Pull to refresh)
   const refresh = useCallback(() => {
-    setCursor(undefined);
-    queryResult.refetch();
-  }, [queryResult]);
+    if (cursor !== undefined) {
+      setCursor(undefined);
+    } else {
+      queryResult.refetch();
+    }
+  }, [cursor, queryResult]);
 
   return {
     ...queryResult, // Trả về tất cả các cờ như isLoading, isFetching, isError,...
