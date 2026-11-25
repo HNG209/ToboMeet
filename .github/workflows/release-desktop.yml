@@ -26,10 +26,36 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build and Publish to GitHub Releases
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Resolve Release Tag
+        id: meta
+        shell: pwsh
+        run: |
+          $pkg = Get-Content -Raw apps/desktop/package.json | ConvertFrom-Json
+          $version = $pkg.version
+          if ("${{ github.ref_type }}" -eq "tag") {
+            $tag = "${{ github.ref_name }}"
+          } else {
+            $tag = "v$version"
+          }
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Build Windows Installer
         run: |
           cd apps/desktop
-          npx electron-builder --win nsis --publish always
+          npx electron-builder --win nsis --publish never
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ToboMeet ${{ steps.meta.outputs.tag }}
+          draft: false
+          prerelease: false
+          files: |
+            apps/desktop/dist/*.exe
+            apps/desktop/dist/*.blockmap
+            apps/desktop/dist/latest.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
