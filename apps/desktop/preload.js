@@ -54,6 +54,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
     },
   },
 
+  // External browser authentication API (Loopback in Dev / Custom Protocol in Prod)
+  auth: {
+    getMode: () => ipcRenderer.invoke("auth:get-mode"),
+    openExternal: (options) => ipcRenderer.invoke("auth:open-external", options),
+    cancelExternal: () => ipcRenderer.invoke("auth:cancel-external"),
+    onAuthCallback: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on("auth:desktop-callback", listener);
+      return () => ipcRenderer.removeListener("auth:desktop-callback", listener);
+    },
+    onAuthError: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      ipcRenderer.on("auth:desktop-error", listener);
+      return () => ipcRenderer.removeListener("auth:desktop-error", listener);
+    },
+  },
+
   // Socket.IO Bridge API
   socket: {
     emit: (eventName, ...args) => {

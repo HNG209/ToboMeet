@@ -97,7 +97,7 @@ export function PersonalMeetingSettings({
       );
       setTimeout(() => setCopiedCode(false), 2000);
     } catch {
-      toast.error("Không thể sao chép");
+      toast.error(t("copy_failed", { defaultValue: "Không thể sao chép" }));
     }
   };
 
@@ -111,7 +111,7 @@ export function PersonalMeetingSettings({
       );
       setTimeout(() => setCopiedLink(false), 2000);
     } catch {
-      toast.error("Không thể sao chép");
+      toast.error(t("copy_failed", { defaultValue: "Không thể sao chép" }));
     }
   };
 
@@ -156,7 +156,7 @@ export function PersonalMeetingSettings({
               </h3>
               {meetingCode && (
                 <p className="text-[11px] text-slate-400 font-mono">
-                  Mã: {meetingCode}
+                  {t("code_prefix", { defaultValue: "Mã" })}: {meetingCode}
                 </p>
               )}
             </div>
@@ -168,7 +168,9 @@ export function PersonalMeetingSettings({
           <ChannelSessionsTab
             initialMeetingCode={meetingCode}
             userId={myProfile?.supabaseId || ""}
-            title="Lịch sử phiên họp cá nhân"
+            title={t("history_sessions_title", {
+              defaultValue: "Lịch sử phiên họp cá nhân",
+            })}
             isPersonalMeeting={true}
           />
         </div>

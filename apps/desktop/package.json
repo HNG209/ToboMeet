@@ -16,6 +16,14 @@
   "build": {
     "appId": "com.tobomeet.app",
     "productName": "ToboMeet",
+    "protocols": [
+      {
+        "name": "ToboMeet Protocol",
+        "schemes": [
+          "tobomeet"
+        ]
+      }
+    ],
     "directories": {
       "output": "dist"
     },

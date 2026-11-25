@@ -31,6 +31,15 @@ const CLIENT_ORIGIN = isDev ? "http://localhost:3000" : PRODUCTION_URL;
 
 const APP_ID = "com.tobomeet.app";
 const APP_NAME = "ToboMeet";
+const AUTH_PROTOCOL = "tobomeet";
+const DESKTOP_UA_MARKER = "ToboMeetDesktop";
+const AUTH_CALLBACK_MODE =
+  process.env.DESKTOP_AUTH_MODE === "protocol" ||
+  process.env.DESKTOP_AUTH_MODE === "loopback"
+    ? process.env.DESKTOP_AUTH_MODE
+    : isDev
+      ? "loopback"
+      : "protocol";
 const ICON_PATH = path.join(__dirname, "../assets/icon.png");
 
 module.exports = {
@@ -41,5 +50,8 @@ module.exports = {
   CLIENT_ORIGIN,
   APP_ID,
   APP_NAME,
+  AUTH_PROTOCOL,
+  DESKTOP_UA_MARKER,
+  AUTH_CALLBACK_MODE,
   ICON_PATH,
 };

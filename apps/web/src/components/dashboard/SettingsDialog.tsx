@@ -75,7 +75,10 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
 
       onClose();
     } catch (err: any) {
-      toast.error(err?.message || "Có lỗi xảy ra khi lưu cài đặt.");
+      toast.error(
+        err?.message ||
+          t("save_error", { defaultValue: "Có lỗi xảy ra khi lưu cài đặt." }),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -94,11 +97,7 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
   const maxWidthClass =
     activeTab === "personal_meeting" && isPersonalMeetingHistory
       ? "max-w-5xl"
-      : activeTab === "devices" ||
-          activeTab === "recording" ||
-          activeTab === "personal_meeting"
-        ? "max-w-3xl"
-        : "max-w-2xl";
+      : "max-w-3xl";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -187,7 +186,10 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
                   {t("tabs.general", { defaultValue: "Cài đặt chung" })}
                 </h3>
                 <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                  Quản lý tùy chọn ngôn ngữ hiển thị và chế độ khởi chạy ứng dụng.
+                  {t("general.desc", {
+                    defaultValue:
+                      "Quản lý tùy chọn ngôn ngữ hiển thị và chế độ khởi chạy ứng dụng.",
+                  })}
                 </p>
               </div>
 
@@ -198,7 +200,10 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
                     {t("language.header", { defaultValue: "Ngôn ngữ hiển thị" })}
                   </h4>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Chọn ngôn ngữ bạn muốn sử dụng trên toàn bộ hệ thống.
+                    {t("general.language_desc", {
+                      defaultValue:
+                        "Chọn ngôn ngữ bạn muốn sử dụng trên toàn bộ hệ thống.",
+                    })}
                   </p>
                 </div>
 
@@ -302,26 +307,28 @@ export default function SettingsDialog({ onClose }: SettingsDialogProps) {
                 <div className="flex flex-col gap-3 pt-4 border-t border-slate-100">
                   <div>
                     <h4 className="text-sm font-bold text-slate-700">
-                      Khởi động cùng hệ thống
+                      {t("general.startup_header", {
+                        defaultValue: "Khởi động cùng hệ thống",
+                      })}
                     </h4>
                     <p className="text-xs text-slate-400 mt-0.5">
-                      Tùy chọn mở và chạy ứng dụng khi khởi động máy tính.
+                      {t("general.startup_desc", {
+                        defaultValue:
+                          "Tùy chọn mở và chạy ứng dụng khi khởi động máy tính.",
+                      })}
                     </p>
                   </div>
 
                   <div className="flex items-center justify-between p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-start gap-3.5 pr-4">
-                      <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0 mt-0.5">
+                    <div className="flex items-center gap-3.5 pr-4">
+                      <div className="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
                         <Power className="w-4.5 h-4.5" />
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-slate-800">
-                          Mở app khi khởi động máy
-                        </span>
-                        <span className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-                          Tự động chạy ngầm ToboMeet trong khay hệ thống (tray icon) khi bạn đăng nhập Windows để luôn sẵn sàng nhận cuộc gọi.
-                        </span>
-                      </div>
+                      <span className="text-sm font-bold text-slate-800">
+                        {t("general.auto_start_label", {
+                          defaultValue: "Mở ứng dụng khi khởi động máy",
+                        })}
+                      </span>
                     </div>
 
                     <button

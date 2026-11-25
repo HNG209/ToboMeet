@@ -3,19 +3,42 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { login, loginWithOAuth, type FormState } from "../../auth/actions";
-import { Eye, EyeOff, Video } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Eye, EyeOff, Monitor, Video } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 
 const initialState: FormState = { error: null, message: null };
 
 export default function LoginPage() {
   const t = useTranslations();
+  const locale = useLocale();
   const searchParams = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
 
   const pathError = searchParams.get("error");
-  const redirectUrl = searchParams.get("redirect") || "";
+  const rawRedirectUrl = searchParams.get("redirect") || "";
+  const sourceParam = searchParams.get("source");
+  const stateParam = searchParams.get("state") || "";
+  const callbackMode = searchParams.get("callback_mode") || "protocol";
+  const callbackPort = searchParams.get("callback_port") || "";
+
+  const isDesktopAuth = sourceParam === "desktop" && Boolean(stateParam);
+  const desktopQueryString = isDesktopAuth
+    ? new URLSearchParams({
+        source: "desktop",
+        state: stateParam,
+        callback_mode: callbackMode,
+        ...(callbackPort ? { callback_port: callbackPort } : {}),
+      }).toString()
+    : "";
+  const desktopCallbackUrl = isDesktopAuth
+    ? `/${locale}/auth/desktop-callback?${new URLSearchParams({
+        state: stateParam,
+        callback_mode: callbackMode,
+        ...(callbackPort ? { callback_port: callbackPort } : {}),
+      }).toString()}`
+    : "";
+  const redirectUrl = rawRedirectUrl || desktopCallbackUrl;
 
   const [loginState, loginAction, isLoginPending] = useActionState(
     login,
@@ -63,6 +86,17 @@ export default function LoginPage() {
           </span>
         </Link>
       </div>
+
+      {isDesktopAuth && (
+        <div className="mb-4 flex items-center justify-center gap-2 px-3.5 py-2 rounded-full bg-blue-50 border border-blue-100 text-[#0052FF] text-xs font-semibold">
+          <Monitor size={14} className="shrink-0" />
+          <span>
+            {locale === "vi"
+              ? "Đang đăng nhập cho ứng dụng ToboMeet Desktop"
+              : "Signing in for ToboMeet Desktop App"}
+          </span>
+        </div>
+      )}
 
       <div className="text-center mb-4">
         <h1 className="text-2xl font-bold text-[#0F172A] mb-2">
@@ -202,7 +236,10 @@ export default function LoginPage() {
 
       <p className="text-center mt-8 text-sm text-gray-500 font-medium">
         {t("login.dont_have_account")}{" "}
-        <Link href="/signup" className="text-[#0052FF] hover:underline">
+        <Link
+          href={desktopQueryString ? `/signup?${desktopQueryString}` : "/signup"}
+          className="text-[#0052FF] hover:underline"
+        >
           {t("login.sign_up")}
         </Link>
       </p>

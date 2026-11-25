@@ -370,6 +370,7 @@
     "cancel": "Hủy bỏ",
     "save": "Lưu thay đổi",
     "saved_success": "Đã lưu cài đặt thành công!",
+    "save_error": "Có lỗi xảy ra khi lưu cài đặt.",
     "tabs": {
       "general": "Cài đặt chung",
       "language": "Ngôn ngữ",
@@ -377,6 +378,13 @@
       "recording": "Ghi hình & Lưu trữ",
       "password": "Mật khẩu",
       "personal_meeting": "Cuộc họp cá nhân"
+    },
+    "general": {
+      "desc": "Quản lý tùy chọn ngôn ngữ hiển thị và chế độ khởi chạy ứng dụng.",
+      "language_desc": "Chọn ngôn ngữ bạn muốn sử dụng trên toàn bộ hệ thống.",
+      "startup_header": "Khởi động cùng hệ thống",
+      "startup_desc": "Tùy chọn mở và chạy ứng dụng khi khởi động máy tính.",
+      "auto_start_label": "Mở ứng dụng khi khởi động máy"
     },
     "language": {
       "header": "Ngôn ngữ hiển thị",
@@ -482,6 +490,9 @@
       "start_meeting_btn": "Bắt đầu cuộc họp",
       "history_btn": "Lịch sử cuộc họp",
       "history_modal_title": "Lịch sử cuộc họp cá nhân",
+      "history_sessions_title": "Lịch sử phiên họp cá nhân",
+      "code_prefix": "Mã",
+      "copy_failed": "Không thể sao chép",
       "back_to_settings": "Quay về",
       "tip_title": "Ghi chú về cuộc họp cá nhân",
       "tip_desc": "Mã phòng họp này được chỉ định duy nhất cho tài khoản của bạn và không đổi. Người khác có thể tham gia bất kỳ lúc nào bạn bắt đầu cuộc họp.",

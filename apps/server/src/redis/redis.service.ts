@@ -134,6 +134,33 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  /**
+   * Đọc và xóa nguyên tử 1 key (dùng cho mã xác thực 1 lần - one-time code).
+   * Tự động fallback sang pipeline MULTI/GET/DEL nếu Redis server < 6.2 chưa hỗ trợ GETDEL.
+   */
+  async getdel(key: string): Promise<string | null> {
+    if (!this.isReady || !this.client) return null;
+    try {
+      return await this.client.getdel(key);
+    } catch (err: any) {
+      const msg = String(err?.message || "");
+      if (msg.toLowerCase().includes("unknown command")) {
+        try {
+          const results = await this.client.multi().get(key).del(key).exec();
+          const val = results?.[0]?.[1];
+          return typeof val === "string" ? val : null;
+        } catch (multiErr: any) {
+          this.logger.warn(
+            `[Redis] multi get/del fallback error for key ${key}: ${multiErr.message}`,
+          );
+          return null;
+        }
+      }
+      this.logger.warn(`[Redis] getdel error for key ${key}: ${msg}`);
+      return null;
+    }
+  }
+
   async hget(key: string, field: string): Promise<string | null> {
     if (!this.isReady || !this.client) return null;
     try {

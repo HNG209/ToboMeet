@@ -1,6 +1,6 @@
 const { BrowserWindow, shell, ipcMain, app } = require("electron");
 const path = require("path");
-const { TARGET_URL, ICON_PATH } = require("./constants");
+const { TARGET_URL, ICON_PATH, DESKTOP_UA_MARKER } = require("./constants");
 
 let mainWindow = null;
 let meetingWindow = null;
@@ -117,6 +117,12 @@ function createMainWindow({ onCloseRequested, startHidden = false }) {
       preload: path.join(__dirname, "../preload.js"),
     },
   });
+
+  // Gắn định danh ToboMeetDesktop vào User-Agent để Next.js Server/Middleware nhận diện ngay không nháy UI
+  const baseUA = mainWindow.webContents.getUserAgent();
+  if (!baseUA.includes(DESKTOP_UA_MARKER)) {
+    mainWindow.webContents.setUserAgent(`${baseUA} ${DESKTOP_UA_MARKER}`);
+  }
 
   mainWindow.loadURL(TARGET_URL);
 

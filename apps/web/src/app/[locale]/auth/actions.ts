@@ -77,6 +77,7 @@ export async function login(prevState: FormState, formData: FormData) {
 export async function signup(prevState: FormState, formData: FormData) {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
+  const redirectUrl = (formData.get("redirect") as string) || "";
 
   const supabase = await createClient();
 
@@ -102,11 +103,15 @@ export async function signup(prevState: FormState, formData: FormData) {
 
   const origin = (process.env.SITE_URL || (await getOrigin())).replace(/\/$/, "");
 
+  const emailCallbackUrl = redirectUrl
+    ? `${origin}/auth/callback?next=${encodeURIComponent(redirectUrl)}`
+    : `${origin}/auth/callback`;
+
   const { error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback`,
+      emailRedirectTo: emailCallbackUrl,
     },
   });
 

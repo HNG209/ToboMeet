@@ -22,6 +22,7 @@ import { SchedulerClientModule } from "./scheduler-client/scheduler-client.modul
 import { AiAgentModule } from "./ai-agent/ai-agent.module";
 import { VectorDbModule } from "./vector-db/vector-db.module";
 import { RedisModule } from "./redis/redis.module";
+import { AuthModule } from "./auth/auth.module";
 
 @Module({
   imports: [
@@ -111,6 +112,7 @@ import { RedisModule } from "./redis/redis.module";
     AiAgentModule,
     VectorDbModule,
     DirectChatModule,
+    AuthModule,
   ],
 })
 export class AppModule { }

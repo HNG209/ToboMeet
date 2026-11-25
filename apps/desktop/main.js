@@ -13,6 +13,14 @@ const {
 } = require("./src/socketManager");
 const { setupScreenShareHandler } = require("./src/screenShare");
 const { setupRecordingIpc } = require("./src/recording");
+const {
+  registerProtocolClient,
+  setupDesktopAuthIpc,
+  handleProtocolUrl,
+  extractProtocolUrlFromArgv,
+  flushQueuedDeepLink,
+  cleanupDesktopAuth,
+} = require("./src/desktopAuth");
 
 // Set Windows App User Model ID so notifications and taskbar show 'ToboMeet'
 if (process.platform === "win32") {
@@ -20,8 +28,11 @@ if (process.platform === "win32") {
 }
 app.setName(APP_NAME);
 
+// Đăng ký Custom Protocol tobomeet:// (dùng cho bản Prod & hỗ trợ fallback)
+registerProtocolClient();
+
 // ==========================================
-// SINGLE INSTANCE LOCK
+// SINGLE INSTANCE LOCK & DEEP LINK HANDLERS
 // ==========================================
 let isQuitting = false;
 
@@ -29,8 +40,20 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
+  // Windows & Linux: bắt URL tobomeet:// khi hệ điều hành gọi lại instance đang chạy
+  app.on("second-instance", (_event, commandLine) => {
     restoreAndFocus();
+    const deepLinkUrl = extractProtocolUrlFromArgv(commandLine);
+    if (deepLinkUrl) {
+      handleProtocolUrl(deepLinkUrl);
+    }
+  });
+
+  // macOS: bắt URL tobomeet:// qua sự kiện open-url
+  app.on("open-url", (event, url) => {
+    event.preventDefault();
+    restoreAndFocus();
+    handleProtocolUrl(url);
   });
 }
 
@@ -39,6 +62,7 @@ if (!gotTheLock) {
 // ==========================================
 function handleQuit() {
   isQuitting = true;
+  cleanupDesktopAuth();
   destroyTray();
   disconnectSocket();
   app.quit();
@@ -51,9 +75,10 @@ app.whenReady().then(() => {
     callback(permission === "media");
   });
 
-  // 2. Initialize screen sharing and recording handlers
+  // 2. Initialize screen sharing, recording, and external browser auth handlers
   setupScreenShareHandler(meetingSession);
   setupRecordingIpc();
+  setupDesktopAuthIpc();
 
   // 3. Initialize Socket.IO bridge and connection
   setupSocketIpc();
@@ -71,6 +96,18 @@ app.whenReady().then(() => {
       }
     },
   });
+
+  // Xử lý deep link nếu app được khởi động trực tiếp từ tobomeet://
+  const initialDeepLink = extractProtocolUrlFromArgv(process.argv);
+  if (initialDeepLink) {
+    mainWindow.webContents.once("did-finish-load", () => {
+      handleProtocolUrl(initialDeepLink);
+    });
+  } else {
+    mainWindow.webContents.once("did-finish-load", () => {
+      flushQueuedDeepLink();
+    });
+  }
 
   // 5. Create system tray
   createTray({
@@ -102,6 +139,7 @@ app.whenReady().then(() => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  cleanupDesktopAuth();
   disconnectSocket();
 });
 

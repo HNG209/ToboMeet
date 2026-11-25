@@ -383,6 +383,7 @@
     "cancel": "Cancel",
     "save": "Save Changes",
     "saved_success": "Settings saved successfully!",
+    "save_error": "An error occurred while saving settings.",
     "tabs": {
       "general": "General Settings",
       "language": "Language",
@@ -390,6 +391,13 @@
       "recording": "Recording & Storage",
       "password": "Password",
       "personal_meeting": "Personal Meeting"
+    },
+    "general": {
+      "desc": "Manage display language and application startup preferences.",
+      "language_desc": "Choose the language you want to use across the entire system.",
+      "startup_header": "Start with System",
+      "startup_desc": "Automatically launch the application when your computer starts.",
+      "auto_start_label": "Launch app at startup"
     },
     "recording": {
       "header": "Recording Configuration",
@@ -495,6 +503,9 @@
       "start_meeting_btn": "Start Meeting",
       "history_btn": "Meeting History",
       "history_modal_title": "Personal Meeting History",
+      "history_sessions_title": "Personal Meeting Session History",
+      "code_prefix": "Code",
+      "copy_failed": "Unable to copy",
       "back_to_settings": "Back",
       "tip_title": "About Personal Meeting",
       "tip_desc": "This room code is permanently assigned to your account. Others can join whenever you start the meeting.",

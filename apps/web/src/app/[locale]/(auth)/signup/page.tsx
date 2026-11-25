@@ -4,15 +4,40 @@ import { useState } from "react";
 import { useActionState } from "react";
 import Link from "next/link";
 import { FormState, loginWithOAuth, signup } from "../../auth/actions";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { validatePasswordPolicy } from "@tobomeet/shared/utils";
-import { Eye, EyeOff, Video } from "lucide-react";
+import { Eye, EyeOff, Monitor, Video } from "lucide-react";
 
 const initialState: FormState = { error: null, message: null };
 
 export default function SignupPage() {
   const t = useTranslations();
+  const locale = useLocale();
   const tPolicy = useTranslations("forgot_password");
+  const searchParams = useSearchParams();
+
+  const sourceParam = searchParams.get("source");
+  const stateParam = searchParams.get("state") || "";
+  const callbackMode = searchParams.get("callback_mode") || "protocol";
+  const callbackPort = searchParams.get("callback_port") || "";
+
+  const isDesktopAuth = sourceParam === "desktop" && Boolean(stateParam);
+  const desktopQueryString = isDesktopAuth
+    ? new URLSearchParams({
+        source: "desktop",
+        state: stateParam,
+        callback_mode: callbackMode,
+        ...(callbackPort ? { callback_port: callbackPort } : {}),
+      }).toString()
+    : "";
+  const desktopCallbackUrl = isDesktopAuth
+    ? `/${locale}/auth/desktop-callback?${new URLSearchParams({
+        state: stateParam,
+        callback_mode: callbackMode,
+        ...(callbackPort ? { callback_port: callbackPort } : {}),
+      }).toString()}`
+    : "";
 
   const [state, action, isPending] = useActionState(signup, initialState);
   const [localError, setLocalError] = useState<string | null>(null);
@@ -100,6 +125,17 @@ export default function SignupPage() {
         </Link>
       </div>
 
+      {isDesktopAuth && (
+        <div className="mb-4 flex items-center justify-center gap-2 px-3.5 py-2 rounded-full bg-blue-50 border border-blue-100 text-[#0052FF] text-xs font-semibold">
+          <Monitor size={14} className="shrink-0" />
+          <span>
+            {locale === "vi"
+              ? "Đang đăng ký cho ứng dụng ToboMeet Desktop"
+              : "Signing up for ToboMeet Desktop App"}
+          </span>
+        </div>
+      )}
+
       <div className="text-center mb-8">
         <h1 className="text-2xl font-bold text-[#0F172A] mb-2">
           {t("signup.sign_up")}
@@ -148,6 +184,9 @@ export default function SignupPage() {
         onSubmit={handleSubmit}
         className="flex flex-col gap-5"
       >
+        {desktopCallbackUrl && (
+          <input type="hidden" name="redirect" value={desktopCallbackUrl} />
+        )}
         <div>
           <label className="block mb-1.5 text-sm font-semibold text-gray-700">
             {t("signup.work_email")}
@@ -288,7 +327,10 @@ export default function SignupPage() {
 
       <p className="text-center mt-8 mb-8 text-sm text-gray-500 font-medium">
         {t("signup.already_have_account")}{" "}
-        <Link href="/login" className="text-[#0052FF] hover:underline">
+        <Link
+          href={desktopQueryString ? `/login?${desktopQueryString}` : "/login"}
+          className="text-[#0052FF] hover:underline"
+        >
           {t("login.sign_in")}
         </Link>
       </p>
@@ -303,6 +345,9 @@ export default function SignupPage() {
 
       <div className="flex flex-col gap-3 mb-2">
         <form action={googleAction}>
+          {desktopCallbackUrl && (
+            <input type="hidden" name="redirect" value={desktopCallbackUrl} />
+          )}
           <button
             disabled={isPending}
             type="submit"
@@ -333,6 +378,9 @@ export default function SignupPage() {
         </form>
 
         <form action={fbAction}>
+          {desktopCallbackUrl && (
+            <input type="hidden" name="redirect" value={desktopCallbackUrl} />
+          )}
           <button
             disabled={isPending}
             type="submit"

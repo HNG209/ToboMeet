@@ -49,15 +49,27 @@ export async function middleware(request: NextRequest) {
   const cookieLocale = request.cookies.get("NEXT_LOCALE")?.value;
   const currentLocale = localeMatch ? localeMatch[1] : cookieLocale || "vi";
 
-  const isCallbackPage = pathWithoutLocale.startsWith("/auth/callback");
+  const isCallbackPage =
+    pathWithoutLocale.startsWith("/auth/callback") ||
+    pathWithoutLocale.startsWith("/auth/desktop-callback");
   const isRoomJoinPage = pathWithoutLocale.startsWith("/room/join");
   const isMeetingPage = pathWithoutLocale.startsWith("/meeting");
+  const isDesktopApp = (request.headers.get("user-agent") || "").includes(
+    "ToboMeetDesktop",
+  );
   const isPublicPage =
     isAuthPage ||
     isHomePage ||
     isCallbackPage ||
     isRoomJoinPage ||
     isMeetingPage;
+
+  // Nếu đang mở trên Electron Desktop khi chưa đăng nhập và vào trang chủ (/) -> chuyển thẳng vào /login (hiển thị DesktopAuthGate)
+  if (!user && isHomePage && isDesktopApp) {
+    return NextResponse.redirect(
+      new URL(`/${currentLocale}/login`, request.url),
+    );
+  }
 
   // Nếu vào trang admin mà không có user hoặc role không phải admin -> Giả vờ như trang không tồn tại (404)
   if (isAdminPage && role !== "admin") {
@@ -70,6 +82,26 @@ export async function middleware(request: NextRequest) {
     pathWithoutLocale === "/signup" ||
     pathWithoutLocale === "/forgot-password";
   if (user && (isAuthRestricted || isHomePage) && !isResetting) {
+    // Nếu trình duyệt mở /login hoặc /signup từ Desktop App khi user ĐÃ đăng nhập sẵn trên web -> chuyển thẳng tới desktop-callback
+    const sourceParam = request.nextUrl.searchParams.get("source");
+    const stateParam = request.nextUrl.searchParams.get("state");
+    if (isAuthRestricted && sourceParam === "desktop" && stateParam) {
+      const desktopCallbackUrl = new URL(
+        `/${currentLocale}/auth/desktop-callback`,
+        request.url,
+      );
+      desktopCallbackUrl.searchParams.set("state", stateParam);
+      const callbackMode = request.nextUrl.searchParams.get("callback_mode");
+      const callbackPort = request.nextUrl.searchParams.get("callback_port");
+      if (callbackMode) {
+        desktopCallbackUrl.searchParams.set("callback_mode", callbackMode);
+      }
+      if (callbackPort) {
+        desktopCallbackUrl.searchParams.set("callback_port", callbackPort);
+      }
+      return NextResponse.redirect(desktopCallbackUrl);
+    }
+
     const redirectParam = request.nextUrl.searchParams.get("redirect");
     if (redirectParam) {
       return NextResponse.redirect(new URL(redirectParam, request.url));
