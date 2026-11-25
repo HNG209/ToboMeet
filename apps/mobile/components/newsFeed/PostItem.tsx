@@ -24,7 +24,7 @@ import { REACTION_ICONS } from "./ReactionPicker";
 import ReactionPicker from "./ReactionPicker";
 import CommentSectionModal from "./CommentSectionModal";
 import PostReactionsModal from "./PostReactionsModal";
-import { renderFormattedText } from "../../utils/markdownParser";
+import { RichTextContent } from "../../utils/markdownParser";
 
 interface PostItemProps {
   post: PostDto;
@@ -48,6 +48,7 @@ export default function PostItem({
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showMenuModal, setShowMenuModal] = useState(false);
   const [showPostReactionsModal, setShowPostReactionsModal] = useState(false);
+  const [isContentExpanded, setIsContentExpanded] = useState(false);
 
   const isAuthor = post.authorId === currentUserId;
 
@@ -283,10 +284,37 @@ export default function PostItem({
         </View>
       ) : (
         <>
-          {/* Content */}
-          <Text className="text-base text-slate-700 leading-relaxed mb-3">
-            {renderFormattedText(post.content)}
-          </Text>
+          {/* Content (Rich Text) */}
+          {!!post.content && (
+            <View className="mb-3">
+              <RichTextContent
+                content={
+                  post.content.length > 350 && !isContentExpanded
+                    ? post.content.substring(0, 350) + "..."
+                    : post.content
+                }
+              />
+              {post.content.length > 350 && (
+                <TouchableOpacity
+                  onPress={() => setIsContentExpanded((prev) => !prev)}
+                  className="mt-1 self-start"
+                  activeOpacity={0.7}
+                >
+                  <Text className="text-xs font-bold text-[#0052FF]">
+                    {isContentExpanded
+                      ? t("news_feed.show_less", {
+                          defaultValue:
+                            i18n.language === "vi" ? "Thu gọn" : "Show less",
+                        })
+                      : t("news_feed.view_more", {
+                          defaultValue:
+                            i18n.language === "vi" ? "Xem thêm" : "View more",
+                        })}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
 
           {/* Attachments */}
           {post.attachments && post.attachments.length > 0 && (

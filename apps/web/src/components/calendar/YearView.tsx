@@ -1,7 +1,12 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { CalendarEvent } from "./types";
+import {
+  CalendarEvent,
+  getLocalDateKey,
+  splitCrossDayEvents,
+} from "./types";
 
 interface YearViewProps {
   locale: string;
@@ -27,6 +32,13 @@ export default function YearView({
     "Sat",
   ];
   const year = currentDate.getFullYear();
+  const eventDateKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const seg of splitCrossDayEvents(events)) {
+      keys.add(getLocalDateKey(seg.segmentStart));
+    }
+    return keys;
+  }, [events]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 bg-white p-6 border border-slate-200 rounded-2xl shadow-sm">
@@ -71,11 +83,7 @@ export default function YearView({
                   cellDate.toDateString() === currentDate.toDateString();
                 const isCurrentMonth = cellDate.getMonth() === monthIdx;
 
-                const hasEvents = events.some(
-                  (ev) =>
-                    new Date(ev.startDate).toDateString() ===
-                    cellDate.toDateString(),
-                );
+                const hasEvents = eventDateKeys.has(getLocalDateKey(cellDate));
 
                 return (
                   <button

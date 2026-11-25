@@ -130,4 +130,6 @@ export class AssignmentSubmission {
 export const AssignmentSubmissionSchema = SchemaFactory.createForClass(AssignmentSubmission);
 // Compound index cho phép nhiều lượt nộp (attemptNumber khác nhau) nhưng đảm bảo không trùng lặp cùng 1 attempt
 AssignmentSubmissionSchema.index({ assignmentId: 1, studentId: 1, attemptNumber: 1 }, { unique: true });
+// Tối ưu truy vấn danh sách bài nộp của 1 học viên cho nhiều nhiệm vụ trong CalendarService.getEvents
+AssignmentSubmissionSchema.index({ studentId: 1, assignmentId: 1, attemptNumber: -1 });
 

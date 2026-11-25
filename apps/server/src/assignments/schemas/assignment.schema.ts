@@ -165,6 +165,9 @@ export class Assignment {
 
 export const AssignmentSchema = SchemaFactory.createForClass(Assignment);
 
-// Compound indexes tối ưu tìm kiếm deadline theo phòng & thời gian
-AssignmentSchema.index({ deadline: 1, status: 1 });
-AssignmentSchema.index({ roomId: 1, deadline: 1, status: 1 });
+// Compound indexes tối ưu theo quy tắc ESR (Equality -> Sort -> Range)
+AssignmentSchema.index({ status: 1, deadline: 1 });
+AssignmentSchema.index({ roomId: 1, status: 1, deadline: 1 });
+AssignmentSchema.index({ roomId: 1, status: 1, startDate: 1 });
+AssignmentSchema.index({ createdBy: 1, status: 1, deadline: 1 });
+AssignmentSchema.index({ createdBy: 1, status: 1, startDate: 1 });

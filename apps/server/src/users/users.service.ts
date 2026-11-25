@@ -178,6 +178,14 @@ export class UsersService {
       ? tokenPayload.email.trim().toLowerCase()
       : "";
     const metadata = tokenPayload.user_metadata || {};
+    const rawAppRole =
+      typeof tokenPayload.app_metadata?.role === "string"
+        ? tokenPayload.app_metadata.role.trim().toLowerCase()
+        : undefined;
+    const validTokenRole =
+      rawAppRole && ["admin", "user", "moderator"].includes(rawAppRole)
+        ? rawAppRole
+        : undefined;
 
     let user = await this.userModel.findOne({
       $or: [
@@ -187,24 +195,28 @@ export class UsersService {
     });
 
     if (user) {
-      let hasChanges = false;
+      const updates: Record<string, unknown> = {};
       if (user.supabaseId !== userId) {
-        user.supabaseId = userId;
-        hasChanges = true;
+        updates.supabaseId = userId;
+      }
+      // Đồng bộ role từ Supabase app_metadata về MongoDB nếu bị lệch
+      if (validTokenRole && user.role !== validTokenRole) {
+        updates.role = validTokenRole;
       }
       // Giữ nguyên displayName và avatarUrl nếu user đã có trong DB
       // Không ghi đè khi người dùng đăng nhập bằng phương thức khác cho cùng email
       if (!user.displayName && metadata.full_name) {
-        user.displayName = metadata.full_name;
-        hasChanges = true;
+        updates.displayName = metadata.full_name;
       }
       if (!user.avatarUrl && metadata.avatar_url) {
-        user.avatarUrl = metadata.avatar_url;
-        hasChanges = true;
+        updates.avatarUrl = metadata.avatar_url;
       }
-      if (hasChanges) {
-        await user.save();
-        console.log(`Đã cập nhật/đồng bộ user: ${email}`);
+      if (Object.keys(updates).length > 0) {
+        const updated = await this.userModel
+          .findByIdAndUpdate(user._id, { $set: updates }, { new: true })
+          .exec();
+        if (updated) user = updated;
+        console.log(`Đã cập nhật/đồng bộ user: ${email}`, updates);
       }
     } else {
       user = await this.userModel.create({
@@ -212,6 +224,7 @@ export class UsersService {
         email: email,
         displayName: metadata.full_name || (email ? email.split("@")[0] : "User"),
         avatarUrl: metadata.avatar_url || "",
+        role: validTokenRole || "user",
       });
       console.log(`Đã tạo mới user: ${email}`);
     }

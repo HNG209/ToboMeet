@@ -69,6 +69,7 @@ export const adminApi = baseApi.injectEndpoints({
         method: "POST",
         data,
       }),
+      invalidatesTags: ["User"],
     }),
     updateUser: builder.mutation<AdminUserResponse, { id: string; displayName: string; role: string; status: string }>({
       query: ({ id, ...data }) => ({
@@ -76,6 +77,7 @@ export const adminApi = baseApi.injectEndpoints({
         method: "PUT",
         data,
       }),
+      invalidatesTags: ["User"],
     }),
     resetPassword: builder.mutation<{ success: boolean; message: string }, string>({
       query: (id) => ({

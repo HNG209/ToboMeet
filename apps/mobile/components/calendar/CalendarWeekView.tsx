@@ -10,7 +10,15 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
-import { CalendarEvent, getWeekDates, getEventColors } from "./types";
+import {
+  CalendarEvent,
+  CalendarEventSegment,
+  getWeekDates,
+  getEventColors,
+  getLocalDateKey,
+  isMidnightNextDay,
+  splitCrossDayEvents,
+} from "./types";
 
 interface CalendarWeekViewProps {
   selectedDate: Date;
@@ -55,19 +63,26 @@ export default function CalendarWeekView({
 
   const isToday = new Date().toDateString() === selectedDate.toDateString();
 
-  const selectedDayEvents = events
-    .filter((e) => {
-      const eDate = new Date(e.startDate);
-      return (
-        eDate.getFullYear() === selectedDate.getFullYear() &&
-        eDate.getMonth() === selectedDate.getMonth() &&
-        eDate.getDate() === selectedDate.getDate()
-      );
-    })
-    .sort(
-      (a, b) =>
-        new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+  const segmentsByDay = React.useMemo(() => {
+    const map = new Map<string, CalendarEventSegment[]>();
+    for (const seg of splitCrossDayEvents(events)) {
+      const key = getLocalDateKey(seg.segmentStart);
+      const list = map.get(key);
+      if (list) {
+        list.push(seg);
+      } else {
+        map.set(key, [seg]);
+      }
+    }
+    return map;
+  }, [events]);
+
+  const selectedDaySegments = React.useMemo(() => {
+    const list = segmentsByDay.get(getLocalDateKey(selectedDate)) ?? [];
+    return [...list].sort(
+      (a, b) => a.anchorTime.getTime() - b.anchorTime.getTime()
     );
+  }, [segmentsByDay, selectedDate]);
 
   const getDayHeaderText = (date: Date) => {
     const localeCode = isVi ? "vi-VN" : "en-US";
@@ -79,18 +94,14 @@ export default function CalendarWeekView({
     });
   };
 
-  const renderWeekEventCard = (item: CalendarEvent) => {
-    const startDate = new Date(item.startDate);
-    const endDate = new Date(item.endDate);
+  const renderWeekEventCard = (seg: CalendarEventSegment) => {
+    const item = seg.originalEvent;
     const localeCode = isVi ? "vi-VN" : "en-US";
-    const startTimeStr = startDate.toLocaleTimeString(localeCode, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-    const endTimeStr = endDate.toLocaleTimeString(localeCode, {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const fmtTime = (d: Date) =>
+      d.toLocaleTimeString(localeCode, {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
 
     const isChannelMeeting =
       item.roomType === "channel_meeting" && item.roomId && item.channelId;
@@ -98,9 +109,33 @@ export default function CalendarWeekView({
     const isRecur = Boolean(item.recurrenceRule || item.isRecurring);
     const colors = getEventColors(item);
 
+    const segmentBadge =
+      seg.segmentRole === "start"
+        ? t("calendar.segment_start", {
+            defaultValue: isVi ? "Bắt đầu" : "Start",
+          })
+        : seg.segmentRole === "end"
+        ? isAssignment
+          ? t("calendar.assignment_due", {
+              defaultValue: isVi ? "Hạn nộp" : "Due",
+            })
+          : t("calendar.segment_end", {
+              defaultValue: isVi ? "Kết thúc" : "End",
+            })
+        : null;
+
+    const timeLabel =
+      seg.segmentRole === "start" || seg.segmentRole === "end"
+        ? `${segmentBadge} • ${fmtTime(seg.anchorTime)}`
+        : isMidnightNextDay(seg.rawStart, seg.rawEnd)
+        ? `${fmtTime(seg.rawStart)} - 24:00`
+        : seg.rawStart.getTime() === seg.rawEnd.getTime()
+        ? fmtTime(seg.rawStart)
+        : `${fmtTime(seg.rawStart)} - ${fmtTime(seg.rawEnd)}`;
+
     return (
       <TouchableOpacity
-        key={`${item._id}_${item.startDate}`}
+        key={seg.segmentKey}
         activeOpacity={0.7}
         disabled={detailPrefetching === item._id}
         onPress={() => onEventPress(item)}
@@ -114,13 +149,32 @@ export default function CalendarWeekView({
           <View className="flex-row items-center gap-1.5">
             <Feather name="clock" size={12} color="#64748B" />
             <Text className="text-xs font-semibold text-slate-600">
-              {isAssignment
-                ? `${startTimeStr}`
-                : `${startTimeStr} - ${endTimeStr}`}
+              {timeLabel}
             </Text>
           </View>
 
           <View className="flex-row items-center gap-1.5">
+            {segmentBadge && (
+              <View
+                className="px-2 py-0.5 rounded-md border"
+                style={{
+                  backgroundColor:
+                    seg.segmentRole === "start" ? "#EEF2FF" : "#FFFBEB",
+                  borderColor:
+                    seg.segmentRole === "start" ? "#C7D2FE" : "#FDE68A",
+                }}
+              >
+                <Text
+                  className="text-[10px] font-bold"
+                  style={{
+                    color: seg.segmentRole === "start" ? "#4338CA" : "#B45309",
+                  }}
+                >
+                  {segmentBadge}
+                </Text>
+              </View>
+            )}
+
             {isRecur && (
               <View className="flex-row items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 border border-indigo-200">
                 <Feather name="repeat" size={10} color="#4F46E5" />
@@ -234,14 +288,8 @@ export default function CalendarWeekView({
               const isSelected =
                 selectedDate.toDateString() === dayDate.toDateString();
 
-              const dayEventsCount = events.filter((e) => {
-                const eDate = new Date(e.startDate);
-                return (
-                  eDate.getFullYear() === dayDate.getFullYear() &&
-                  eDate.getMonth() === dayDate.getMonth() &&
-                  eDate.getDate() === dayDate.getDate()
-                );
-              }).length;
+              const dayEventsCount =
+                segmentsByDay.get(getLocalDateKey(dayDate))?.length ?? 0;
 
               return (
                 <TouchableOpacity
@@ -335,8 +383,8 @@ export default function CalendarWeekView({
               <View className="px-2.5 py-0.5 rounded-full bg-slate-200">
                 <Text className="text-xs font-semibold text-slate-600">
                   {t("calendar.meetings_count", {
-                    count: selectedDayEvents.length,
-                    defaultValue: `${selectedDayEvents.length} cuộc họp`,
+                    count: selectedDaySegments.length,
+                    defaultValue: `${selectedDaySegments.length} cuộc họp`,
                   })}
                 </Text>
               </View>
@@ -353,7 +401,7 @@ export default function CalendarWeekView({
                 })}
               </Text>
             </View>
-          ) : selectedDayEvents.length === 0 ? (
+          ) : selectedDaySegments.length === 0 ? (
             <View className="py-16 px-6 items-center justify-center bg-white rounded-2xl border border-slate-200 my-2">
               <View className="w-14 h-14 rounded-full bg-blue-50 items-center justify-center mb-3">
                 <Feather name="calendar" size={26} color="#3B82F6" />
@@ -371,7 +419,7 @@ export default function CalendarWeekView({
             </View>
           ) : (
             <View className="gap-1">
-              {selectedDayEvents.map((event) => renderWeekEventCard(event))}
+              {selectedDaySegments.map((seg) => renderWeekEventCard(seg))}
             </View>
           )}
         </ScrollView>

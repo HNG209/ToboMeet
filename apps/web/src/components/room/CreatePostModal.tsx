@@ -400,12 +400,12 @@ export default function CreatePostModal({
         onDragOver={handleDrag}
         onDragLeave={handleDrag}
         onDrop={handleDrop}
-        className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col z-10 transition-all border duration-200 overflow-hidden ${
+        className={`relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col z-10 transition-all border duration-200 overflow-hidden ${
           dragActive ? "border-brand-500 bg-brand-50/10 scale-[0.99]" : "border-slate-200"
         }`}
       >
         {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+        <div className="shrink-0 flex justify-between items-center px-6 py-4 border-b border-slate-100 bg-slate-50/50">
           <h3 className="text-base font-bold text-slate-800">
             {editPostData ? t("edit_post_title") : t("new_post_title")}
           </h3>
@@ -418,12 +418,14 @@ export default function CreatePostModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-y-auto max-h-[80vh] p-6 space-y-4">
-          {/* Main Input TipTap Rich Text Area */}
-          <div
-            onClick={() => editor?.commands.focus()}
-            className="relative flex-1 min-h-[140px] cursor-text"
-          >
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Scrollable Body: Editor, Validation Error, Attachments */}
+          <div className="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+            {/* Main Input TipTap Rich Text Area */}
+            <div
+              onClick={() => editor?.commands.focus()}
+              className="relative min-h-[140px] cursor-text"
+            >
             <EditorContent editor={editor} />
 
             {/* Mention Dropdown */}
@@ -527,9 +529,10 @@ export default function CreatePostModal({
               ))}
             </div>
           )}
+          </div>
 
-          {/* Form Bottom Bar - Rich Text Toolbar & Upload Buttons */}
-          <div className="border-t border-slate-100 pt-4 flex flex-wrap items-center justify-between gap-3 bg-white">
+          {/* Form Bottom Bar - Pinned at bottom, never pushed up by long content */}
+          <div className="shrink-0 border-t border-slate-100 px-6 py-4 flex flex-wrap items-center justify-between gap-3 bg-white relative z-20">
             {/* Rich Text Options */}
             <div className="flex items-center gap-0.5 border border-slate-200 rounded-lg p-0.5 bg-slate-50">
               <button

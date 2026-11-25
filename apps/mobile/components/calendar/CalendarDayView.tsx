@@ -10,10 +10,14 @@ import { Feather } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import {
   CalendarEvent,
+  CalendarEventSegment,
   HOUR_HEIGHT,
   TIME_AXIS_WIDTH,
   getEventColors,
-  getEventLayout,
+  getSegmentLayout,
+  isMidnightNextDay,
+  isSameLocalDay,
+  splitCrossDayEvents,
 } from "./types";
 
 interface CalendarDayViewProps {
@@ -40,46 +44,41 @@ export default function CalendarDayView({
   screenWidth,
 }: CalendarDayViewProps) {
   const { t, i18n } = useTranslation();
-  const hours = Array.from({ length: 23 }, (_, i) => i + 1);
+  const hours = Array.from({ length: 24 }, (_, i) => i);
   const colWidth = screenWidth - TIME_AXIS_WIDTH - 24;
   const isVi = i18n.language === "vi";
 
-  const dayEvents = events.filter((e) => {
-    const eDate = new Date(e.startDate);
-    return (
-      eDate.getFullYear() === selectedDate.getFullYear() &&
-      eDate.getMonth() === selectedDate.getMonth() &&
-      eDate.getDate() === selectedDate.getDate()
-    );
-  });
+  const daySegments = React.useMemo(
+    () =>
+      splitCrossDayEvents(events).filter((seg) =>
+        isSameLocalDay(seg.segmentStart, selectedDate)
+      ),
+    [events, selectedDate]
+  );
 
   const layoutItems = React.useMemo(() => {
-    const sorted = [...dayEvents].sort((a, b) => {
-      const aStart = new Date(a.startDate).getTime();
-      const bStart = new Date(b.startDate).getTime();
-      return aStart - bStart;
-    });
+    const items = daySegments
+      .map((segment) => {
+        const { top, height, startMinutes, endMinutes } =
+          getSegmentLayout(segment);
 
-    const items = sorted.map((event) => {
-      const { top, height } = getEventLayout(event);
-      const s = new Date(event.startDate);
-      const e = new Date(event.endDate || event.startDate);
-      let startMinutes = s.getHours() * 60 + s.getMinutes();
-      let endMinutes = e.getHours() * 60 + e.getMinutes();
-      if (endMinutes <= startMinutes) {
-        endMinutes = startMinutes + 30;
-      }
-
-      return {
-        event,
-        top,
-        height,
-        startMinutes,
-        endMinutes,
-        colIndex: 0,
-        totalCols: 1,
-      };
-    });
+        return {
+          segment,
+          event: segment.originalEvent,
+          top,
+          height,
+          startMinutes,
+          endMinutes,
+          colIndex: 0,
+          totalCols: 1,
+        };
+      })
+      .sort((a, b) => {
+        if (a.startMinutes !== b.startMinutes) {
+          return a.startMinutes - b.startMinutes;
+        }
+        return b.endMinutes - a.endMinutes;
+      });
 
     // Cụm các sự kiện trùng nhau
     const clusters: (typeof items)[] = [];
@@ -130,7 +129,7 @@ export default function CalendarDayView({
     const maxCols =
       items.length > 0 ? Math.max(1, ...items.map((i) => i.totalCols)) : 1;
     return { items, maxCols };
-  }, [dayEvents]);
+  }, [daySegments]);
 
   const MIN_MOBILE_COL_WIDTH = 150;
   const effectiveColWidth = Math.max(
@@ -148,13 +147,33 @@ export default function CalendarDayView({
     });
   };
 
-  const formatEventTime = (startDate: string, endDate: string) => {
-    const s = new Date(startDate);
-    const e = new Date(endDate);
+  const formatSegmentTime = (seg: CalendarEventSegment) => {
     const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${pad(s.getHours())}:${pad(s.getMinutes())} - ${pad(
-      e.getHours()
-    )}:${pad(e.getMinutes())}`;
+    const fmt = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const isAssignment = seg.originalEvent.eventType === "assignment";
+
+    if (seg.segmentRole === "start") {
+      return `${t("calendar.segment_start", {
+        defaultValue: isVi ? "Bắt đầu" : "Start",
+      })} ${fmt(seg.anchorTime)}`;
+    }
+    if (seg.segmentRole === "end") {
+      const label = isAssignment
+        ? t("calendar.assignment_due", {
+            defaultValue: isVi ? "Hạn nộp" : "Due",
+          })
+        : t("calendar.segment_end", {
+            defaultValue: isVi ? "Kết thúc" : "End",
+          });
+      return `${label} ${fmt(seg.anchorTime)}`;
+    }
+    if (isMidnightNextDay(seg.rawStart, seg.rawEnd)) {
+      return `${fmt(seg.rawStart)} - 24:00`;
+    }
+    if (seg.rawStart.getTime() === seg.rawEnd.getTime()) {
+      return fmt(seg.rawStart);
+    }
+    return `${fmt(seg.rawStart)} - ${fmt(seg.rawEnd)}`;
   };
 
   return (
@@ -199,7 +218,7 @@ export default function CalendarDayView({
               className="relative"
               style={{
                 width: effectiveColWidth,
-                height: 23 * HOUR_HEIGHT,
+                height: 24 * HOUR_HEIGHT,
               }}
             >
               {/* Horizontal Grid lines */}
@@ -215,7 +234,7 @@ export default function CalendarDayView({
 
               {/* Day Events positioned side-by-side without squashing */}
               {layoutItems.items.map(
-                ({ event, top, height, colIndex, totalCols }) => {
+                ({ segment, event, top, height, colIndex, totalCols }) => {
                   const colors = getEventColors(event);
                   const isAssignment = event.eventType === "assignment";
                   const isRecur = Boolean(
@@ -223,10 +242,24 @@ export default function CalendarDayView({
                   );
                   const width = effectiveColWidth / totalCols;
                   const left = colIndex * width;
+                  const segmentBadge =
+                    segment.segmentRole === "start"
+                      ? t("calendar.segment_start", {
+                          defaultValue: isVi ? "Bắt đầu" : "Start",
+                        })
+                      : segment.segmentRole === "end"
+                      ? isAssignment
+                        ? t("calendar.assignment_due", {
+                            defaultValue: isVi ? "Hạn nộp" : "Due",
+                          })
+                        : t("calendar.segment_end", {
+                            defaultValue: isVi ? "Kết thúc" : "End",
+                          })
+                      : null;
 
                   return (
                     <TouchableOpacity
-                      key={`${event._id}_${event.startDate}`}
+                      key={segment.segmentKey}
                       disabled={detailPrefetching === event._id}
                       onPress={() => onEventPress(event)}
                       className="rounded-xl p-2 justify-between shadow-xs"
@@ -267,6 +300,21 @@ export default function CalendarDayView({
                               }] ${event.title}`
                             : event.title}
                         </Text>
+                        {segmentBadge && (
+                          <View className="px-1.5 py-0.5 rounded bg-white/85">
+                            <Text
+                              className="text-[9px] font-bold"
+                              style={{
+                                color:
+                                  segment.segmentRole === "start"
+                                    ? "#4338CA"
+                                    : "#B45309",
+                              }}
+                            >
+                              {segmentBadge}
+                            </Text>
+                          </View>
+                        )}
                       </View>
 
                       {/* Hiển thị giờ sự kiện đầy đủ, rõ ràng */}
@@ -275,7 +323,7 @@ export default function CalendarDayView({
                         style={{ color: colors.text }}
                         numberOfLines={1}
                       >
-                        {formatEventTime(event.startDate, event.endDate)}
+                        {formatSegmentTime(segment)}
                       </Text>
                     </TouchableOpacity>
                   );

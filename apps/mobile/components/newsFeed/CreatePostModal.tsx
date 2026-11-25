@@ -219,7 +219,7 @@ export default function CreatePostModal({
 
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "height"}
-          className="w-full max-w-lg bg-white rounded-3xl overflow-hidden shadow-2xl z-10 border border-slate-100"
+          className="w-full max-w-lg max-h-[85%] bg-white rounded-3xl overflow-hidden shadow-2xl z-10 border border-slate-100"
         >
           {/* Header */}
           <View className="px-6 py-4 border-b border-slate-100 flex-row justify-between items-center bg-white">
@@ -236,7 +236,12 @@ export default function CreatePostModal({
           </View>
 
           {/* Body Content */}
-          <ScrollView contentContainerStyle={{ padding: 20 }}>
+          <ScrollView
+            className="flex-shrink"
+            style={{ maxHeight: 360 }}
+            contentContainerStyle={{ padding: 20 }}
+            keyboardShouldPersistTaps="handled"
+          >
             <TextInput
               value={content}
               onChangeText={setContent}
@@ -317,7 +322,7 @@ export default function CreatePostModal({
                 <Feather name="italic" size={15} color="#475569" />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => insertFormatting("<u>", "</u>")}
+                onPress={() => insertFormatting("__", "__")}
                 className="w-8 h-8 rounded-lg justify-center items-center active:bg-slate-200"
               >
                 <Feather name="underline" size={15} color="#475569" />

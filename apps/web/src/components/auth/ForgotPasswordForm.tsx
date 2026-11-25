@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   CheckCircle2,
   Send,
-  ShieldCheck,
   RefreshCw,
   AlertCircle,
   Eye,
@@ -307,13 +306,6 @@ export default function ForgotPasswordForm() {
                 )}
               </button>
             </form>
-
-            <div className="mt-6 flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-emerald-50/50 border border-emerald-100/50 text-emerald-600">
-              <ShieldCheck size={14} />
-              <p className="text-[12px] leading-relaxed font-medium">
-                {t("security_note")}
-              </p>
-            </div>
 
             <div className="mt-6 text-center">
               <Link

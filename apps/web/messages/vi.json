@@ -362,7 +362,8 @@
     "error_personal_meeting_link": "Không thể lấy link cuộc họp cá nhân",
     "view_edit_profile": "Bấm để xem & chỉnh sửa thông tin cá nhân",
     "edit_profile_hint": "Chỉnh sửa trang cá nhân →",
-    "profile_menu_item": "Hồ sơ cá nhân"
+    "profile_menu_item": "Hồ sơ cá nhân",
+    "admin_mode": "Chế độ quản trị"
   },
   "settings": {
     "title": "Cài đặt",
@@ -2383,6 +2384,9 @@
     "event_item": {
       "assignment_tag": "[Nhiệm vụ]",
       "recur_badge": "Định kì",
+      "segment_start": "Bắt đầu",
+      "segment_end": "Kết thúc",
+      "assignment_due": "Hạn nộp",
       "assignment_status": {
         "submitted": "Đã nộp",
         "graded": "Đã chấm",

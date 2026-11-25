@@ -405,7 +405,31 @@ export class CalendarService {
     });
 
     const query = { $and: andConditions };
-    const events = await this.calendarEventModel.find(query).lean().exec();
+
+    // Chạy song song: truy vấn CalendarEvent và danh sách phòng user đang tham gia (Room-first)
+    const [events, userRooms] = await Promise.all([
+      this.calendarEventModel.find(query).lean().exec(),
+      filters?.createdByMe
+        ? Promise.resolve([] as any[])
+        : this.roomModel
+            .find(
+              {
+                ...(filters?.roomId ? { _id: filters.roomId } : {}),
+                isDeleted: { $ne: true },
+                $or: [
+                  { members: { $elemMatch: { userId, status: "active" } } },
+                  { ownerId: userId },
+                ],
+              },
+              {
+                _id: 1,
+                members: { $elemMatch: { userId, status: "active" } },
+              },
+            )
+            .lean()
+            .exec(),
+    ]);
+
     const resultEvents: any[] = [];
 
     for (const event of events) {
@@ -458,24 +482,110 @@ export class CalendarService {
       }
     }
 
-    // Đính kèm thông tin người tổ chức (hostEmail, hostDisplayName) - BATCH QUERY (O(1) thay vì O(N))
-    const hostIds = Array.from(
-      new Set(resultEvents.map((e) => e.hostId).filter(Boolean)),
+    // Truy vấn Assignment đã được thu hẹp phạm vi theo phòng & đẩy điều kiện phân quyền xuống MongoDB
+    // Hỗ trợ lấy cả nhiệm vụ có mốc bắt đầu (startDate) hoặc hạn nộp (deadline) nằm trong khoảng [rangeStart, rangeEnd]
+    const assignmentTimeCondition = {
+      $or: [
+        { deadline: { $gte: rangeStart, $lte: rangeEnd } },
+        { startDate: { $gte: rangeStart, $lte: rangeEnd } },
+      ],
+    };
+
+    const userRoomIds = userRooms.map((r: any) => r._id.toString());
+    let assignments: any[] = [];
+
+    if (filters?.createdByMe) {
+      const createdByMeQuery: Record<string, unknown> = {
+        status: "published",
+        createdBy: userId,
+        ...assignmentTimeCondition,
+      };
+      if (filters.roomId) {
+        createdByMeQuery.roomId = filters.roomId;
+      }
+      assignments = await this.assignmentModel
+        .find(createdByMeQuery)
+        .select(
+          "title description roomId channelIds startDate createdAt deadline submissionPolicy createdBy",
+        )
+        .lean()
+        .exec();
+    } else if (userRoomIds.length > 0) {
+      const memberIdentifiers = Array.from(
+        new Set([
+          userId,
+          ...userRooms
+            .map((r: any) => r.members?.[0]?._id?.toString())
+            .filter(Boolean),
+        ]),
+      );
+
+      const assignmentQuery = {
+        $and: [
+          { status: "published" },
+          { roomId: { $in: userRoomIds } },
+          assignmentTimeCondition,
+          {
+            $or: [
+              { createdBy: userId },
+              {
+                recipientType: {
+                  $nin: ["specific_members", "current_members"],
+                },
+              },
+              { recipientMemberIds: { $size: 0 } },
+              { recipientMemberIds: { $in: memberIdentifiers } },
+            ],
+          },
+        ],
+      };
+
+      assignments = await this.assignmentModel
+        .find(assignmentQuery)
+        .select(
+          "title description roomId channelIds startDate createdAt deadline submissionPolicy createdBy",
+        )
+        .lean()
+        .exec();
+    }
+
+    // Gộp 1 lần query User duy nhất cho cả host của CalendarEvent và người giao của Assignment,
+    // chạy song song với query AssignmentSubmission (chỉ select các trường cần thiết)
+    const allUserIds = Array.from(
+      new Set([
+        ...resultEvents.map((e) => e.hostId).filter(Boolean),
+        ...assignments.map((a) => a.createdBy).filter(Boolean),
+      ]),
     );
-    const hostUsers =
-      hostIds.length > 0
-        ? await this.userModel
-          .find({ supabaseId: { $in: hostIds } })
-          .select("supabaseId email displayName avatarUrl")
-          .lean()
-          .exec()
-        : [];
-    const hostUserMap = new Map<string, any>(
-      hostUsers.map((u: any) => [u.supabaseId, u] as [string, any]),
+    const assignmentIds = assignments.map((a) => a._id.toString());
+
+    const [users, submissions] = await Promise.all([
+      allUserIds.length > 0
+        ? this.userModel
+            .find({ supabaseId: { $in: allUserIds } })
+            .select("supabaseId email displayName avatarUrl")
+            .lean()
+            .exec()
+        : Promise.resolve([] as any[]),
+      assignmentIds.length > 0
+        ? this.submissionModel
+            .find({
+              studentId: userId,
+              assignmentId: { $in: assignmentIds },
+            })
+            .select("assignmentId score submittedAt attemptNumber")
+            .sort({ attemptNumber: -1 })
+            .lean()
+            .exec()
+        : Promise.resolve([] as any[]),
+    ]);
+
+    const userMap = new Map<string, any>(
+      users.map((u: any) => [u.supabaseId, u] as [string, any]),
     );
 
     const finalEvents: any[] = resultEvents.map((e) => {
-      const hostUser = hostUserMap.get(e.hostId);
+      const hostUser = userMap.get(e.hostId);
       const eventObj = typeof e.toObject === "function" ? e.toObject() : e;
       return {
         ...eventObj,
@@ -487,85 +597,21 @@ export class CalendarService {
       };
     });
 
-    // Tìm các nhiệm vụ (Assignment) có hạn nộp (deadline) trong khoảng thời gian [rangeStart, rangeEnd]
-    const assignmentQuery: Record<string, unknown> = {
-      deadline: { $gte: rangeStart, $lte: rangeEnd },
-      status: "published",
-    };
-
-    if (filters?.roomId) {
-      assignmentQuery.roomId = filters.roomId;
-    }
-
-    const assignments = await this.assignmentModel
-      .find(assignmentQuery)
-      .lean()
-      .exec();
-    const now = new Date();
-
     if (assignments.length > 0) {
-      const roomIds = Array.from(new Set(assignments.map((a) => a.roomId)));
-      const assignmentIds = assignments.map((a) => a._id.toString());
-      const creatorIds = Array.from(
-        new Set(assignments.map((a) => a.createdBy).filter(Boolean)),
-      );
+      const now = new Date();
 
-      // Query gộp theo lô song song (Parallel Batching - 3 queries chạy cùng lúc)
-      const [rooms, submissions, creatorUsers] = await Promise.all([
-        this.roomModel.find({ _id: { $in: roomIds } }).lean().exec(),
-        this.submissionModel
-          .find({
-            assignmentId: { $in: assignmentIds },
-            studentId: userId,
-          })
-          .lean()
-          .exec(),
-        creatorIds.length > 0
-          ? this.userModel
-            .find({ supabaseId: { $in: creatorIds } })
-            .select("supabaseId email displayName avatarUrl")
-            .lean()
-            .exec()
-          : [],
-      ]);
-
-      const roomMap = new Map<string, any>(
-        rooms.map((r: any) => [r._id.toString(), r] as [string, any]),
-      );
-      const submissionMap = new Map<string, any>(
-        submissions.map((s: any) => [s.assignmentId, s] as [string, any]),
-      );
-      const creatorMap = new Map<string, any>(
-        creatorUsers.map((u: any) => [u.supabaseId, u] as [string, any]),
-      );
+      // Với nhiều lượt nộp (attemptNumber), ưu tiên bản đã chấm điểm, nếu không thì lấy lượt mới nhất
+      const hasScore = (sub: any) =>
+        sub?.score !== undefined && sub?.score !== null;
+      const submissionMap = new Map<string, any>();
+      for (const s of submissions) {
+        const existing = submissionMap.get(s.assignmentId);
+        if (!existing || (!hasScore(existing) && hasScore(s))) {
+          submissionMap.set(s.assignmentId, s);
+        }
+      }
 
       for (const assignment of assignments) {
-        const room = roomMap.get(assignment.roomId);
-        if (!room) continue;
-
-        const isCreator = assignment.createdBy === userId;
-        const member = room.members?.find(
-          (m: any) => m.userId === userId && m.status === "active",
-        );
-
-        // Quyền truy cập: Người tạo HOẶC thành viên hợp lệ trong phòng
-        if (!isCreator) {
-          if (!member) continue;
-
-          if (
-            (assignment.recipientType === "specific_members" ||
-              assignment.recipientType === "current_members") &&
-            assignment.recipientMemberIds?.length > 0
-          ) {
-            const userMemberId = (member as any)._id?.toString();
-            const hasAccess =
-              assignment.recipientMemberIds.includes(userId) ||
-              (userMemberId &&
-                assignment.recipientMemberIds.includes(userMemberId));
-            if (!hasAccess) continue;
-          }
-        }
-
         // Xác định trạng thái của nhiệm vụ đối với người dùng này từ Cache Map O(1)
         let assignmentStatus:
           | "in_progress"
@@ -597,15 +643,19 @@ export class CalendarService {
         }
 
         // Thông tin người giao từ Map O(1)
-        const creatorUser = creatorMap.get(assignment.createdBy);
+        const creatorUser = userMap.get(assignment.createdBy);
+        const anchorDate =
+          assignment.deadline ||
+          assignment.startDate ||
+          (assignment as any).createdAt;
 
         finalEvents.push({
           _id: `assignment_${assignment._id}`,
           assignmentId: assignment._id.toString(),
           title: assignment.title || "Nhiệm vụ",
           description: assignment.description || "",
-          startDate: assignment.deadline,
-          endDate: assignment.deadline,
+          startDate: anchorDate,
+          endDate: anchorDate,
           assignmentStartDate:
             assignment.startDate || (assignment as any).createdAt,
           assignmentDueDate: assignment.deadline,
@@ -617,7 +667,7 @@ export class CalendarService {
           hostId: assignment.createdBy,
           hostEmail: creatorUser ? creatorUser.email : "",
           hostDisplayName: creatorUser
-            ? creatorUser.displayName || creatorUser.email.split("@")[0]
+            ? creatorUser.displayName || creatorUser.email?.split("@")[0] || ""
             : "",
           hostAvatarUrl: creatorUser ? creatorUser.avatarUrl : "",
           roomType: "classroom",

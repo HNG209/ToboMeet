@@ -126,6 +126,138 @@ export const getCacheKey = (date: Date) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}`;
 };
 
+export type EventSegmentRole = "single" | "start" | "end";
+
+export interface CalendarEventSegment {
+  segmentKey: string;
+  originalEvent: CalendarEvent;
+  segmentRole: EventSegmentRole;
+  segmentStart: Date;
+  segmentEnd: Date;
+  anchorTime: Date;
+  rawStart: Date;
+  rawEnd: Date;
+  isCrossDay: boolean;
+}
+
+export const isSameLocalDay = (a: Date, b: Date): boolean =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+export const getLocalDateKey = (d: Date): string =>
+  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+export const isMidnightNextDay = (start: Date, end: Date): boolean => {
+  const nextMidnight = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate() + 1,
+    0,
+    0,
+    0,
+    0,
+  );
+  return end.getTime() === nextMidnight.getTime();
+};
+
+/**
+ * Tách sự kiện kéo dài qua ngày khác thành đúng 2 lịch con dạng mốc ngắn (bắt đầu & kết thúc),
+ * áp dụng cho cả sự kiện thông thường và nhiệm vụ (Assignment).
+ */
+export const splitCrossDayEvents = (
+  events: CalendarEvent[],
+  milestoneMinutes = 45,
+): CalendarEventSegment[] => {
+  const segments: CalendarEventSegment[] = [];
+  const slotMs = milestoneMinutes * 60 * 1000;
+
+  for (const ev of events) {
+    const isAssignment = ev.eventType === "assignment";
+    const rawStart = new Date(
+      isAssignment ? ev.assignmentStartDate || ev.startDate : ev.startDate,
+    );
+    let rawEnd = new Date(
+      isAssignment
+        ? ev.assignmentDueDate || ev.endDate || ev.startDate
+        : ev.endDate || ev.startDate,
+    );
+
+    if (Number.isNaN(rawStart.getTime())) continue;
+    if (Number.isNaN(rawEnd.getTime()) || rawEnd.getTime() < rawStart.getTime()) {
+      rawEnd = new Date(rawStart.getTime());
+    }
+
+    const baseKey = `${ev._id}_${ev.occurrenceDate || ev.startDate}`;
+
+    if (isSameLocalDay(rawStart, rawEnd) || isMidnightNextDay(rawStart, rawEnd)) {
+      segments.push({
+        segmentKey: `${baseKey}_single`,
+        originalEvent: ev,
+        segmentRole: "single",
+        segmentStart: rawStart,
+        segmentEnd: rawEnd,
+        anchorTime: rawStart,
+        rawStart,
+        rawEnd,
+        isCrossDay: false,
+      });
+      continue;
+    }
+
+    const endOfStartDay = new Date(
+      rawStart.getFullYear(),
+      rawStart.getMonth(),
+      rawStart.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
+    const startOfEndDay = new Date(
+      rawEnd.getFullYear(),
+      rawEnd.getMonth(),
+      rawEnd.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+
+    // 1. Lịch con Bắt đầu (mốc ngắn ở ngày bắt đầu)
+    segments.push({
+      segmentKey: `${baseKey}_start`,
+      originalEvent: ev,
+      segmentRole: "start",
+      segmentStart: rawStart,
+      segmentEnd: new Date(
+        Math.min(endOfStartDay.getTime(), rawStart.getTime() + slotMs),
+      ),
+      anchorTime: rawStart,
+      rawStart,
+      rawEnd,
+      isCrossDay: true,
+    });
+
+    // 2. Lịch con Kết thúc (mốc ngắn ở ngày kết thúc)
+    segments.push({
+      segmentKey: `${baseKey}_end`,
+      originalEvent: ev,
+      segmentRole: "end",
+      segmentStart: new Date(
+        Math.max(startOfEndDay.getTime(), rawEnd.getTime() - slotMs),
+      ),
+      segmentEnd: rawEnd,
+      anchorTime: rawEnd,
+      rawStart,
+      rawEnd,
+      isCrossDay: true,
+    });
+  }
+
+  return segments;
+};
+
 export const getDaysOfWeek = (current: Date) => {
   const temp = new Date(current);
   const day = temp.getDay();

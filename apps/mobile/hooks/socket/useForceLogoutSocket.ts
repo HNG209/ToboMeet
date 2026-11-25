@@ -77,10 +77,19 @@ export function useForceLogoutSocket() {
         }
       }
 
+      const isRolePromoted = data?.reason === "role_promoted_admin";
+      const isRoleUpdated = data?.reason === "role_updated";
+
       // Hiển thị thông báo cho user
       Alert.alert(
-        "Phiên đăng nhập kết thúc",
-        "Phiên đăng nhập của bạn đã bị đăng xuất từ một thiết bị khác.",
+        isRolePromoted || isRoleUpdated
+          ? "Quyền tài khoản đã thay đổi"
+          : "Phiên đăng nhập kết thúc",
+        isRolePromoted
+          ? "Tài khoản của bạn đã được cấp quyền Quản trị viên. Vui lòng đăng nhập lại để áp dụng quyền mới."
+          : isRoleUpdated
+            ? "Vai trò tài khoản của bạn đã được cập nhật. Vui lòng đăng nhập lại."
+            : "Phiên đăng nhập của bạn đã bị đăng xuất từ một thiết bị khác.",
         [
           {
             text: "OK",

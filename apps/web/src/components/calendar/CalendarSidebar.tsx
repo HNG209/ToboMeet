@@ -9,7 +9,14 @@ import {
   Clock,
   CalendarCheck,
 } from "lucide-react";
-import { CalendarEvent } from "./types";
+import {
+  CalendarEvent,
+  CalendarEventSegment,
+  getLocalDateKey,
+  isMidnightNextDay,
+  isSameLocalDay,
+  splitCrossDayEvents,
+} from "./types";
 
 interface CalendarSidebarProps {
   locale: string;
@@ -43,44 +50,42 @@ export default function CalendarSidebar({
     cells.push(new Date(startDate.getTime() + i * 24 * 60 * 60 * 1000));
   }
 
-  const todayEvents = useMemo(() => {
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+  const eventSegments = useMemo(() => splitCrossDayEvents(events), [events]);
 
-    return events
-      .filter((ev) => {
-        const isAssignment = ev.eventType === "assignment";
-        const start = new Date(
-          isAssignment ? ev.assignmentStartDate || ev.startDate : ev.startDate,
-        );
-        const end = new Date(
-          isAssignment
-            ? ev.assignmentDueDate || ev.endDate || ev.startDate
-            : ev.endDate || ev.startDate,
-        );
-        return start <= todayEnd && end >= todayStart;
-      })
-      .sort(
-        (a, b) =>
-          new Date(a.startDate).getTime() - new Date(b.startDate).getTime(),
-      );
-  }, [events]);
+  const eventDateKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const seg of eventSegments) {
+      keys.add(getLocalDateKey(seg.segmentStart));
+    }
+    return keys;
+  }, [eventSegments]);
 
-  const formatEventTime = (ev: CalendarEvent) => {
-    const isAssignment = ev.eventType === "assignment";
-    const start = new Date(
-      isAssignment ? ev.assignmentStartDate || ev.startDate : ev.startDate,
-    );
-    const end = new Date(
-      isAssignment
-        ? ev.assignmentDueDate || ev.endDate || ev.startDate
-        : ev.endDate || ev.startDate,
-    );
+  const todaySegments = useMemo(() => {
+    const today = new Date();
+    return eventSegments
+      .filter((seg) => isSameLocalDay(seg.segmentStart, today))
+      .sort((a, b) => a.anchorTime.getTime() - b.anchorTime.getTime());
+  }, [eventSegments]);
+
+  const formatSegmentTime = (seg: CalendarEventSegment) => {
     const pad = (n: number) => n.toString().padStart(2, "0");
-    const sStr = `${pad(start.getHours())}:${pad(start.getMinutes())}`;
-    const eStr = `${pad(end.getHours())}:${pad(end.getMinutes())}`;
+    const fmt = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    const isAssignment = seg.originalEvent.eventType === "assignment";
+
+    if (seg.segmentRole === "start") {
+      return `${t("event_item.segment_start")} ${fmt(seg.anchorTime)}`;
+    }
+    if (seg.segmentRole === "end") {
+      const label = isAssignment
+        ? t("event_item.assignment_due")
+        : t("event_item.segment_end");
+      return `${label} ${fmt(seg.anchorTime)}`;
+    }
+    if (isMidnightNextDay(seg.rawStart, seg.rawEnd)) {
+      return `${fmt(seg.rawStart)} - 24:00`;
+    }
+    const sStr = fmt(seg.rawStart);
+    const eStr = fmt(seg.rawEnd);
     return sStr === eStr ? sStr : `${sStr} - ${eStr}`;
   };
 
@@ -156,10 +161,7 @@ export default function CalendarSidebar({
             const isCurrentMonth = cellDate.getMonth() === currentDate.getMonth();
 
             // Check if date has events for showing event dot indicator
-            const hasEvents = events.some(
-              (ev) =>
-                new Date(ev.startDate).toDateString() === cellDate.toDateString(),
-            );
+            const hasEvents = eventDateKeys.has(getLocalDateKey(cellDate));
 
             return (
               <button
@@ -198,14 +200,14 @@ export default function CalendarSidebar({
               {t("today_schedule.title", { defaultValue: "Lịch hôm nay" })}
             </h3>
           </div>
-          {todayEvents.length > 0 && (
+          {todaySegments.length > 0 && (
             <span className="px-1.5 py-0.5 rounded-full bg-indigo-50 text-[10px] font-bold text-indigo-600">
-              {todayEvents.length}
+              {todaySegments.length}
             </span>
           )}
         </div>
 
-        {todayEvents.length === 0 ? (
+        {todaySegments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-5 px-3 rounded-2xl bg-slate-50/70 border border-dashed border-slate-200/90 text-center">
             <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-2">
               <CalendarCheck className="w-4 h-4 text-slate-400" />
@@ -218,23 +220,26 @@ export default function CalendarSidebar({
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-            {todayEvents.map((ev) => (
-              <div
-                key={ev._id}
-                onClick={() => onSetCurrentDate(new Date(ev.startDate))}
-                className="group p-2.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 hover:border-indigo-300 transition-all cursor-pointer shadow-xs"
-              >
-                <div className="flex items-start justify-between gap-1.5 mb-1">
-                  <h4 className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
-                    {ev.title}
-                  </h4>
+            {todaySegments.map((seg) => {
+              const ev = seg.originalEvent;
+              return (
+                <div
+                  key={seg.segmentKey}
+                  onClick={() => onSetCurrentDate(new Date(seg.segmentStart))}
+                  className="group p-2.5 rounded-xl border border-slate-200/80 bg-white hover:bg-slate-50 hover:border-indigo-300 transition-all cursor-pointer shadow-xs"
+                >
+                  <div className="flex items-start justify-between gap-1.5 mb-1">
+                    <h4 className="text-xs font-bold text-slate-800 truncate group-hover:text-indigo-600 transition-colors">
+                      {ev.title}
+                    </h4>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
+                    <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                    <span>{formatSegmentTime(seg)}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium">
-                  <Clock className="w-3 h-3 text-slate-400 shrink-0" />
-                  <span>{formatEventTime(ev)}</span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -8,14 +8,20 @@ import {
   ForbiddenException,
 } from "@nestjs/common";
 import { InjectModel } from "@nestjs/mongoose";
-import { Model } from "mongoose";
+import { Model, Types } from "mongoose";
 import * as nodemailer from "nodemailer";
 import * as fs from "fs";
 import * as path from "path";
 import { User, UserDocument } from "../users/schemas/user.schema";
+import {
+  DeviceSession,
+  DeviceSessionDocument,
+} from "../users/schemas/device-session.schema";
 import { Room, RoomDocument } from "../rooms/schemas/room.schema";
 import { Meeting, MeetingDocument } from "../meetings/schemas/meeting.schema";
 import { MeetingsGateway } from "../meetings/meetings.gateway";
+import { AppGateway } from "../core/gateways/app.gateway";
+import { SupabaseGuard } from "../core/guards/supabase.guard";
 import { ConfigService } from "@nestjs/config";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
@@ -25,10 +31,13 @@ export class AdminService {
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
+    @InjectModel(DeviceSession.name)
+    private sessionModel: Model<DeviceSessionDocument>,
     @InjectModel(Room.name) private roomModel: Model<RoomDocument>,
     @InjectModel(Meeting.name) private meetingModel: Model<MeetingDocument>,
     @Inject(forwardRef(() => MeetingsGateway))
     private readonly meetingsGateway: MeetingsGateway,
+    private readonly appGateway: AppGateway,
     private configService: ConfigService,
   ) {
     const supabaseUrl = this.configService.get<string>("SUPABASE_URL");
@@ -272,13 +281,13 @@ export class AdminService {
       password && password.trim() ? password.trim() : "12345678";
 
     // 3. Tạo tài khoản trên Supabase Auth
+    const normalizedRole = (role || "user").trim().toLowerCase();
     const { data: supabaseUser, error: supabaseError } =
       await this.supabaseAdmin.auth.admin.createUser({
         email: normalizedEmail,
         password: finalPassword,
         email_confirm: true,
-        role: role || "user",
-        app_metadata: { role: role || "user" },
+        app_metadata: { role: normalizedRole },
         user_metadata: {
           displayName: displayName || normalizedEmail.split("@")[0],
         },
@@ -294,7 +303,7 @@ export class AdminService {
       }
       throw new BadRequestException(
         "Không thể tạo tài khoản trên Supabase: " +
-          (supabaseError?.message || "Lỗi không xác định"),
+        (supabaseError?.message || "Lỗi không xác định"),
       );
     }
 
@@ -333,39 +342,124 @@ export class AdminService {
     status?: string,
     adminEmail?: string,
   ) {
-    this.logEmailDebug(
-      `[Debug] Cập nhật thông tin tài khoản (bởi ${adminEmail || "admin"}): id=${id}, role=${role}, status=${status || "N/A"}`,
-    );
-    const user = await this.userModel.findById(id).exec();
+    const normalizedRole = (role || "user").trim().toLowerCase();
+
+    const user = Types.ObjectId.isValid(id)
+      ? await this.userModel.findById(id).exec()
+      : await this.userModel.findOne({ supabaseId: id }).exec();
+
     if (!user) {
       throw new NotFoundException("Người dùng không tồn tại");
     }
 
-    user.displayName = displayName;
-    user.role = role;
-    await user.save();
+    const updateFields: Record<string, unknown> = {
+      role: normalizedRole,
+    };
+    if (displayName && displayName.trim()) {
+      updateFields.displayName = displayName.trim();
+    }
 
-    // Cập nhật vai trò (role) lên Supabase
+    const normalizedStatus = status?.trim().toLowerCase();
+    if (normalizedStatus === "active") {
+      updateFields.status = "ACTIVE";
+    } else if (normalizedStatus === "locked") {
+      updateFields.status = "BLOCKED";
+    }
+
+    // 1. Cập nhật vai trò (role) trong app_metadata lên Supabase trước để đảm bảo đồng bộ
+    const supabaseUpdatePayload: Record<string, any> = {
+      app_metadata: { role: normalizedRole },
+    };
+    if (normalizedStatus === "active" && user.status === "BLOCKED") {
+      supabaseUpdatePayload.ban_duration = "none";
+    }
+
     const { error: roleError } =
-      await this.supabaseAdmin.auth.admin.updateUserById(user.supabaseId, {
-        role: role,
-        app_metadata: { role: role },
-      });
+      await this.supabaseAdmin.auth.admin.updateUserById(
+        user.supabaseId,
+        supabaseUpdatePayload,
+      );
     if (roleError) {
-      this.logEmailDebug(
-        `Lỗi cập nhật role sang Supabase: ${roleError.message}`,
+      throw new BadRequestException(
+        `Không thể cập nhật quyền trên Supabase: ${roleError.message}`,
+      );
+    }
+
+    // 2. Đồng bộ trực tiếp vào MongoDB bằng $set (tránh lỗi validation từ các trường legacy khác)
+    const previousRole = (user.role || "user").trim().toLowerCase();
+    const updatedUser = await this.userModel
+      .findByIdAndUpdate(user._id, { $set: updateFields }, { new: true })
+      .exec();
+
+    if (!updatedUser) {
+      throw new NotFoundException("Không thể cập nhật người dùng trong MongoDB");
+    }
+
+    // 3. Nếu người dùng vừa được thay đổi quyền (đặc biệt khi cấp quyền admin),
+    // đăng xuất ngay trên tất cả thiết bị để lần đăng nhập tới nhận access token mới có quyền admin
+    if (previousRole !== normalizedRole) {
+      await this.forceLogoutAllUserSessions(
+        user.supabaseId,
+        normalizedRole === "admin" ? "role_promoted_admin" : "role_updated",
       );
     }
 
     return {
-      id: user._id,
-      supabaseId: user.supabaseId,
-      email: user.email,
-      displayName: user.displayName,
-      role: role,
-      status: user.status || "ACTIVE",
-      createdAt: (user as unknown as Record<string, unknown>).createdAt,
+      id: updatedUser._id,
+      supabaseId: updatedUser.supabaseId,
+      email: updatedUser.email,
+      displayName: updatedUser.displayName,
+      role: updatedUser.role,
+      status: updatedUser.status || "ACTIVE",
+      createdAt: (updatedUser as unknown as Record<string, unknown>).createdAt,
     };
+  }
+
+  /**
+   * Thu hồi toàn bộ phiên đăng nhập của user (MongoDB DeviceSession + Supabase + WebSocket force_logout)
+   * để đảm bảo access token cũ không còn hiệu lực và client đăng xuất ngay lập tức.
+   */
+  private async forceLogoutAllUserSessions(
+    supabaseId: string,
+    reason: string,
+  ): Promise<void> {
+    if (!supabaseId) return;
+
+    // 1. Đánh dấu thu hồi tất cả session trong MongoDB & xóa cache của SupabaseGuard
+    try {
+      await this.sessionModel
+        .updateMany(
+          { userId: supabaseId, isRevoked: { $ne: true } },
+          { $set: { isRevoked: true, revokedAt: new Date() } },
+        )
+        .exec();
+      SupabaseGuard.invalidateSessionCache(supabaseId);
+    } catch (err) {
+      this.logEmailDebug(
+        `Lỗi thu hồi DeviceSession trong MongoDB cho user ${supabaseId}`,
+        err,
+      );
+    }
+
+    // 2. Thu hồi phiên đăng nhập phía Supabase Auth
+    try {
+      await this.supabaseAdmin.auth.admin.signOut(supabaseId);
+    } catch (err) {
+    }
+
+    // 3. Bắn sự kiện WebSocket force_logout tới mọi thiết bị đang mở của user
+    try {
+      if (this.appGateway?.server) {
+        this.appGateway.server
+          .to(`user_${supabaseId}`)
+          .emit("force_logout", { reason });
+      }
+    } catch (err) {
+      this.logEmailDebug(
+        `Lỗi bắn WebSocket force_logout cho user ${supabaseId}`,
+        err,
+      );
+    }
   }
 
   async sendLockEmail(email: string) {

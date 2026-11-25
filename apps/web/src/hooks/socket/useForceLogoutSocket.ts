@@ -69,10 +69,22 @@ export function useForceLogoutSocket() {
         }
       }
 
-      toast.warning("Phiên đăng nhập bị kết thúc", {
-        description: "Phiên đăng nhập của bạn đã bị đăng xuất từ một thiết bị khác.",
-        duration: 4000,
-      });
+      const isRolePromoted = data?.reason === "role_promoted_admin";
+      const isRoleUpdated = data?.reason === "role_updated";
+
+      toast.warning(
+        isRolePromoted || isRoleUpdated
+          ? "Quyền tài khoản đã thay đổi"
+          : "Phiên đăng nhập bị kết thúc",
+        {
+          description: isRolePromoted
+            ? "Tài khoản của bạn đã được cấp quyền Quản trị viên. Vui lòng đăng nhập lại để áp dụng quyền mới."
+            : isRoleUpdated
+              ? "Vai trò tài khoản của bạn đã được cập nhật. Vui lòng đăng nhập lại."
+              : "Phiên đăng nhập của bạn đã bị đăng xuất từ một thiết bị khác.",
+          duration: 4000,
+        },
+      );
 
       // Delay nhỏ để user kịp đọc thông báo
       await new Promise((resolve) => setTimeout(resolve, 1500));

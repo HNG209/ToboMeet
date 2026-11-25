@@ -375,7 +375,8 @@
     "error_personal_meeting_link": "Unable to get personal meeting link",
     "view_edit_profile": "Click to view & edit profile",
     "edit_profile_hint": "Edit Profile →",
-    "profile_menu_item": "Personal Profile"
+    "profile_menu_item": "Personal Profile",
+    "admin_mode": "Admin Mode"
   },
   "settings": {
     "title": "Settings",
@@ -2398,6 +2399,9 @@
     "event_item": {
       "assignment_tag": "[Assignment]",
       "recur_badge": "Recur",
+      "segment_start": "Start",
+      "segment_end": "End",
+      "assignment_due": "Due",
       "assignment_status": {
         "submitted": "Submitted",
         "graded": "Graded",

@@ -120,6 +120,177 @@ export const getEventColors = (event: CalendarEvent) => {
   };
 };
 
+export type EventSegmentRole = "single" | "start" | "end";
+
+export interface CalendarEventSegment {
+  segmentKey: string;
+  originalEvent: CalendarEvent;
+  segmentRole: EventSegmentRole;
+  segmentStart: Date;
+  segmentEnd: Date;
+  anchorTime: Date;
+  rawStart: Date;
+  rawEnd: Date;
+  isCrossDay: boolean;
+}
+
+export const isSameLocalDay = (a: Date, b: Date): boolean =>
+  a.getFullYear() === b.getFullYear() &&
+  a.getMonth() === b.getMonth() &&
+  a.getDate() === b.getDate();
+
+export const getLocalDateKey = (d: Date): string =>
+  `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+export const isMidnightNextDay = (start: Date, end: Date): boolean => {
+  const nextMidnight = new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate() + 1,
+    0,
+    0,
+    0,
+    0,
+  );
+  return end.getTime() === nextMidnight.getTime();
+};
+
+/**
+ * Tách sự kiện kéo dài qua ngày khác thành đúng 2 lịch con dạng mốc ngắn (bắt đầu & kết thúc),
+ * áp dụng cho cả sự kiện thông thường và nhiệm vụ (Assignment).
+ */
+export const splitCrossDayEvents = (
+  events: CalendarEvent[],
+  milestoneMinutes = 45,
+): CalendarEventSegment[] => {
+  const segments: CalendarEventSegment[] = [];
+  const slotMs = milestoneMinutes * 60 * 1000;
+
+  for (const ev of events) {
+    const isAssignment = ev.eventType === "assignment";
+    const rawStart = new Date(
+      isAssignment ? ev.assignmentStartDate || ev.startDate : ev.startDate,
+    );
+    let rawEnd = new Date(
+      isAssignment
+        ? ev.assignmentDueDate || ev.endDate || ev.startDate
+        : ev.endDate || ev.startDate,
+    );
+
+    if (Number.isNaN(rawStart.getTime())) continue;
+    if (Number.isNaN(rawEnd.getTime()) || rawEnd.getTime() < rawStart.getTime()) {
+      rawEnd = new Date(rawStart.getTime());
+    }
+
+    const baseKey = `${ev._id}_${ev.occurrenceDate || ev.startDate}`;
+
+    if (isSameLocalDay(rawStart, rawEnd) || isMidnightNextDay(rawStart, rawEnd)) {
+      segments.push({
+        segmentKey: `${baseKey}_single`,
+        originalEvent: ev,
+        segmentRole: "single",
+        segmentStart: rawStart,
+        segmentEnd: rawEnd,
+        anchorTime: rawStart,
+        rawStart,
+        rawEnd,
+        isCrossDay: false,
+      });
+      continue;
+    }
+
+    const endOfStartDay = new Date(
+      rawStart.getFullYear(),
+      rawStart.getMonth(),
+      rawStart.getDate(),
+      23,
+      59,
+      59,
+      999,
+    );
+    const startOfEndDay = new Date(
+      rawEnd.getFullYear(),
+      rawEnd.getMonth(),
+      rawEnd.getDate(),
+      0,
+      0,
+      0,
+      0,
+    );
+
+    // 1. Lịch con Bắt đầu
+    segments.push({
+      segmentKey: `${baseKey}_start`,
+      originalEvent: ev,
+      segmentRole: "start",
+      segmentStart: rawStart,
+      segmentEnd: new Date(
+        Math.min(endOfStartDay.getTime(), rawStart.getTime() + slotMs),
+      ),
+      anchorTime: rawStart,
+      rawStart,
+      rawEnd,
+      isCrossDay: true,
+    });
+
+    // 2. Lịch con Kết thúc
+    segments.push({
+      segmentKey: `${baseKey}_end`,
+      originalEvent: ev,
+      segmentRole: "end",
+      segmentStart: new Date(
+        Math.max(startOfEndDay.getTime(), rawEnd.getTime() - slotMs),
+      ),
+      segmentEnd: rawEnd,
+      anchorTime: rawEnd,
+      rawStart,
+      rawEnd,
+      isCrossDay: true,
+    });
+  }
+
+  return segments;
+};
+
+export const getSegmentLayout = (segment: CalendarEventSegment) => {
+  let startMinutes =
+    segment.segmentStart.getHours() * 60 + segment.segmentStart.getMinutes();
+  let endMinutes = isSameLocalDay(segment.segmentStart, segment.segmentEnd)
+    ? segment.segmentEnd.getHours() * 60 + segment.segmentEnd.getMinutes()
+    : 24 * 60;
+
+  if (endMinutes <= startMinutes) {
+    if (segment.segmentRole === "end" && startMinutes >= 24 * 60 - 30) {
+      endMinutes = 24 * 60;
+      startMinutes = 24 * 60 - 30;
+    } else {
+      endMinutes = Math.min(24 * 60, startMinutes + 35);
+      if (endMinutes - startMinutes < 35) {
+        startMinutes = Math.max(0, endMinutes - 35);
+      }
+    }
+  } else if (endMinutes - startMinutes < 35) {
+    if (segment.segmentRole === "end") {
+      if (endMinutes < 35) {
+        startMinutes = 0;
+        endMinutes = 35;
+      } else {
+        startMinutes = Math.max(0, endMinutes - 35);
+      }
+    } else {
+      endMinutes = Math.min(24 * 60, startMinutes + 35);
+      if (endMinutes - startMinutes < 35) {
+        startMinutes = Math.max(0, endMinutes - 35);
+      }
+    }
+  }
+
+  const top = (startMinutes / 60) * HOUR_HEIGHT;
+  const height = Math.max(36, ((endMinutes - startMinutes) / 60) * HOUR_HEIGHT);
+
+  return { top, height, startMinutes, endMinutes };
+};
+
 export const getEventLayout = (event: CalendarEvent) => {
   const start = new Date(event.startDate);
   const end = new Date(event.endDate);

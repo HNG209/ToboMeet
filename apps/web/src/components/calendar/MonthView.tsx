@@ -1,7 +1,14 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
-import { CalendarEvent, getEventBgColor } from "./types";
+import {
+  CalendarEvent,
+  CalendarEventSegment,
+  getEventBgColor,
+  getLocalDateKey,
+  splitCrossDayEvents,
+} from "./types";
 
 interface MonthViewProps {
   locale: string;
@@ -42,6 +49,22 @@ export default function MonthView({
     monthDays.push(new Date(startOfGrid.getTime() + i * 24 * 60 * 60 * 1000));
   }
 
+  // Tách sự kiện dài qua ngày thành 2 mốc (bắt đầu & kết thúc) và gom theo ngày O(N)
+  const segmentsByDay = useMemo(() => {
+    const map = new Map<string, CalendarEventSegment[]>();
+    const segments = splitCrossDayEvents(filteredEvents);
+    for (const seg of segments) {
+      const key = getLocalDateKey(seg.segmentStart);
+      const list = map.get(key);
+      if (list) {
+        list.push(seg);
+      } else {
+        map.set(key, [seg]);
+      }
+    }
+    return map;
+  }, [filteredEvents]);
+
   return (
     <div className="bg-white border-t border-slate-200 flex flex-col h-full flex-1">
       {/* Month Grid Header — Cố định khi cuộn xuống */}
@@ -60,10 +83,7 @@ export default function MonthView({
             cellDate.toDateString() === currentDate.toDateString();
           const isCurrentMonth = cellDate.getMonth() === currentDate.getMonth();
 
-          const dayEvents = filteredEvents.filter(
-            (ev) =>
-              new Date(ev.startDate).toDateString() === cellDate.toDateString(),
-          );
+          const daySegments = segmentsByDay.get(getLocalDateKey(cellDate)) ?? [];
 
           return (
             <div
@@ -96,25 +116,51 @@ export default function MonthView({
 
               {/* Mini events list inside Month Cell */}
               <div className="flex-1 mt-1 overflow-y-auto space-y-1 max-h-[85px] pr-0.5">
-                {dayEvents.map((ev) => (
-                  <div
-                    key={`${ev._id}_${ev.occurrenceDate || ev.startDate}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectEvent(ev);
-                    }}
-                    className={`px-1.5 py-0.5 text-[9px] font-semibold border-l-2 rounded-sm truncate ${getEventBgColor(
-                      ev.roomType,
-                      ev.status,
-                      ev.eventType,
-                      ev.assignmentStatus,
-                    )} transition-transform hover:scale-[1.02] cursor-pointer`}
-                  >
-                    {ev.eventType === "assignment"
-                      ? `${t("event_item.assignment_tag")} ${ev.title}`
-                      : ev.title}
-                  </div>
-                ))}
+                {daySegments.map((seg) => {
+                  const ev = seg.originalEvent;
+                  const isAssignment = ev.eventType === "assignment";
+                  const segmentTag =
+                    seg.segmentRole === "start"
+                      ? t("event_item.segment_start")
+                      : seg.segmentRole === "end"
+                        ? isAssignment
+                          ? t("event_item.assignment_due")
+                          : t("event_item.segment_end")
+                        : null;
+
+                  return (
+                    <div
+                      key={seg.segmentKey}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectEvent(ev);
+                      }}
+                      className={`px-1.5 py-0.5 text-[9px] font-semibold border-l-2 rounded-sm truncate flex items-center gap-1 ${getEventBgColor(
+                        ev.roomType,
+                        ev.status,
+                        ev.eventType,
+                        ev.assignmentStatus,
+                      )} transition-transform hover:scale-[1.02] cursor-pointer`}
+                    >
+                      {segmentTag && (
+                        <span
+                          className={`px-1 rounded text-[8px] font-extrabold shrink-0 bg-white/80 ${
+                            seg.segmentRole === "start"
+                              ? "text-indigo-700"
+                              : "text-amber-700"
+                          }`}
+                        >
+                          {segmentTag}
+                        </span>
+                      )}
+                      <span className="truncate">
+                        {isAssignment
+                          ? `${t("event_item.assignment_tag")} ${ev.title}`
+                          : ev.title}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

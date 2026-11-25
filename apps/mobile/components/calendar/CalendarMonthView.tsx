@@ -10,8 +10,11 @@ import { Feather } from "@expo/vector-icons";
 import { useTranslation } from "react-i18next";
 import {
   CalendarEvent,
+  CalendarEventSegment,
   generateMonthDays,
   getEventColors,
+  getLocalDateKey,
+  splitCrossDayEvents,
 } from "./types";
 
 interface CalendarMonthViewProps {
@@ -46,23 +49,36 @@ export default function CalendarMonthView({
     ? ["T2", "T3", "T4", "T5", "T6", "T7", "CN"]
     : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
-  const selectedDayEvents = events.filter((e) => {
-    const eDate = new Date(e.startDate);
-    return (
-      eDate.getFullYear() === selectedDate.getFullYear() &&
-      eDate.getMonth() === selectedDate.getMonth() &&
-      eDate.getDate() === selectedDate.getDate()
-    );
-  });
+  const segmentsByDay = React.useMemo(() => {
+    const map = new Map<string, CalendarEventSegment[]>();
+    for (const seg of splitCrossDayEvents(events)) {
+      const key = getLocalDateKey(seg.segmentStart);
+      const list = map.get(key);
+      if (list) {
+        list.push(seg);
+      } else {
+        map.set(key, [seg]);
+      }
+    }
+    return map;
+  }, [events]);
 
-  const renderItem = ({ item }: { item: CalendarEvent }) => {
-    const startDate = new Date(item.startDate);
+  const selectedDaySegments = React.useMemo(() => {
+    const list = segmentsByDay.get(getLocalDateKey(selectedDate)) ?? [];
+    return [...list].sort(
+      (a, b) => a.anchorTime.getTime() - b.anchorTime.getTime()
+    );
+  }, [segmentsByDay, selectedDate]);
+
+  const renderItem = ({ item: seg }: { item: CalendarEventSegment }) => {
+    const item = seg.originalEvent;
+    const anchorDate = seg.anchorTime;
     const localeCode = isVi ? "vi-VN" : "en-US";
-    const dateStr = startDate.toLocaleDateString(localeCode, {
+    const dateStr = anchorDate.toLocaleDateString(localeCode, {
       day: "2-digit",
       month: "2-digit",
     });
-    const timeStr = startDate.toLocaleTimeString(localeCode, {
+    const timeStr = anchorDate.toLocaleTimeString(localeCode, {
       hour: "2-digit",
       minute: "2-digit",
     });
@@ -72,6 +88,20 @@ export default function CalendarMonthView({
     const isAssignment = item.eventType === "assignment";
     const isRecur = Boolean(item.recurrenceRule || item.isRecurring);
     const colors = getEventColors(item);
+    const segmentBadge =
+      seg.segmentRole === "start"
+        ? t("calendar.segment_start", {
+            defaultValue: isVi ? "Bắt đầu" : "Start",
+          })
+        : seg.segmentRole === "end"
+        ? isAssignment
+          ? t("calendar.assignment_due", {
+              defaultValue: isVi ? "Hạn nộp" : "Due",
+            })
+          : t("calendar.segment_end", {
+              defaultValue: isVi ? "Kết thúc" : "End",
+            })
+        : null;
 
     return (
       <TouchableOpacity
@@ -84,6 +114,16 @@ export default function CalendarMonthView({
         <View className="items-center mr-3.5 pr-3.5 border-r border-slate-200">
           <Text className="text-sm font-bold text-slate-800">{dateStr}</Text>
           <Text className="text-xs text-slate-500 mt-1">{timeStr}</Text>
+          {segmentBadge && (
+            <Text
+              className="text-[9px] font-bold mt-0.5"
+              style={{
+                color: seg.segmentRole === "start" ? "#4338CA" : "#B45309",
+              }}
+            >
+              {segmentBadge}
+            </Text>
+          )}
         </View>
 
         <View className="flex-1 mr-2">
@@ -187,14 +227,8 @@ export default function CalendarMonthView({
           const isSelected =
             selectedDate.toDateString() === dayDate.toDateString();
 
-          const dayEvents = events.filter((e) => {
-            const eDate = new Date(e.startDate);
-            return (
-              eDate.getFullYear() === dayDate.getFullYear() &&
-              eDate.getMonth() === dayDate.getMonth() &&
-              eDate.getDate() === dayDate.getDate()
-            );
-          });
+          const daySegments =
+            segmentsByDay.get(getLocalDateKey(dayDate)) ?? [];
 
           return (
             <TouchableOpacity
@@ -237,19 +271,19 @@ export default function CalendarMonthView({
               </View>
 
               <View className="flex-row gap-0.5 flex-wrap">
-                {dayEvents.slice(0, 3).map((event) => {
-                  const colors = getEventColors(event);
+                {daySegments.slice(0, 3).map((seg) => {
+                  const colors = getEventColors(seg.originalEvent);
                   return (
                     <View
-                      key={`${event._id}_${event.startDate}`}
+                      key={seg.segmentKey}
                       className="w-1.5 h-1.5 rounded-full"
                       style={{ backgroundColor: colors.border }}
                     />
                   );
                 })}
-                {dayEvents.length > 3 && (
+                {daySegments.length > 3 && (
                   <Text className="text-[8px] text-slate-500 font-bold">
-                    +{dayEvents.length - 3}
+                    +{daySegments.length - 3}
                   </Text>
                 )}
               </View>
@@ -271,16 +305,16 @@ export default function CalendarMonthView({
           <View className="px-2 py-0.5 rounded-full bg-slate-200">
             <Text className="text-[11px] font-medium text-slate-600">
               {t("calendar.events_count", {
-                count: selectedDayEvents.length,
-                defaultValue: `${selectedDayEvents.length} sự kiện`,
+                count: selectedDaySegments.length,
+                defaultValue: `${selectedDaySegments.length} sự kiện`,
               })}
             </Text>
           </View>
         </View>
 
         <FlatList
-          data={selectedDayEvents}
-          keyExtractor={(item) => `${item._id}_${item.startDate}`}
+          data={selectedDaySegments}
+          keyExtractor={(item) => item.segmentKey}
           renderItem={renderItem}
           ListEmptyComponent={
             <View className="py-8 items-center justify-center">

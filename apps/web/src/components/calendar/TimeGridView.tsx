@@ -5,9 +5,13 @@ import { useTranslations } from "next-intl";
 import { Repeat } from "lucide-react";
 import {
   CalendarEvent,
+  CalendarEventSegment,
   getDaysOfWeek,
   getEventBgColor,
   getEventIcon,
+  isMidnightNextDay,
+  isSameLocalDay,
+  splitCrossDayEvents,
 } from "./types";
 
 interface TimeGridViewProps {
@@ -22,6 +26,7 @@ interface TimeGridViewProps {
 }
 
 interface PositionedCalendarEvent {
+  segment: CalendarEventSegment;
   event: CalendarEvent;
   key: string;
   top: number;
@@ -41,65 +46,54 @@ const HOUR_HEIGHT = 64; // Độ cao mỗi khung giờ (px) — chuẩn tỉ l�
  * Tự động gom các lịch trùng/chồng thời gian thành nhóm và chia đều chiều ngang để không đè lên nhau
  */
 function computeDayEventLayout(
-  events: CalendarEvent[],
+  segments: CalendarEventSegment[],
   dayDate: Date,
   hourHeight: number,
 ): { positionedEvents: PositionedCalendarEvent[]; maxCols: number } {
-  const startOfDay = new Date(
-    dayDate.getFullYear(),
-    dayDate.getMonth(),
-    dayDate.getDate(),
-    0,
-    0,
-    0,
-    0,
-  );
-  const endOfDay = new Date(
-    dayDate.getFullYear(),
-    dayDate.getMonth(),
-    dayDate.getDate(),
-    23,
-    59,
-    59,
-    999,
-  );
+  // 1. Lọc các lịch con (hoặc lịch cùng ngày) thuộc ngày đang xét và tính phút bắt đầu/kết thúc
+  const items = segments
+    .map((segment) => {
+      if (!isSameLocalDay(segment.segmentStart, dayDate)) return null;
 
-  // 1. Lọc các sự kiện diễn ra trong ngày này và tính số phút bắt đầu/kết thúc
-  const items = events
-    .map((ev) => {
-      const isAssignment = ev.eventType === "assignment";
-      const rawStart = new Date(
-        isAssignment ? ev.assignmentStartDate || ev.startDate : ev.startDate,
-      );
-      const rawEnd = new Date(
-        isAssignment
-          ? ev.assignmentDueDate || ev.endDate || ev.startDate
-          : ev.endDate,
-      );
+      let startMinutes =
+        segment.segmentStart.getHours() * 60 +
+        segment.segmentStart.getMinutes();
 
-      // Kiểm tra sự kiện có giao với ngày đang xét không
-      if (rawEnd < startOfDay || rawStart > endOfDay) return null;
+      let endMinutes = isSameLocalDay(segment.segmentStart, segment.segmentEnd)
+        ? segment.segmentEnd.getHours() * 60 + segment.segmentEnd.getMinutes()
+        : 24 * 60;
 
-      let startMinutes = 0;
-      if (rawStart >= startOfDay) {
-        startMinutes = rawStart.getHours() * 60 + rawStart.getMinutes();
-      }
-
-      let endMinutes = 24 * 60;
-      if (rawEnd <= endOfDay) {
-        endMinutes = rawEnd.getHours() * 60 + rawEnd.getMinutes();
-      }
-
-      // Đảm bảo độ dài tối thiểu 28 phút để hiển thị rõ tiêu đề và nhãn
+      // Đảm bảo độ dài tối thiểu 28 phút để hiển thị rõ tiêu đề và nhãn mà không tràn khung 24h
       if (endMinutes <= startMinutes) {
-        endMinutes = Math.min(24 * 60, startMinutes + 30);
-      } else if (endMinutes - startMinutes < 25) {
-        endMinutes = Math.min(24 * 60, startMinutes + 28);
+        if (segment.segmentRole === "end" && startMinutes >= 24 * 60 - 30) {
+          endMinutes = 24 * 60;
+          startMinutes = 24 * 60 - 30;
+        } else {
+          endMinutes = Math.min(24 * 60, startMinutes + 30);
+          if (endMinutes - startMinutes < 28) {
+            startMinutes = Math.max(0, endMinutes - 28);
+          }
+        }
+      } else if (endMinutes - startMinutes < 28) {
+        if (segment.segmentRole === "end") {
+          if (endMinutes < 28) {
+            startMinutes = 0;
+            endMinutes = 28;
+          } else {
+            startMinutes = Math.max(0, endMinutes - 28);
+          }
+        } else {
+          endMinutes = Math.min(24 * 60, startMinutes + 28);
+          if (endMinutes - startMinutes < 28) {
+            startMinutes = Math.max(0, endMinutes - 28);
+          }
+        }
       }
 
       return {
-        event: ev,
-        key: `${ev._id}_${ev.occurrenceDate || ev.startDate}`,
+        segment,
+        event: segment.originalEvent,
+        key: segment.segmentKey,
         startMinutes,
         endMinutes,
         colIndex: 0,
@@ -182,6 +176,7 @@ function computeDayEventLayout(
       const leftPercent = item.colIndex * widthPercent;
 
       result.push({
+        segment: item.segment,
         event: item.event,
         key: item.key,
         top,
@@ -215,6 +210,7 @@ export default function TimeGridView({
   const t = useTranslations("calendar");
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [currentTime, setCurrentTime] = useState<Date>(new Date());
+  const [hoveredEventId, setHoveredEventId] = useState<string | null>(null);
 
   const daysOfWeek = getDaysOfWeek(currentDate);
 
@@ -232,12 +228,18 @@ export default function TimeGridView({
   // Hỗ trợ đầy đủ 24 khung giờ từ 0 đến 23
   const hoursRange = Array.from({ length: 24 }, (_, i) => i);
 
+  // Tách các sự kiện dài qua ngày khác thành 2 mốc ngắn (bắt đầu & kết thúc)
+  const eventSegments = useMemo(
+    () => splitCrossDayEvents(filteredEvents),
+    [filteredEvents],
+  );
+
   // Tính toán layout trước cho từng ngày để xác định độ rộng cột thoải mái
   const dayLayouts = useMemo(() => {
     return displayedDays.map((dayDate) =>
-      computeDayEventLayout(filteredEvents, dayDate, HOUR_HEIGHT),
+      computeDayEventLayout(eventSegments, dayDate, HOUR_HEIGHT),
     );
-  }, [displayedDays, filteredEvents]);
+  }, [displayedDays, eventSegments]);
 
   // Chiều rộng tối thiểu mỗi cột sự kiện để hiển thị trọn vẹn giờ và tiêu đề thoải mái
   const MIN_COL_WIDTH = 175;
@@ -286,11 +288,41 @@ export default function TimeGridView({
     return hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
   };
 
-  const formatEventTime = (startDate: string, endDate: string) => {
-    const s = new Date(startDate);
-    const e = new Date(endDate);
+  const formatHHmm = (d: Date) => {
     const pad = (n: number) => n.toString().padStart(2, "0");
-    return `${pad(s.getHours())}:${pad(s.getMinutes())} - ${pad(e.getHours())}:${pad(e.getMinutes())}`;
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  const formatDateShort = (d: Date) => {
+    const pad = (n: number) => n.toString().padStart(2, "0");
+    return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${formatHHmm(d)}`;
+  };
+
+  const formatSegmentTime = (seg: CalendarEventSegment) => {
+    const isAssignment = seg.originalEvent.eventType === "assignment";
+    if (seg.segmentRole === "start") {
+      return `${t("event_item.segment_start")} ${formatHHmm(seg.anchorTime)}`;
+    }
+    if (seg.segmentRole === "end") {
+      const endLabel = isAssignment
+        ? t("event_item.assignment_due")
+        : t("event_item.segment_end");
+      return `${endLabel} ${formatHHmm(seg.anchorTime)}`;
+    }
+    if (isMidnightNextDay(seg.rawStart, seg.rawEnd)) {
+      return `${formatHHmm(seg.rawStart)} - 24:00`;
+    }
+    if (seg.rawStart.getTime() === seg.rawEnd.getTime()) {
+      return formatHHmm(seg.rawStart);
+    }
+    return `${formatHHmm(seg.rawStart)} - ${formatHHmm(seg.rawEnd)}`;
+  };
+
+  const formatSegmentTooltip = (seg: CalendarEventSegment) => {
+    if (seg.isCrossDay) {
+      return `${seg.originalEvent.title} (${formatDateShort(seg.rawStart)} → ${formatDateShort(seg.rawEnd)})`;
+    }
+    return `${seg.originalEvent.title} (${formatSegmentTime(seg)})`;
   };
 
   const handleDragStart = (e: React.DragEvent, eventId: string) => {
@@ -441,6 +473,7 @@ export default function TimeGridView({
                     <div className="absolute inset-0 pointer-events-none">
                       {positionedEvents.map((item) => {
                         const {
+                          segment,
                           event,
                           top,
                           height,
@@ -450,7 +483,19 @@ export default function TimeGridView({
                         } = item;
                         const isHighlighted =
                           highlightedEventId === event._id;
+                        const isLinkedHover =
+                          segment.isCrossDay && hoveredEventId === event._id;
                         const isAssignment = event.eventType === "assignment";
+                        const canDrag =
+                          !isAssignment && segment.segmentRole !== "end";
+                        const segmentBadge =
+                          segment.segmentRole === "start"
+                            ? t("event_item.segment_start")
+                            : segment.segmentRole === "end"
+                              ? isAssignment
+                                ? t("event_item.assignment_due")
+                                : t("event_item.segment_end")
+                              : null;
 
                         return (
                           <div
@@ -465,24 +510,41 @@ export default function TimeGridView({
                             className="pointer-events-auto px-1 py-0.5 select-none"
                           >
                             <div
-                              draggable
-                              onDragStart={(e) =>
-                                handleDragStart(e, event._id)
-                              }
+                              draggable={canDrag}
+                              onDragStart={(e) => {
+                                if (!canDrag) {
+                                  e.preventDefault();
+                                  return;
+                                }
+                                handleDragStart(e, event._id);
+                              }}
+                              onMouseEnter={() => {
+                                if (segment.isCrossDay) {
+                                  setHoveredEventId(event._id);
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                if (segment.isCrossDay) {
+                                  setHoveredEventId(null);
+                                }
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onSelectEvent(event);
                               }}
-                              title={`${event.title} (${formatEventTime(event.startDate, event.endDate)})`}
+                              title={formatSegmentTooltip(segment)}
                               className={`w-full h-full px-2.5 py-1.5 rounded-xl border border-l-4 ${getEventBgColor(
                                 event.roomType,
                                 event.status,
                                 event.eventType,
                                 event.assignmentStatus,
-                              )} transition-all cursor-pointer overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md hover:scale-[1.01] ${isHighlighted
-                                ? "ring-2 ring-indigo-500 ring-offset-1 scale-[1.02] z-20 shadow-lg animate-pulse"
-                                : ""
-                                }`}
+                              )} transition-all cursor-pointer overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md hover:scale-[1.01] ${
+                                isHighlighted
+                                  ? "ring-2 ring-indigo-500 ring-offset-1 scale-[1.02] z-20 shadow-lg animate-pulse"
+                                  : isLinkedHover
+                                    ? "ring-2 ring-indigo-400/80 ring-offset-1 shadow-md z-10"
+                                    : ""
+                              }`}
                             >
                               <div className="flex items-center gap-1.5 min-w-0">
                                 <div className="shrink-0 text-slate-600">
@@ -496,42 +558,49 @@ export default function TimeGridView({
                                     ? `${t("event_item.assignment_tag")} ${event.title}`
                                     : event.title}
                                 </h4>
-                                {isAssignment && event.assignmentStatus && (
-                                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/80 shrink-0">
-                                    {t(
-                                      `event_item.assignment_status.${event.assignmentStatus}`,
-                                    )}
+                                {segmentBadge && (
+                                  <span
+                                    className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-white/85 shrink-0 ${
+                                      segment.segmentRole === "start"
+                                        ? "text-indigo-700"
+                                        : "text-amber-700"
+                                    }`}
+                                  >
+                                    {segmentBadge}
                                   </span>
                                 )}
+                                {!segmentBadge &&
+                                  isAssignment &&
+                                  event.assignmentStatus && (
+                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/80 shrink-0">
+                                      {t(
+                                        `event_item.assignment_status.${event.assignmentStatus}`,
+                                      )}
+                                    </span>
+                                  )}
                               </div>
 
                               {/* Hiển thị thời gian và biểu tượng lặp đầy đủ, rõ ràng */}
                               {height < 34 ? (
                                 <div className="flex items-center justify-between text-[10px] text-slate-600 font-semibold min-w-0 mt-0.5">
                                   <span className="truncate">
-                                    {formatEventTime(
-                                      event.startDate,
-                                      event.endDate,
-                                    )}
+                                    {formatSegmentTime(segment)}
                                   </span>
                                 </div>
                               ) : (
                                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium mt-0.5 min-w-0">
                                   <span className="truncate font-semibold text-slate-600">
-                                    {formatEventTime(
-                                      event.startDate,
-                                      event.endDate,
-                                    )}
+                                    {formatSegmentTime(segment)}
                                   </span>
                                   {(event.recurrenceRule ||
                                     event.isRecurring) && (
-                                      <span className="flex items-center gap-0.5 text-indigo-600 font-semibold text-[9px] shrink-0 ml-1">
-                                        <Repeat className="w-2.5 h-2.5" />
-                                        <span>
-                                          {t("event_item.recur_badge")}
-                                        </span>
+                                    <span className="flex items-center gap-0.5 text-indigo-600 font-semibold text-[9px] shrink-0 ml-1">
+                                      <Repeat className="w-2.5 h-2.5" />
+                                      <span>
+                                        {t("event_item.recur_badge")}
                                       </span>
-                                    )}
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
