@@ -110,9 +110,14 @@ logging.getLogger("deepl").setLevel(logging.WARNING)
 TRANSCRIPT_DIR = Path("transcripts")
 TRANSCRIPT_DIR.mkdir(exist_ok=True)
 
-MAX_CONCURRENT_TRANSCRIBING = 3   # Tối đa 3 luồng transcribe cùng lúc trong 1 phòng
-SILENCE_TIMEOUT_SECONDS = 20.0    # Đóng stream Deepgram khi người dùng im lặng > 20.0s (tránh disconnect/reconnect liên tục)
-PRE_ROLL_BUFFER_FRAMES = 20       # Giữ đệm ~400ms audio trước khi nói để không mất âm đầu (tránh dồn đệm gây lag)
+MAX_CONCURRENT_TRANSCRIBING = 3    # Tối đa 3 luồng transcribe cùng lúc trong 1 phòng
+SILENCE_TIMEOUT_SECONDS = 20.0     # Đóng stream Deepgram khi người dùng im lặng > 20.0s (tránh disconnect/reconnect liên tục)
+AUDIO_SAMPLE_RATE = 16000          # 16kHz mono linear16 chuẩn cho Deepgram
+AUDIO_NUM_CHANNELS = 1
+AUDIO_FRAME_SIZE_MS = 20           # 20ms/frame (320 samples) giúp giảm 50% tải vòng lặp so với 10ms mặc định
+AUDIO_SAMPLES_PER_FRAME = AUDIO_SAMPLE_RATE * AUDIO_FRAME_SIZE_MS // 1000
+PRE_ROLL_BUFFER_FRAMES = 30        # Giữ đệm ~600ms (30 * 20ms) audio trước khi nói để không mất âm đầu câu
+SILENCE_PADDING_TRIGGER_SEC = 0.06 # Bơm silence nếu quá 60ms không nhận frame (chống WebRTC DTX/rớt gói làm treo endpointing)
 
 
 def _sync_upload_to_r2(local_file: Path, s3_key: str) -> bool:
@@ -161,7 +166,7 @@ async def _notify_server_transcript_ready(payload: dict):
 
 
 class ParticipantAudioTracker:
-    """Quản lý audio stream, pre-roll buffer, VAD dựa trên RMS và phiên Deepgram STT cho từng người tham gia."""
+    """Quản lý audio stream, pre-roll buffer, silence padding, LiveKit SFU VAD và phiên Deepgram STT cho từng người tham gia."""
 
     def __init__(
         self,
@@ -181,18 +186,40 @@ class ParticipantAudioTracker:
         self.speaker_name = participant.name or participant.identity
         self.language = participant.attributes.get("transcribe_language", "vi")
 
-        self.audio_stream = rtc.AudioStream(audio_track, sample_rate=16000, num_channels=1)
+        self.audio_stream = rtc.AudioStream(
+            audio_track,
+            sample_rate=AUDIO_SAMPLE_RATE,
+            num_channels=AUDIO_NUM_CHANNELS,
+            frame_size_ms=AUDIO_FRAME_SIZE_MS,
+        )
         self.pre_roll_buffer: deque = deque(maxlen=PRE_ROLL_BUFFER_FRAMES)
+        self._silence_frame = rtc.AudioFrame.create(
+            AUDIO_SAMPLE_RATE,
+            AUDIO_NUM_CHANNELS,
+            AUDIO_SAMPLES_PER_FRAME,
+        )
 
         self.is_transcribing = False
         self._current_stt_stream = None
         self.stt_task: asyncio.Task | None = None
         self.last_speech_time: float = time.monotonic()  # Khởi tạo = hiện tại để allocate_available_slots có thể cấp slot ngay
         self._last_speech_trigger: float = 0.0
+        self._last_frame_pushed_time: float = 0.0
+        self._pushed_audio_seconds: float = 0.0
         self.last_final_text: str = ""
         self.last_final_time: float = 0.0
 
         self.read_task = asyncio.create_task(self._read_audio())
+
+    def _push_frame_to_stt(self, stt_stream, frame: rtc.AudioFrame) -> bool:
+        """Đẩy 1 audio frame vào Deepgram stream và cập nhật đồng hồ audio đã gửi."""
+        try:
+            stt_stream.push_frame(frame)
+            self._pushed_audio_seconds += frame.duration
+            self._last_frame_pushed_time = time.monotonic()
+            return True
+        except Exception:
+            return False
 
     async def _read_audio(self):
         """Đọc audio frame liên tục: sử dụng LiveKit SFU VAD (is_speaking)."""
@@ -214,10 +241,7 @@ class ParticipantAudioTracker:
                 # Đẩy frame trực tiếp vào stream Deepgram (non-blocking) nếu đang transcribe
                 # Không dùng hàng đợi frame_queue trung gian để tránh dồn đệm gây trễ/xếp hàng
                 if self.is_transcribing and self._current_stt_stream:
-                    try:
-                        self._current_stt_stream.push_frame(frame)
-                    except Exception:
-                        pass
+                    self._push_frame_to_stt(self._current_stt_stream, frame)
                 else:
                     self.pre_roll_buffer.append(frame)
                 await asyncio.sleep(0)
@@ -283,25 +307,56 @@ class ParticipantAudioTracker:
                     self.speaker_name,
                     self.language,
                 )
-                connect_start = time.monotonic()
                 stt_stream = self.stt_instance.stream(language=self.language)
+                self._pushed_audio_seconds = 0.0
+                self._last_frame_pushed_time = time.monotonic()
 
-                # Chuyển pre-roll buffer (~400ms) vào stream mới để bắt trọn âm đầu câu
+                # Chuyển pre-roll buffer (~600ms) vào stream mới để bắt trọn âm đầu câu
                 while self.pre_roll_buffer:
-                    try:
-                        stt_stream.push_frame(self.pre_roll_buffer.popleft())
-                    except Exception:
+                    if not self._push_frame_to_stt(stt_stream, self.pre_roll_buffer.popleft()):
                         break
 
                 self._current_stt_stream = stt_stream
                 current_utterance_id = None
                 last_interim_text = ""
-                session_start_time = time.monotonic()
                 speech_start_time: float | None = None
+                last_stream_offset = stt_stream.start_time_offset
+
+                async def _silence_padder(stream):
+                    """Bơm frame PCM im lặng khi luồng WebRTC bị ngắt (DTX/rớt gói) để Deepgram luôn nhận đủ silence cho endpointing."""
+                    frame_sec = AUDIO_FRAME_SIZE_MS / 1000.0
+                    try:
+                        while self.is_transcribing and self._current_stt_stream is stream:
+                            await asyncio.sleep(0.04)
+                            if not self.is_transcribing or self._current_stt_stream is not stream:
+                                break
+                            now_pad = time.monotonic()
+                            gap = now_pad - self._last_frame_pushed_time
+                            if gap >= SILENCE_PADDING_TRIGGER_SEC:
+                                num_frames = min(5, int(gap / frame_sec))
+                                for _ in range(num_frames):
+                                    try:
+                                        stream.push_frame(self._silence_frame)
+                                        self._pushed_audio_seconds += frame_sec
+                                        self._last_frame_pushed_time += frame_sec
+                                    except Exception:
+                                        return
+                                if now_pad - self._last_frame_pushed_time > 0.2:
+                                    self._last_frame_pushed_time = now_pad
+                    except asyncio.CancelledError:
+                        pass
+
+                padder_task = asyncio.create_task(_silence_padder(stt_stream))
 
                 try:
                     async for stt_event in stt_stream:
                         now = time.monotonic()
+
+                        # Nếu plugin tự reconnect WebSocket bên trong, đồng bộ lại bộ đếm audio đã gửi
+                        if stt_stream.start_time_offset != last_stream_offset:
+                            last_stream_offset = stt_stream.start_time_offset
+                            self._pushed_audio_seconds = 0.0
+                            self._last_frame_pushed_time = now
 
                         if stt_event.type == SpeechEventType.START_OF_SPEECH:
                             speech_start_time = now
@@ -334,11 +389,11 @@ class ParticipantAudioTracker:
                         sd = stt_event.alternatives[0] if has_alts else None
                         text = sd.text.strip() if sd else ""
 
-                        # Tính độ trễ audio lag so với thời gian thực
+                        # Tính độ trễ xử lý thực tế dựa trên lượng audio đã đẩy so với mốc Deepgram đã phiên âm
                         audio_lag_ms = None
                         if sd and sd.end_time > 0:
-                            elapsed_wall = now - session_start_time
-                            audio_lag_ms = max(0, int((elapsed_wall - sd.end_time) * 1000))
+                            audio_end_relative = max(0.0, sd.end_time - stt_stream.start_time_offset)
+                            audio_lag_ms = max(0, int((self._pushed_audio_seconds - audio_end_relative) * 1000))
 
                         # 2. Xử lý FINAL_TRANSCRIPT:
                         if stt_event.type == SpeechEventType.FINAL_TRANSCRIPT:
@@ -441,6 +496,8 @@ class ParticipantAudioTracker:
                         await asyncio.sleep(0.5)
                 finally:
                     self._current_stt_stream = None
+                    if not padder_task.done():
+                        padder_task.cancel()
                     await stt_stream.aclose()
 
                 if not self.is_transcribing:
@@ -558,12 +615,13 @@ async def entrypoint(ctx: JobContext):
     stt_instance = deepgram.STT(
         model="nova-3",
         language="vi",
+        sample_rate=AUDIO_SAMPLE_RATE,
         interim_results=True,
         punctuate=True,
         smart_format=True,
         no_delay=True,
-        endpointing_ms=150,
-        utterance_end_ms=None,
+        endpointing_ms=300,
+        utterance_end_ms=1000,
         http_session=http_session,
     )
 
@@ -1021,7 +1079,7 @@ async def entrypoint(ctx: JobContext):
     ctx.add_shutdown_callback(save_transcript)
 
     logger.info(
-        "STT agent ready (Tối đa %d luồng đồng thời & VAD Audio Energy) trong phòng: %s",
+        "STT agent ready (Tối đa %d luồng đồng thời & LiveKit SFU VAD) trong phòng: %s",
         MAX_CONCURRENT_TRANSCRIBING,
         room_name,
     )

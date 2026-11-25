@@ -79,6 +79,14 @@ export function useMeetingSession() {
     const roomInstance = new Room({
       adaptiveStream: false,
       dynacast: true,
+      publishDefaults: {
+        dtx: false,
+      },
+      audioCaptureDefaults: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
       videoCaptureDefaults: {
         facingMode: (meetingData.cameraFacing === "back"
           ? "environment"

@@ -197,6 +197,9 @@ function ActiveLiveKitRoom({
     const r = new Room({
       adaptiveStream: true,
       dynacast: true,
+      publishDefaults: {
+        dtx: false, // Tắt DTX để gửi luồng audio liên tục cho LiveKit STT/Deepgram endpointing không bị trễ
+      },
       ...(e2eeConfig && { e2ee: e2eeConfig }),
       videoCaptureDefaults: {
         deviceId: hardwareConfig.parsedCameraConfig?.deviceId,
@@ -206,14 +209,12 @@ function ActiveLiveKitRoom({
           frameRate: 30,
         },
       },
-      ...(hardwareConfig.micId && {
-        audioCaptureDefaults: {
-          deviceId: hardwareConfig.micId,
-          echoCancellation: true,
-          noiseSuppression: false,
-          autoGainControl: false,
-        },
-      }),
+      audioCaptureDefaults: {
+        ...(hardwareConfig.micId && { deviceId: hardwareConfig.micId }),
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
       ...(hardwareConfig.speakerId && {
         audioOutput: { deviceId: hardwareConfig.speakerId },
       }),
