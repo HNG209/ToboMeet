@@ -10,7 +10,6 @@ from pathlib import Path
 
 import aiohttp
 import deepl
-import numpy as np
 from dotenv import load_dotenv
 from livekit.agents import JobContext, cli, AgentServer
 from livekit.agents.stt import SpeechEventType
@@ -196,18 +195,13 @@ class ParticipantAudioTracker:
         self.read_task = asyncio.create_task(self._read_audio())
 
     async def _read_audio(self):
-        """Đọc audio frame liên tục: kết hợp LiveKit SFU VAD (is_speaking) và peak check siêu nhẹ."""
+        """Đọc audio frame liên tục: sử dụng LiveKit SFU VAD (is_speaking)."""
         try:
             async for audio_frame_event in self.audio_stream:
                 frame = audio_frame_event.frame
 
-                # Nhận diện tiếng nói: ưu tiên VAD truyền xuống từ LiveKit SFU (is_speaking)
-                # và kiểm tra biên độ mẫu thưa cực nhanh (< 0.01ms, không làm nghẽn asyncio loop)
+                # Nhận diện tiếng nói: dùng VAD từ LiveKit SFU (is_speaking)
                 is_speech = getattr(self.participant, "is_speaking", False)
-                if not is_speech and len(frame.data) > 0:
-                    samples = np.frombuffer(frame.data, dtype=np.int16)
-                    if len(samples) > 0 and np.max(np.abs(samples[::4])) > 800:
-                        is_speech = True
 
                 if is_speech:
                     now = time.monotonic()
