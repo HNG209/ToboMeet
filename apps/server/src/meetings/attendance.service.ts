@@ -81,6 +81,7 @@ export class AttendanceService {
         userId: string,
         displayName?: string,
     ) {
+        if (meetingCode?.includes("_sub_")) return;
         if (
             !userId ||
             userId.startsWith("EG_") ||
@@ -140,6 +141,7 @@ export class AttendanceService {
      * User leave phòng
      */
     async markLeft(meetingCode: string, userId: string) {
+        if (meetingCode?.includes("_sub_")) return;
         if (
             !userId ||
             userId.startsWith("EG_") ||
@@ -185,6 +187,7 @@ export class AttendanceService {
      * Đóng tất cả visit đang mở khi phòng kết thúc
      */
     async closeAllOpenVisits(meetingCode: string) {
+        if (meetingCode?.includes("_sub_")) return;
         const session = await this.findOngoingSession(meetingCode);
         if (!session) return;
 

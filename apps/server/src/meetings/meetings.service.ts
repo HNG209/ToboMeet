@@ -85,7 +85,12 @@ export class MeetingsService {
     allowStart = false,
     skipWaitingRoom = false,
     isE2EE = false,
+    isReturningFromBreakout = false,
   ): Promise<MeetingJoinResponse> {
+    if (this.isBreakoutRoomCode(meetingCode)) {
+      throw new AppException(ErrorCode.INVALID_BREAKOUT_ROOM);
+    }
+
     const apiKey =
       process.env.LIVEKIT_API_KEY ||
       (isLoadTestMode() ? "mock_livekit_api_key_load_test" : "");
@@ -115,6 +120,7 @@ export class MeetingsService {
 
     // Kiểm tra phòng LiveKit có đang active không
     let livekitRoom = await this.isRoomActive(meeting.meetingCode);
+    const hasActiveBreakout = await this.hasActiveBreakoutRooms(meeting.meetingCode);
     let humanParticipantsCount = 0;
     let participants: any[] = [];
 
@@ -141,13 +147,25 @@ export class MeetingsService {
       humanParticipantsCount = participants.filter((p) => !isAgentParticipant(p)).length;
       const hasAgent = participants.some((p) => isAgentParticipant(p));
 
-      // Nếu tất cả người dùng đều đã thoát nhưng Agent vẫn còn trong phòng:
-      if (humanParticipantsCount === 0 && hasAgent) {
+      // Nếu tất cả người dùng đã thoát nhưng Agent vẫn còn trong phòng
+      // (Bỏ qua nếu phòng đang có breakout hoạt động hoặc user đang quay về từ breakout)
+      if (
+        humanParticipantsCount === 0 &&
+        hasAgent &&
+        !hasActiveBreakout &&
+        !isReturningFromBreakout
+      ) {
         throw new AppException(ErrorCode.MEETING_CLOSING);
       }
 
       // Nếu phòng LiveKit không còn ai, kết thúc session cũ và dọn phòng
-      if (humanParticipantsCount === 0 && !hasAgent) {
+      // (KHÔNG đóng phòng nếu đang có breakout hoạt động hoặc user đang quay về từ breakout)
+      if (
+        humanParticipantsCount === 0 &&
+        !hasAgent &&
+        !hasActiveBreakout &&
+        !isReturningFromBreakout
+      ) {
         await this.endMeetingByCode(meeting.meetingCode);
         await this.forceDeleteLiveKitRoom(meeting.meetingCode);
         livekitRoom = null;
@@ -155,7 +173,18 @@ export class MeetingsService {
       }
     }
 
-    const isMeetingStarting = !livekitRoom;
+    // Nếu phòng chính trên LiveKit bị hết timeout trong lúc mọi người ở breakout,
+    // nhưng session trong MongoDB vẫn đang ongoing -> cho phép khôi phục lại phòng chính mà không tạo session mới
+    const existingOngoingSession =
+      !livekitRoom && (isReturningFromBreakout || hasActiveBreakout)
+        ? await this.sessionModel.findOne({
+            meetingCode: meeting.meetingCode,
+            status: "ongoing",
+          })
+        : null;
+
+    const isRestoringMainRoomForBreakout = Boolean(existingOngoingSession);
+    const isMeetingStarting = !livekitRoom && !isRestoringMainRoomForBreakout;
 
     if (isMeetingStarting) {
       // Không cho phép start → chặn (người lạ / refresh người cuối)
@@ -426,6 +455,9 @@ export class MeetingsService {
     roomName: string,
     sessionId?: string,
   ): Promise<{ dispatched: boolean; message?: string }> {
+    if (this.isBreakoutRoomCode(roomName)) {
+      return { dispatched: false, message: "Captions are disabled in breakout rooms" };
+    }
     if (!this.agentDispatchClient) {
       return { dispatched: false, message: "Agent dispatch client not initialized" };
     }
@@ -524,8 +556,13 @@ export class MeetingsService {
       return { canStart: false, reason: "MEETING_NOT_FOUND" };
     }
 
-    // Kiểm tra phòng LiveKit thực tế có người tham gia không
+    // Kiểm tra phòng LiveKit thực tế có người tham gia hoặc đang có breakout hoạt động không
     const livekitRoom = await this.isRoomActive(meeting.meetingCode);
+    const hasActiveBreakout = await this.hasActiveBreakoutRooms(meeting.meetingCode);
+    if (hasActiveBreakout) {
+      return { canStart: false, reason: "ALREADY_ONGOING" };
+    }
+
     if (livekitRoom) {
       const humanCount = await this.getHumanParticipantsCount(meeting.meetingCode);
       if (humanCount > 0) {
@@ -535,11 +572,11 @@ export class MeetingsService {
       if (hasAgent) {
         return { canStart: false, reason: "MEETING_CLOSING" };
       }
-      // Không có người & agent đã thoát: dọn dẹp phòng cũ và đóng session cũ để cho phép start mới
+      // Không có người & agent đã thoát & không có breakout: dọn dẹp phòng cũ và đóng session cũ
       await this.endMeetingByCode(meeting.meetingCode);
       await this.forceDeleteLiveKitRoom(meeting.meetingCode);
     } else {
-      // LiveKit không có phòng, đảm bảo kết thúc mọi session ongoing bị treo
+      // LiveKit không có phòng và không có breakout, đảm bảo kết thúc mọi session ongoing bị treo
       await this.sessionModel.updateMany(
         { meetingCode: meeting.meetingCode, status: "ongoing" },
         { $set: { status: "ended", endedAt: new Date() } },
@@ -719,6 +756,9 @@ export class MeetingsService {
    * Bật tắt chế độ phòng chờ (Waiting Room)
    */
   async toggleWaitingRoom(meetingCode: string, isWaitingRoomEnabled: boolean) {
+    if (this.isBreakoutRoomCode(meetingCode)) {
+      throw new AppException(ErrorCode.INVALID_PERMISSION);
+    }
     if (!this.livekitRoomService) {
       throw new AppException(ErrorCode.SERVER_ERROR);
     }
@@ -946,6 +986,9 @@ export class MeetingsService {
     meetingCode: string,
     permission: "admin_only" | "member_and_admin" | "everyone",
   ) {
+    if (this.isBreakoutRoomCode(meetingCode)) {
+      throw new AppException(ErrorCode.INVALID_PERMISSION);
+    }
     if (!this.livekitRoomService) {
       throw new AppException(ErrorCode.SERVER_ERROR);
     }
@@ -1203,13 +1246,24 @@ export class MeetingsService {
       if (humanCount > 0) {
         isActuallyOngoing = true;
       } else {
-        // Phòng tồn tại trên LiveKit nhưng không có người: đóng session và xoá phòng
-        await this.endMeetingByCode(meeting.meetingCode);
-        await this.forceDeleteLiveKitRoom(meeting.meetingCode);
+        // Kiểm tra xem mọi người có đang ở trong breakout room không
+        const hasActiveBreakout = await this.hasActiveBreakoutRooms(meeting.meetingCode);
+        if (hasActiveBreakout) {
+          isActuallyOngoing = true;
+        } else {
+          // Phòng tồn tại trên LiveKit nhưng không có người và không có breakout: đóng session và xoá phòng
+          await this.endMeetingByCode(meeting.meetingCode);
+          await this.forceDeleteLiveKitRoom(meeting.meetingCode);
+        }
       }
     } else {
-      // Không có phòng LiveKit, nếu session vẫn còn ongoing thì đóng lại
-      await this.endMeetingByCode(meeting.meetingCode);
+      // Phòng chính chưa có trên LiveKit nhưng nếu vẫn còn breakout đang chạy thì giữ nguyên phiên
+      const hasActiveBreakout = await this.hasActiveBreakoutRooms(meeting.meetingCode);
+      if (hasActiveBreakout) {
+        isActuallyOngoing = true;
+      } else {
+        await this.endMeetingByCode(meeting.meetingCode);
+      }
     }
 
     return {
@@ -1265,46 +1319,109 @@ export class MeetingsService {
   }
 
   /**
-   * Kiểm tra thực tế số người trong phòng, nếu bằng 0 thì ép xóa, bỏ qua nếu là phòng breakout
+   * Kiểm tra xem meetingCode có phải là phòng breakout (_sub_) không
    */
-  async checkAndCloseEmptyRoom(meetingCode: string) {
-    if (!this.livekitRoomService) return;
+  isBreakoutRoomCode(meetingCode?: string): boolean {
+    return Boolean(meetingCode && meetingCode.includes("_sub_"));
+  }
+
+  /**
+   * Kiểm tra xem phòng chính có đang có phiên breakout hoạt động hoặc phòng breakout con đang mở không
+   */
+  async hasActiveBreakoutRooms(mainMeetingCode: string): Promise<boolean> {
+    if (
+      !this.livekitRoomService ||
+      !mainMeetingCode ||
+      this.isBreakoutRoomCode(mainMeetingCode)
+    ) {
+      return false;
+    }
 
     try {
+      // 1. Kiểm tra metadata phòng chính nếu vẫn còn trên LiveKit
+      const mainRooms = await this.livekitRoomService.listRooms([mainMeetingCode]);
+      if (mainRooms && mainRooms.length > 0 && mainRooms[0].metadata) {
+        try {
+          const meta: LivekitRoomMetadata = JSON.parse(mainRooms[0].metadata);
+          if (
+            meta.roomType === "main" &&
+            meta.breakoutSession?.status === "active"
+          ) {
+            return true;
+          }
+        } catch {
+          // ignore
+        }
+      }
+
+      // 2. Kiểm tra danh sách phòng breakout con đang tồn tại trên LiveKit
+      const allRooms = await this.livekitRoomService.listRooms();
+      const prefix = `${mainMeetingCode}_sub_`;
+      for (const room of allRooms || []) {
+        if (!room.name?.startsWith(prefix)) continue;
+        if (room.numParticipants > 0) {
+          return true;
+        }
+        if (room.metadata) {
+          try {
+            const subMeta = JSON.parse(room.metadata);
+            if (subMeta.status === "active") {
+              return true;
+            }
+          } catch {
+            // ignore
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `[MeetingsService] Lỗi kiểm tra breakout rooms cho ${mainMeetingCode}:`,
+        error,
+      );
+    }
+
+    return false;
+  }
+
+  /**
+   * Kiểm tra thực tế số người trong phòng, nếu bằng 0 thì ép xóa, bỏ qua nếu là phòng breakout
+   * hoặc nếu phòng chính đang có phiên breakout hoạt động
+   */
+  async checkAndCloseEmptyRoom(meetingCode: string) {
+    if (!this.livekitRoomService || this.isBreakoutRoomCode(meetingCode)) return;
+
+    try {
+      // Bỏ qua nếu đang có breakout hoạt động (tránh đóng phòng chính khi người cuối vào breakout)
+      if (await this.hasActiveBreakoutRooms(meetingCode)) {
+        console.log(
+          `Bỏ qua tự động dọn dẹp phòng chính ${meetingCode} vì đang có phiên breakout hoạt động.`,
+        );
+        return;
+      }
+
       // Lấy thông tin phòng để kiểm tra metadata trước
       const rooms = await this.livekitRoomService.listRooms([meetingCode]);
       if (rooms && rooms.length > 0) {
         const room = rooms[0];
 
-        let isBreakoutRoom = false;
-        let hasActiveBreakoutSession = false;
-
         if (room.metadata) {
           try {
             const meta: LivekitRoomMetadata = JSON.parse(room.metadata);
             if (meta.roomType === "breakout") {
-              isBreakoutRoom = true;
-            } else if (meta.breakoutSession?.status === "active") {
-              hasActiveBreakoutSession = true;
+              console.log(
+                `Bỏ qua tự động dọn dẹp cho phòng breakout: ${meetingCode}`,
+              );
+              return;
+            }
+            if (meta.breakoutSession?.status === "active") {
+              console.log(
+                `Bỏ qua tự động dọn dẹp phòng chính ${meetingCode} vì đang có người trong breakout.`,
+              );
+              return;
             }
           } catch (e) {
             console.error("Lỗi parse metadata phòng khi check empty:", e);
           }
-        }
-
-        // Bỏ qua việc tự động đóng nếu là phòng breakout
-        if (isBreakoutRoom) {
-          console.log(
-            `Bỏ qua tự động dọn dẹp cho phòng breakout: ${meetingCode}`,
-          );
-          return;
-        }
-
-        if (hasActiveBreakoutSession) {
-          console.log(
-            `Bỏ qua tự động dọn dẹp phòng chính ${meetingCode} vì đang có người trong breakout.`,
-          );
-          return;
         }
       }
 
@@ -1317,21 +1434,27 @@ export class MeetingsService {
         return (
           !id.startsWith("EG_") &&
           !id.startsWith("agent-") &&
-          !id.includes("stt-transcriber") &&
-          !name.includes("stt-transcriber") &&
+          !id.includes(this.STT_AGENT_NAME) &&
+          !name.includes(this.STT_AGENT_NAME) &&
           (p as any).kind !== 2 &&
           !(p as any).isAgent
         );
       });
 
       if (humanParticipants.length === 0) {
+        // Kiểm tra lại lần nữa trước khi kết thúc phòng (tránh race condition khi vừa bấm start breakout)
+        if (await this.hasActiveBreakoutRooms(meetingCode)) {
+          return;
+        }
         await this.endMeetingByCode(meetingCode);
         await this.forceDeleteLiveKitRoom(meetingCode);
       }
     } catch (error) {
       console.log(`Phòng ${meetingCode} có thể đã được dọn dẹp.`, error);
-      // Đảm bảo session trong DB được đóng lại ngay cả khi LiveKit đã xóa phòng trước
-      await this.endMeetingByCode(meetingCode);
+      // Chỉ đóng session nếu chắc chắn không còn phòng breakout nào đang hoạt động
+      if (!(await this.hasActiveBreakoutRooms(meetingCode))) {
+        await this.endMeetingByCode(meetingCode);
+      }
     }
   }
 
@@ -1339,6 +1462,9 @@ export class MeetingsService {
    * Bật tắt chat trong cuộc họp
    */
   async toggleRoomChat(meetingCode: string, isChatEnabled: boolean) {
+    if (this.isBreakoutRoomCode(meetingCode)) {
+      throw new AppException(ErrorCode.INVALID_PERMISSION);
+    }
     if (!this.livekitRoomService) {
       throw new AppException(ErrorCode.SERVER_ERROR);
     }
@@ -1488,6 +1614,8 @@ export class MeetingsService {
   }
 
   async endMeetingByCode(meetingCode: string) {
+    if (this.isBreakoutRoomCode(meetingCode)) return;
+
     const meeting = await this.meetingModel.findOne({
       meetingCode,
     });

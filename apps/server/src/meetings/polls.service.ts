@@ -36,6 +36,10 @@ export class PollsService {
     userId: string,
     dto: CreatePollDto,
   ): Promise<Poll> {
+    if (meetingCode?.includes("_sub_")) {
+      throw new AppException(ErrorCode.INVALID_PERMISSION);
+    }
+
     const session = await this.sessionModel
       .findOne({
         meetingCode,

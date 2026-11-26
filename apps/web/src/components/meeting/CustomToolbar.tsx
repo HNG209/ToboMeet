@@ -682,46 +682,6 @@ export default function CustomToolbar({
         </button>
 
         <button
-          onClick={() => onToggleSidebar("polls")}
-          className={getBtnStyle(activeTab === "polls")}
-          title={t("polls")}
-        >
-          <div className="relative flex items-center justify-center">
-            <BarChart2
-              size={21}
-              className={activeTab === "polls" ? "text-brand-400" : ""}
-            />
-          </div>
-          <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
-            {t("polls")}
-          </span>
-        </button>
-
-        {!isE2EE && (
-          <button
-            onClick={() => {
-              if (!isLiveCaptionEnabled) {
-                onToggleLiveCaption?.();
-              } else {
-                onToggleSidebar("captions");
-              }
-            }}
-            className={getBtnStyle(activeTab === "captions")}
-            title="Phụ đề"
-          >
-            <div className="relative flex items-center justify-center">
-              <Captions
-                size={21}
-                className={activeTab === "captions" ? "text-brand-400" : ""}
-              />
-            </div>
-            <span className="text-[10px] mt-0.5 hidden sm:block font-medium">
-              Phụ đề
-            </span>
-          </button>
-        )}
-
-        <button
           onClick={toggleScreenShare}
           disabled={isSomeoneElseSharing || isScreenShareLoading}
           title={
@@ -753,8 +713,8 @@ export default function CustomToolbar({
           </span>
         </button>
 
-        {/* ================= NÚT GHI HÌNH (SPLIT BUTTON - CHỈ HIỂN THỊ KHI KHÔNG BẬT E2EE) ================= */}
-        {!isE2EE && (
+        {/* ================= NÚT GHI HÌNH (SPLIT BUTTON - ẨN KHI E2EE HOẶC TRONG BREAKOUT) ================= */}
+        {!isE2EE && !isInBreakoutRoom && (
         <div className="relative h-11 hidden md:flex items-center">
           {/* NÚT CHÍNH */}
           <button
@@ -952,27 +912,31 @@ export default function CustomToolbar({
                   <span>{isCopied ? t("link_copied") : t("copy_link")}</span>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setIsInviteModalOpen(true);
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center gap-2.5 transition-colors cursor-pointer"
-                >
-                  <UserPlus size={16} />
-                  <span>{t("invite_participants")}</span>
-                </button>
+                {!isInBreakoutRoom && (
+                  <button
+                    onClick={() => {
+                      setIsInviteModalOpen(true);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <UserPlus size={16} />
+                    <span>{t("invite_participants")}</span>
+                  </button>
+                )}
 
-                {/* MỞ BÌNH CHỌN CHO TẤT CẢ MỌI NGƯỜI */}
-                <button
-                  onClick={() => {
-                    setIsMoreMenuOpen(false);
-                    onToggleSidebar("polls");
-                  }}
-                  className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center gap-2.5 transition-colors cursor-pointer"
-                >
-                  <BarChart2 size={16} />
-                  <span>{t("open_polls")}</span>
-                </button>
+                {/* MỞ BÌNH CHỌN CHO TẤT CẢ MỌI NGƯỜI (CHỈ Ở PHÒNG CHÍNH) */}
+                {!isInBreakoutRoom && (
+                  <button
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      onToggleSidebar("polls");
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-[#232328] flex items-center gap-2.5 transition-colors cursor-pointer"
+                  >
+                    <BarChart2 size={16} />
+                    <span>{t("open_polls")}</span>
+                  </button>
+                )}
 
                 {/* THAM GIA HOẶC ĐÓNG WHITEBOARD */}
                 <div className="w-full px-3 py-1.5 flex items-center justify-between text-sm text-slate-200 hover:bg-[#232328] transition-colors rounded">
@@ -1002,8 +966,8 @@ export default function CustomToolbar({
                   </button>
                 </div>
 
-                {/* PHỤ ĐỀ (CLICK ĐỂ MỞ TAB VÀ KÍCH HOẠT AGENT) */}
-                {!isE2EE && (
+                {/* PHỤ ĐỀ (CLICK ĐỂ MỞ TAB VÀ KÍCH HOẠT AGENT - ẨN KHI E2EE HOẶC BREAKOUT) */}
+                {!isE2EE && !isInBreakoutRoom && (
                   <button
                     type="button"
                     onClick={(e) => {
@@ -1022,7 +986,7 @@ export default function CustomToolbar({
                   </button>
                 )}
 
-                {isHost && (
+                {isHost && !isInBreakoutRoom && (
                   <>
                     <div className="px-3 py-1.5 mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-y border-[#232328] bg-[#232328]/50">
                       {t("admin_tools")}
@@ -1296,19 +1260,23 @@ export default function CustomToolbar({
       </div>
 
       {/* ================= MODAL MỜI THÀNH VIÊN ================= */}
-      <InviteMemberModal
-        isOpen={isInviteModalOpen}
-        onClose={() => setIsInviteModalOpen(false)}
-        meetingCode={meetingCode}
-        displayParticipants={displayParticipants}
-      />
+      {!isInBreakoutRoom && (
+        <InviteMemberModal
+          isOpen={isInviteModalOpen}
+          onClose={() => setIsInviteModalOpen(false)}
+          meetingCode={meetingCode}
+          displayParticipants={displayParticipants}
+        />
+      )}
 
       {/* ================= MODAL TẠO BREAKOUT ================= */}
-      <CreateBreakoutModal
-        isOpen={isBreakoutModalOpen}
-        onClose={() => setIsBreakoutModalOpen(false)}
-        meetingCode={meetingCode}
-      />
+      {!isInBreakoutRoom && (
+        <CreateBreakoutModal
+          isOpen={isBreakoutModalOpen}
+          onClose={() => setIsBreakoutModalOpen(false)}
+          meetingCode={meetingCode}
+        />
+      )}
 
       {/* ================= MODAL JOIN BREAKOUT ================= */}
       <JoinBreakoutModal

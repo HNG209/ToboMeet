@@ -105,6 +105,7 @@ export default function MeetingRoomContent({
   const [isLiveCaptionEnabled, setIsLiveCaptionEnabled] = useState(false);
 
   const handleToggleLiveCaption = () => {
+    if (isBreakoutRoom) return;
     setIsLiveCaptionEnabled((prev) => {
       const nextState = !prev;
       if (nextState) {
@@ -117,6 +118,17 @@ export default function MeetingRoomContent({
       return nextState;
     });
   };
+
+  // Tự động đóng tab Bình chọn / Phụ đề và modal tạo poll khi vào phòng breakout
+  useEffect(() => {
+    if (isBreakoutRoom) {
+      setIsCreatePollOpen(false);
+      setIsLiveCaptionEnabled(false);
+      if (sidebarTab === "polls" || sidebarTab === "captions") {
+        setIsSidebarOpen(false);
+      }
+    }
+  }, [isBreakoutRoom, sidebarTab]);
 
   const storageKey = `meeting_chat_${meetingCode}`;
 
@@ -236,13 +248,13 @@ export default function MeetingRoomContent({
     >
       {/* MAIN MEETING COLUMN (Header, Video Grid, Toolbar) */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden transition-all duration-300">
-        <header className="relative z-50 h-10 shrink-0 px-4 flex items-center justify-between bg-[#111113] border-b border-[#232328]">
-          <div className="flex items-center gap-2">
-            {isBreakoutRoom && <Grid2X2 size={15} className="text-blue-400 shrink-0" />}
+        <header className="relative z-50 h-16 shrink-0 px-5 flex items-center justify-between bg-[#111113] border-b border-[#232328]">
+          <div className="flex items-center gap-2.5 min-w-0">
+            {isBreakoutRoom && <Grid2X2 size={18} className="text-blue-400 shrink-0" />}
 
             {/* Cụm tên phòng / kênh và biểu tượng khiên an toàn */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-semibold tracking-wide flex items-center gap-1.5 text-slate-100">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[15px] font-semibold tracking-wide flex items-center gap-1.5 text-slate-100 truncate">
                 {displayTitle}
                 {isBreakoutRoom && timeDisplay && (
                   <span className="ml-1 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs">
@@ -366,19 +378,19 @@ export default function MeetingRoomContent({
       {/* SIDEBAR CỤM CHAT, PARTICIPANTS & POLLS NẰM NGOÀI CÙNG */}
       {isSidebarOpen && (
         <aside className="fixed inset-0 z-50 flex flex-col bg-[#111113] lg:static lg:w-[360px] xl:w-[380px] lg:z-auto lg:border-l lg:border-[#232328] shadow-2xl transition-all duration-300 ease-in-out shrink-0 h-full">
-          {/* Header với Tiêu đề & Nút đóng */}
-          <div className="h-14 px-5 flex items-center justify-between border-b border-[#232328] bg-[#111113] shrink-0">
-            <div className="flex items-center gap-2.5 text-slate-100">
+          {/* Header đồng bộ chiều cao (h-16) và cỡ chữ với header chính của MeetingRoomContent & thanh toolbar */}
+          <div className="h-16 px-5 flex items-center justify-between border-b border-[#232328] bg-[#111113] shrink-0">
+            <div className="flex items-center gap-2.5 text-slate-100 min-w-0">
               {sidebarTab === "chat" ? (
-                <MessageSquare size={17} className="text-slate-100" />
+                <MessageSquare size={18} className="text-slate-100 shrink-0" />
               ) : sidebarTab === "people" ? (
-                <Users size={17} className="text-slate-100" />
+                <Users size={18} className="text-slate-100 shrink-0" />
               ) : sidebarTab === "polls" ? (
-                <BarChart2 size={17} className="text-slate-100" />
+                <BarChart2 size={18} className="text-slate-100 shrink-0" />
               ) : (
-                <Captions size={17} className="text-slate-100" />
+                <Captions size={18} className="text-slate-100 shrink-0" />
               )}
-              <h2 className="text-sm font-semibold text-slate-100 tracking-wide">
+              <h2 className="text-[15px] font-semibold text-slate-100 tracking-wide truncate">
                 {sidebarTab === "chat"
                   ? t("chat_header")
                   : sidebarTab === "people"
@@ -391,7 +403,7 @@ export default function MeetingRoomContent({
 
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
               title={t("close")}
             >
               <X size={18} />
@@ -425,12 +437,14 @@ export default function MeetingRoomContent({
         </aside>
       )}
 
-      {/* MODAL TẠO BÌNH CHỌN CHO HOST/ADMIN */}
-      <CreatePollModal
-        isOpen={isCreatePollOpen}
-        onClose={() => setIsCreatePollOpen(false)}
-        meetingCode={meetingCode}
-      />
+      {/* MODAL TẠO BÌNH CHỌN CHO HOST/ADMIN (CHỈ Ở PHÒNG CHÍNH) */}
+      {!isBreakoutRoom && (
+        <CreatePollModal
+          isOpen={isCreatePollOpen}
+          onClose={() => setIsCreatePollOpen(false)}
+          meetingCode={meetingCode}
+        />
+      )}
     </div>
   );
 }

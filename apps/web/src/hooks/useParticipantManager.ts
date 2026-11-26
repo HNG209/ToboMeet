@@ -51,33 +51,36 @@ export function useParticipantManager({
     newName: string;
   } | null>(null);
 
-  // Phân tích Role của bản thân
+  // Phân tích Room Metadata
+  let approvalPermission = "admin_only";
+  let isWaitingRoomEnabled = false;
+  let isBreakoutRoom = false;
+  try {
+    if (roomMetadata) {
+      const roomMeta = JSON.parse(roomMetadata);
+      isBreakoutRoom = roomMeta.roomType === "breakout";
+      approvalPermission = roomMeta.approvalPermission || "admin_only";
+      isWaitingRoomEnabled = !isBreakoutRoom && roomMeta.isWaitingRoomEnabled === true;
+    }
+  } catch (error) { }
+
+  // Phân tích Role của bản thân (vô hiệu hóa quyền quản trị khi đang trong phòng breakout)
   let localRole = "guest";
   try {
     if (localParticipant.metadata) {
       localRole = JSON.parse(localParticipant.metadata).role || "guest";
     }
   } catch (error) { }
-  const canManageParticipants = localRole === "owner" || localRole === "admin";
-  const isLocalAdmin = localRole === "admin";
-  const isLocalOwner = localRole === "owner";
-
-  // Phân tích Room Metadata
-  let approvalPermission = "admin_only";
-  let isWaitingRoomEnabled = false;
-  try {
-    if (roomMetadata) {
-      const roomMeta = JSON.parse(roomMetadata);
-      approvalPermission = roomMeta.approvalPermission || "admin_only";
-      isWaitingRoomEnabled = roomMeta.isWaitingRoomEnabled === true;
-    }
-  } catch (error) { }
+  const canManageParticipants =
+    !isBreakoutRoom && (localRole === "owner" || localRole === "admin");
+  const isLocalAdmin = !isBreakoutRoom && localRole === "admin";
+  const isLocalOwner = !isBreakoutRoom && localRole === "owner";
 
   const roleName = t("role_leader", { defaultValue: "Trưởng phòng" });
 
   // AI CÓ QUYỀN DUYỆT?
   let canApprove = false;
-  if (isWaitingRoomEnabled) {
+  if (!isBreakoutRoom && isWaitingRoomEnabled) {
     if (canManageParticipants) {
       canApprove = true; // Admin/Owner luôn có quyền
     } else if (approvalPermission === "everyone") {

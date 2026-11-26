@@ -77,13 +77,12 @@ export class BreakoutRoomsService {
     try {
       const sessionStartedAt = Date.now();
 
+      if (mainMeetingCode.includes("_sub_")) return;
+
       const livekitRooms = await this.livekitRoomService.listRooms([
         mainMeetingCode,
       ]);
       let currentMeta: LivekitRoomMetadata = {} as LivekitRoomMetadata;
-
-      // Chỉ xử lý cho phòng chính
-      if (currentMeta.roomType === "breakout") return;
 
       if (livekitRooms?.length > 0 && livekitRooms[0].metadata) {
         try {
@@ -92,6 +91,9 @@ export class BreakoutRoomsService {
           console.error("Lỗi parse metadata phòng chính", e);
         }
       }
+
+      // Chỉ xử lý cho phòng chính (chặn tạo breakout từ bên trong breakout room)
+      if (currentMeta.roomType === "breakout") return;
 
       // Map config → cấu trúc nội bộ có ID tự tăng. Thời gian là dùng chung cho tất cả các phòng
       const breakoutRooms: LivekitBreakoutRoom[] = roomConfigs.map(
@@ -437,13 +439,26 @@ export class BreakoutRoomsService {
         throw new AppException(ErrorCode.BREAKOUT_ROOM_FREE_TO_CHOOSE);
       }
 
-      // Loại bỏ Host/Owner ra khỏi danh sách gán
+      // Loại bỏ Chủ phòng (owner) và Phó phòng (admin) ra khỏi danh sách gán vì họ có quyền vào tự do
       const meeting = await this.meetingModel
         .findOne({ meetingCode: mainMeetingCode })
         .lean();
-      const validUserIds = meeting?.ownerId
-        ? userIds.filter((id) => id !== meeting.ownerId)
-        : userIds;
+      let validUserIds = userIds;
+      if (meeting) {
+        const roleChecks = await Promise.all(
+          userIds.map(async (id) => {
+            const { hasAdminPowers } =
+              await this.meetingsService.resolveParticipantRole(
+                meeting as any,
+                id,
+              );
+            return { id, hasAdminPowers };
+          }),
+        );
+        validUserIds = roleChecks
+          .filter((item) => !item.hasAdminPowers)
+          .map((item) => item.id);
+      }
 
       if (validUserIds.length === 0) {
         return {
@@ -538,6 +553,17 @@ export class BreakoutRoomsService {
 
     const fullBreakoutRoomName = `${mainMeetingCode}_${breakoutRoomId}`;
 
+    // Xác định quyền Chủ phòng (owner) / Phó phòng (admin) theo phòng chính (cả personal và channel)
+    const mainMeeting = await this.meetingModel
+      .findOne({ meetingCode: mainMeetingCode })
+      .lean();
+    const { role, hasAdminPowers } = mainMeeting
+      ? await this.meetingsService.resolveParticipantRole(
+          mainMeeting as any,
+          userId,
+        )
+      : { role: "guest", hasAdminPowers: false };
+
     // ==========================================
     // BƯỚC 1: KIỂM TRA TÍNH HỢP LỆ CỦA PHÒNG BREAKOUT
     // ==========================================
@@ -569,20 +595,15 @@ export class BreakoutRoomsService {
           );
         }
 
-        // KIỂM TRA QUYỀN: Nếu có cấu hình assignedUsers (auto/manual), chỉ cho phép người được gán hoặc host vào phòng
+        // KIỂM TRA QUYỀN: Nếu có cấu hình assignedUsers (auto/manual),
+        // cho phép người được gán HOẶC Chủ phòng (owner) / Phó phòng (admin) vào thoải mái không cần phân công trước
         const breakoutMeta = meta as BreakoutRoomMetadata;
         if (Array.isArray(breakoutMeta.assignedUsers)) {
           const isAssigned = breakoutMeta.assignedUsers.includes(userId);
-          if (!isAssigned) {
-            const meeting = await this.meetingModel
-              .findOne({ meetingCode: mainMeetingCode })
-              .lean();
-            const isHost = meeting?.ownerId === userId;
-            if (!isHost) {
-              throw new AppException(
-                ErrorCode.NOT_ASSIGNED_TO_BREAKOUT_ROOM,
-              );
-            }
+          if (!isAssigned && !hasAdminPowers) {
+            throw new AppException(
+              ErrorCode.NOT_ASSIGNED_TO_BREAKOUT_ROOM,
+            );
           }
         }
       } else {
@@ -626,6 +647,8 @@ export class BreakoutRoomsService {
       finalDisplayName,
       avatarUrl,
       deviceId,
+      role,
+      hasAdminPowers,
     );
   }
 
@@ -644,6 +667,7 @@ export class BreakoutRoomsService {
 
     // Lấy thông tin phòng Breakout hiện tại để tự suy ra Main Room
     let parentRoomCode = "";
+    let parentIsE2EE = false;
     try {
       const subRooms = await this.livekitRoomService.listRooms([
         fullBreakoutRoomName,
@@ -658,6 +682,7 @@ export class BreakoutRoomsService {
         const subMeta: LivekitRoomMetadata = JSON.parse(subRooms[0].metadata);
         if (subMeta.roomType !== "breakout") return;
         parentRoomCode = subMeta.parentRoom;
+        parentIsE2EE = Boolean(subMeta.parentMetadata?.isE2EE);
       }
 
       if (!parentRoomCode) {
@@ -687,7 +712,7 @@ export class BreakoutRoomsService {
     const user = await this.userModel.findOne({ supabaseId: userId }).exec();
     const finalDisplayName = user?.displayName || "Người dùng ẩn danh";
 
-    // Sinh token cấp quyền vào lại phòng chính (bỏ qua phòng chờ vì đã có quyền ở trong phiên)
+    // Sinh token cấp quyền vào lại phòng chính (bỏ qua phòng chờ + đánh dấu quay về từ breakout)
     return this.meetingsService.joinMeeting(
       parentRoomCode,
       userId,
@@ -696,6 +721,8 @@ export class BreakoutRoomsService {
       false, // forceSwitch
       false, // allowStart
       true, // skipWaitingRoom
+      parentIsE2EE, // isE2EE
+      true, // isReturningFromBreakout
     );
   }
 
@@ -766,6 +793,8 @@ export class BreakoutRoomsService {
     displayName: string,
     avatarUrl: string,
     deviceId: string,
+    role: string = "guest",
+    hasAdminPowers: boolean = false,
   ) {
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -777,6 +806,8 @@ export class BreakoutRoomsService {
       metadata: JSON.stringify({
         deviceId: deviceId,
         avatarUrl: avatarUrl,
+        role: role as any,
+        hasAdminPowers,
         status: "joined",
       } as ParticipantMetadata),
     });
@@ -789,7 +820,6 @@ export class BreakoutRoomsService {
       canPublishSources: [
         TrackSource.CAMERA,
         TrackSource.MICROPHONE,
-        TrackSource.SCREEN_SHARE,
       ],
       canUpdateOwnMetadata: true,
     });

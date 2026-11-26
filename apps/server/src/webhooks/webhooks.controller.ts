@@ -34,6 +34,18 @@ export class WebhooksController {
   @Post("transcripts/ready")
   @HttpCode(HttpStatus.OK)
   async handleTranscriptReady(@Body() payload: TranscriptReadyWebhookDto) {
+    // Không ghi nhận transcript / summary session cho breakout room
+    if (payload.room_name?.includes("_sub_")) {
+      this.logger.log(
+        `Ignoring transcript webhook for breakout room: ${payload.room_name}`,
+      );
+      return {
+        received: true,
+        ignored: true,
+        reason: "Breakout room does not record session",
+      };
+    }
+
     this.logger.log(
       `Received transcript ready webhook for room: ${payload.room_name}, session: ${payload.session_id} (${payload.segment_count} segments, ${payload.word_count} words)`,
     );
@@ -66,6 +78,17 @@ export class WebhooksController {
     const event = await this.receiver.receive(rawBody, authHeader);
 
     const meetingCode = event.room?.name;
+    const isBreakoutRoom = Boolean(
+      meetingCode?.includes("_sub_") ||
+        (() => {
+          try {
+            if (event.room?.metadata) {
+              return JSON.parse(event.room.metadata)?.roomType === "breakout";
+            }
+          } catch {}
+          return false;
+        })(),
+    );
     const userId = event.participant?.identity;
     const displayName = event.participant?.name;
     const isAgent =
@@ -98,8 +121,8 @@ export class WebhooksController {
 
       case "participant_joined":
         if (meetingCode && userId) {
-          // Bỏ qua egress client và Agent
-          if (isAgent) break;
+          // Bỏ qua egress client, Agent và phòng breakout (không ghi nhận session/attendance cho breakout)
+          if (isAgent || isBreakoutRoom) break;
           await this.meetingQueue.add(
             "attendance-joined",
             { meetingCode, userId, displayName },
@@ -115,8 +138,8 @@ export class WebhooksController {
 
       case "participant_left":
         if (meetingCode && userId) {
-          // Bỏ qua egress client và Agent
-          if (isAgent) break;
+          // Bỏ qua egress client, Agent và phòng breakout
+          if (isAgent || isBreakoutRoom) break;
           // Tự động dừng ghi hình nếu người thoát chính là người đang quay cuộc họp
           await this.recordingsService.handleParticipantLeft(meetingCode, userId);
 
@@ -135,7 +158,9 @@ export class WebhooksController {
 
       case "room_finished":
         if (meetingCode) {
-          // Đóng hết visit còn mở + end session nếu cần
+          // Không ghi nhận/đóng session cho breakout room
+          if (isBreakoutRoom) break;
+          // Đóng hết visit còn mở + end session nếu không có breakout đang hoạt động
           await this.meetingQueue.add(
             "attendance-close-all",
             { meetingCode },

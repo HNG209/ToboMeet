@@ -939,6 +939,21 @@ async def entrypoint(ctx: JobContext):
 
     empty_room_timer: asyncio.TimerHandle | None = None
 
+    def has_active_breakout_session() -> bool:
+        """Kiểm tra phòng chính có đang mở phiên breakout hay không."""
+        raw_meta = getattr(ctx.room, "metadata", None) or ""
+        if not raw_meta:
+            return False
+        try:
+            meta = json.loads(raw_meta)
+            return (
+                meta.get("roomType") != "breakout"
+                and isinstance(meta.get("breakoutSession"), dict)
+                and meta["breakoutSession"].get("status") == "active"
+            )
+        except Exception:
+            return False
+
     def check_empty_room():
         nonlocal empty_room_timer
         human_participants = [
@@ -946,6 +961,17 @@ async def entrypoint(ctx: JobContext):
             for p in ctx.room.remote_participants.values()
             if p.kind != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT
         ]
+        # Không tắt STT agent khi người cuối cùng tạm rời phòng chính để vào breakout room
+        if has_active_breakout_session():
+            if empty_room_timer is not None:
+                logger.info(
+                    "Active breakout session in room %s. Cancelled agent shutdown timer.",
+                    room_name,
+                )
+                empty_room_timer.cancel()
+                empty_room_timer = None
+            return
+
         if len(human_participants) == 0:
             logger.info(
                 "Room %s has no human participants left. Scheduling agent shutdown in 10s...",
@@ -967,6 +993,14 @@ async def entrypoint(ctx: JobContext):
                 empty_room_timer = None
 
     async def shutdown_if_empty():
+        nonlocal empty_room_timer
+        empty_room_timer = None
+        if has_active_breakout_session():
+            logger.info(
+                "Room %s has active breakout session. Skipping STT agent shutdown.",
+                room_name,
+            )
+            return
         human_participants = [
             p
             for p in ctx.room.remote_participants.values()
@@ -975,6 +1009,9 @@ async def entrypoint(ctx: JobContext):
         if len(human_participants) == 0:
             logger.info("Room %s is still empty. Shutting down STT agent.", room_name)
             ctx.shutdown("Room empty")
+
+    def on_room_metadata_changed(_old_metadata: str, _new_metadata: str):
+        check_empty_room()
 
     def on_participant_connected(participant: rtc.RemoteParticipant):
         if participant.kind != rtc.ParticipantKind.PARTICIPANT_KIND_AGENT:
@@ -1002,6 +1039,7 @@ async def entrypoint(ctx: JobContext):
     ctx.room.on("data_received", on_data_received)
     ctx.room.on("participant_connected", on_participant_connected)
     ctx.room.on("participant_disconnected", on_participant_disconnected)
+    ctx.room.on("room_metadata_changed", on_room_metadata_changed)
     ctx.room.on("disconnected", on_room_disconnected)
 
     # Xử lý các track đã được subscribe từ trước

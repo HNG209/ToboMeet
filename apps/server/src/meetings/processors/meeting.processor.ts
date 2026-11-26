@@ -49,6 +49,7 @@ export class MeetingProcessor extends WorkerHost {
       case "attendance-joined": {
         const { meetingCode, userId, displayName } =
           job.data as AttendanceJobData;
+        if (this.meetingsService.isBreakoutRoomCode(meetingCode)) break;
         await this.attendanceService.markJoined(
           meetingCode,
           userId,
@@ -59,15 +60,23 @@ export class MeetingProcessor extends WorkerHost {
 
       case "attendance-left": {
         const { meetingCode, userId } = job.data as AttendanceJobData;
+        if (this.meetingsService.isBreakoutRoomCode(meetingCode)) break;
         await this.recordingService.handleParticipantLeft(meetingCode, userId);
         await this.attendanceService.markLeft(meetingCode, userId);
-        // Kiểm tra phòng trống sau khi leave
+        // Kiểm tra phòng trống sau khi leave (bỏ qua nếu đang có breakout hoạt động)
         await this.meetingsService.checkAndCloseEmptyRoom(meetingCode);
         break;
       }
 
       case "attendance-close-all": {
         const { meetingCode } = job.data as { meetingCode: string };
+        if (this.meetingsService.isBreakoutRoomCode(meetingCode)) break;
+        if (await this.meetingsService.hasActiveBreakoutRooms(meetingCode)) {
+          this.logger.log(
+            `[MeetingProcessor] Bỏ qua đóng session phòng chính ${meetingCode} vì đang có breakout room hoạt động.`,
+          );
+          break;
+        }
         await this.attendanceService.closeAllOpenVisits(meetingCode);
         await this.meetingsService.endMeetingByCode(meetingCode);
         break;

@@ -53,6 +53,10 @@ export class MeetingInviteService {
     inviteeId: string,
     meetingCode: string,
   ) {
+    if (meetingCode?.includes("_sub_")) {
+      throw new AppException(ErrorCode.MEETING_INVITE_NOT_ALLOWED);
+    }
+
     if (!this.livekitRoomService) {
       throw new AppException(ErrorCode.SERVER_ERROR);
     }

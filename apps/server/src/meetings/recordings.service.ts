@@ -295,6 +295,10 @@ export class RecordingsService {
         if (!egressInfo) return;
 
         const { egressId, roomName: meetingCode, status } = egressInfo;
+        if (meetingCode?.includes("_sub_")) {
+            this.logger.log(`[RecordingsService] Bỏ qua egress_ended cho breakout room: ${meetingCode}`);
+            return;
+        }
         this.logger.log(`[RecordingsService] Nhận webhook egress_ended: ${egressId} (room: ${meetingCode}, status: ${status})`);
 
         // Dọn dẹp cờ recording trong room metadata khi Egress đã thoát hẳn
