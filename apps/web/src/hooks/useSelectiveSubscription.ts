@@ -14,6 +14,10 @@ import {
 } from "livekit-client";
 import { useSafeMeetingWhiteboard } from "@/components/meeting/contexts/MeetingWhiteboardContext";
 import { isAgentParticipant } from "@/utils/participant";
+import {
+  getIsLocalRecording,
+  subscribeLocalRecording,
+} from "@/lib/recording/localRecordingState";
 
 function makeKey(identity: string, source: Track.Source) {
 
@@ -47,6 +51,15 @@ export function useSelectiveSubscription() {
   const [currentPage, setCurrentPage] = useState(0);
   const [metaTick, setMetaTick] = useState(0);
   const [pinnedKey, setPinnedKey] = useState<string | null>(null);
+  const [isLocalRecording, setIsLocalRecording] = useState<boolean>(() =>
+    getIsLocalRecording(),
+  );
+
+  // Đồng bộ trạng thái Local Recording để giữ subscribe ScreenShare ở mọi trang
+  useEffect(() => {
+    setIsLocalRecording(getIsLocalRecording());
+    return subscribeLocalRecording(setIsLocalRecording);
+  }, []);
 
   // Selective Subscription Refs
   const lastDesiredRef = useRef<Set<string>>(new Set());
@@ -186,21 +199,25 @@ export function useSelectiveSubscription() {
     [pinnedKey],
   );
 
-  // Audio luôn subscribe (trừ người chờ)
+  // Audio luôn subscribe (Microphone + ScreenShareAudio, trừ người chờ và agent)
   const ensureAudioSubscribed = useCallback(() => {
     room.remoteParticipants.forEach((participant) => {
-      const micPub = participant.getTrackPublication(
-        Track.Source.Microphone,
-      ) as RemoteTrackPublication | undefined;
-
       if (isAgentParticipant(participant)) return;
 
-      if (micPub && typeof micPub.setSubscribed === "function") {
-        const shouldSubscribe = !isWaiting(participant);
-        if (micPub.isDesired !== shouldSubscribe) {
-          micPub.setSubscribed(shouldSubscribe);
-        }
-      }
+      const shouldSubscribe = !isWaiting(participant);
+      [Track.Source.Microphone, Track.Source.ScreenShareAudio].forEach(
+        (audioSource) => {
+          const audioPub = participant.getTrackPublication(audioSource) as
+            | RemoteTrackPublication
+            | undefined;
+
+          if (audioPub && typeof audioPub.setSubscribed === "function") {
+            if (audioPub.isDesired !== shouldSubscribe) {
+              audioPub.setSubscribed(shouldSubscribe);
+            }
+          }
+        },
+      );
     });
   }, [room]);
 
@@ -235,16 +252,22 @@ export function useSelectiveSubscription() {
           }
         });
 
-        // Audio
-        const micPub = participant.getTrackPublication(
-          Track.Source.Microphone,
-        ) as RemoteTrackPublication | undefined;
+        // Audio (Microphone + ScreenShareAudio)
+        if (!isAgentParticipant(participant)) {
+          const shouldSubscribeAudio = !isWaiting(participant);
+          [Track.Source.Microphone, Track.Source.ScreenShareAudio].forEach(
+            (audioSource) => {
+              const audioPub = participant.getTrackPublication(audioSource) as
+                | RemoteTrackPublication
+                | undefined;
 
-        if (micPub && typeof micPub.setSubscribed === "function") {
-          const shouldSubscribeMic = !isWaiting(participant);
-          if (micPub.isDesired !== shouldSubscribeMic) {
-            micPub.setSubscribed(shouldSubscribeMic);
-          }
+              if (audioPub && typeof audioPub.setSubscribed === "function") {
+                if (audioPub.isDesired !== shouldSubscribeAudio) {
+                  audioPub.setSubscribed(shouldSubscribeAudio);
+                }
+              }
+            },
+          );
         }
       });
     },
@@ -262,10 +285,17 @@ export function useSelectiveSubscription() {
     [applySubscriptions],
   );
 
-  // Effect chính: subscribe theo trang hiện tại + luôn giữ pinned (trừ khi đang ở trang Whiteboard)
+  // Effect chính: subscribe theo trang hiện tại + luôn giữ pinned
+  // Khi đang quay Local (isLocalRecording): LUÔN giữ subscribe ScreenShare dù đang ở trang Camera hay Whiteboard
   useEffect(() => {
+    const screenShareKeys = isLocalRecording
+      ? validTracks
+          .filter((t) => t.source === Track.Source.ScreenShare)
+          .map((t) => makeKey(t.participant.identity, t.source))
+      : [];
+
     if (!pages.length) {
-      scheduleApply(new Set());
+      scheduleApply(new Set(screenShareKeys));
       return;
     }
 
@@ -275,8 +305,8 @@ export function useSelectiveSubscription() {
     let desired: Set<string>;
 
     if (isWhiteboardPage) {
-      // Khi đang xem whiteboard: KHÔNG subscribe bất kỳ video track nào để tiết kiệm tối đa băng thông!
-      desired = new Set<string>();
+      // Khi đang xem whiteboard: không subscribe camera, chỉ giữ ScreenShare nếu đang quay Local
+      desired = new Set<string>(screenShareKeys);
     } else {
       const activeItems = currentData?.tracks ?? [];
       desired = new Set<string>(
@@ -287,6 +317,9 @@ export function useSelectiveSubscription() {
       if (pinnedKey) {
         desired.add(pinnedKey);
       }
+
+      // Khi đang quay Local: luôn giữ ScreenShare kể cả khi lật sang trang Camera
+      screenShareKeys.forEach((k) => desired.add(k));
     }
 
     scheduleApply(desired);
@@ -294,7 +327,7 @@ export function useSelectiveSubscription() {
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     };
-  }, [currentPage, pages, pinnedKey, scheduleApply]);
+  }, [currentPage, pages, pinnedKey, isLocalRecording, validTracks, scheduleApply]);
 
   // Track mới publish
   useEffect(() => {
@@ -302,9 +335,12 @@ export function useSelectiveSubscription() {
       publication: RemoteTrackPublication,
       participant: any,
     ) => {
-      if (isWaiting(participant)) return;
+      if (isWaiting(participant) || isAgentParticipant(participant)) return;
 
-      if (publication.source === Track.Source.Microphone) {
+      if (
+        publication.source === Track.Source.Microphone ||
+        publication.source === Track.Source.ScreenShareAudio
+      ) {
         if (!publication.isDesired) {
           publication.setSubscribed(true);
         }
@@ -318,7 +354,13 @@ export function useSelectiveSubscription() {
         return;
 
       const key = makeKey(participant.identity, publication.source);
-      if (lastDesiredRef.current.has(key) && !publication.isDesired) {
+      const forceScreenShareForRecording =
+        getIsLocalRecording() && publication.source === Track.Source.ScreenShare;
+
+      if (
+        (lastDesiredRef.current.has(key) || forceScreenShareForRecording) &&
+        !publication.isDesired
+      ) {
         publication.setSubscribed(true);
         console.log(`[Web TrackPublished] 🟢 SUB immediate → ${key}`);
       }

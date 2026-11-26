@@ -331,10 +331,11 @@ export default function CustomToolbar({
     meetingCode,
   });
 
-  // Local Recorder (Electron MediaRecorder)
+  // Local Recorder (Electron Direct LiveKit Canvas + WebAudio Recorder)
   const {
     isRecording: isLocalRecording,
     isPaused: isLocalPaused,
+    isStopping: isStoppingLocalRecording,
 
     // Actions
     pauseRecording: pauseLocalRecording,
@@ -342,7 +343,7 @@ export default function CustomToolbar({
     startRecording: startLocalRecording,
     stopRecording: stopLocalRecording,
   } = useScreenRecorder({
-    isMicrophoneEnabled, // Chỉ thu mic khi người dùng mở
+    isMicrophoneEnabled, // Đồng bộ AudioMixer khi người dùng bật/tắt mic
   });
 
   const {
@@ -374,6 +375,7 @@ export default function CustomToolbar({
 
   const isAnyRecordingStopping =
     isStoppingCloudRecording ||
+    isStoppingLocalRecording ||
     isCloudRecordingStopping ||
     recordingInfo?.status === "stopping";
 
@@ -767,7 +769,10 @@ export default function CustomToolbar({
                 handleConfirmStartCloudRecording();
               }
             }}
-            disabled={isAnyRecordingStopping || (isRecordingActive ? isRecordingByOther : false)}
+            disabled={
+              isAnyRecordingStopping ||
+              (!isLocalRecording && isRecordingActive && isRecordingByOther)
+            }
             title={
               isAnyRecordingStopping
                 ? (t("stopping_recording") || "Đang dừng...")

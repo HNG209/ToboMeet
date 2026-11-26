@@ -13,12 +13,23 @@ contextBridge.exposeInMainWorld("electronAPI", {
   selectScreenShare: (sourceId) =>
     ipcRenderer.send("screen-share-selected", sourceId),
 
-  // Open directory selection dialog
+  // Open directory selection dialog & local recording IPC
   selectFolder: () => ipcRenderer.invoke("select-folder"),
-  prepareRecording: () => ipcRenderer.invoke("prepare-recording"),
-  startRecording: (config) => ipcRenderer.send("start-recording", config),
-  saveVideoChunk: (buffer) => ipcRenderer.send("save-video-chunk", buffer),
-  stopRecording: () => ipcRenderer.send("stop-recording"),
+  startRecording: (config) => ipcRenderer.invoke("start-recording", config),
+  saveVideoChunk: (buffer) => ipcRenderer.invoke("save-video-chunk", buffer),
+  stopRecording: () => ipcRenderer.invoke("stop-recording"),
+  showRecordingInFolder: (filePath) =>
+    ipcRenderer.invoke("recording:show-in-folder", filePath),
+  onRecordingStatus: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("recording:status", listener);
+    return () => ipcRenderer.removeListener("recording:status", listener);
+  },
+  onRecordingCompleted: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on("recording:completed", listener);
+    return () => ipcRenderer.removeListener("recording:completed", listener);
+  },
 
   // Meeting window close confirmation
   onTriggerLeaveMeeting: (callback) => {

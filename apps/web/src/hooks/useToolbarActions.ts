@@ -116,6 +116,12 @@ export function useToolbarActions() {
             audio: true,
             selfBrowserSurface: "include",
             systemAudio: "include",
+            resolution: {
+              width: 1920,
+              height: 1080,
+              frameRate: 30,
+            },
+            contentHint: "detail",
           });
         } catch (shareErr) {
           // Rollback nhả khóa trên server nếu người dùng hủy ở browser picker hoặc lỗi thiết bị

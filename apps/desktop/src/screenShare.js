@@ -1,22 +1,11 @@
 const { BrowserWindow, desktopCapturer, ipcMain } = require("electron");
 
-let autoApproveRecording = false;
-
-function setAutoApproveRecording(enabled) {
-  autoApproveRecording = Boolean(enabled);
-}
-
 /**
- * Configures display media request handlers for screen sharing and meeting recording.
+ * Configures display media request handlers for screen sharing in meetings.
  * @param {Electron.Session} meetingSession
  */
 function setupScreenShareHandler(meetingSession) {
-  ipcMain.handle("prepare-recording", () => {
-    setAutoApproveRecording(true);
-    return true;
-  });
-
-  meetingSession.setDisplayMediaRequestHandler(async (request, callback) => {
+  meetingSession.setDisplayMediaRequestHandler(async (_request, callback) => {
     let isCallbackCalled = false;
     const safeCallback = (data) => {
       if (!isCallbackCalled) {
@@ -31,16 +20,7 @@ function setupScreenShareHandler(meetingSession) {
         return safeCallback();
       }
 
-      // 1. Screen recording (auto-approved without modal prompt)
-      if (autoApproveRecording) {
-        autoApproveRecording = false;
-        return safeCallback({
-          video: focusedWindow.webContents.mainFrame,
-          audio: "loopback",
-        });
-      }
-
-      // 2. Screen sharing in meeting (shows picker dialog to user)
+      // Screen sharing in meeting (shows picker dialog to user)
       const sources = await desktopCapturer.getSources({
         types: ["screen", "window"],
       });
@@ -77,5 +57,4 @@ function setupScreenShareHandler(meetingSession) {
 
 module.exports = {
   setupScreenShareHandler,
-  setAutoApproveRecording,
 };

@@ -199,6 +199,10 @@ function ActiveLiveKitRoom({
       dynacast: true,
       publishDefaults: {
         dtx: false, // Tắt DTX để gửi luồng audio liên tục cho LiveKit STT/Deepgram endpointing không bị trễ
+        screenShareEncoding: {
+          maxBitrate: 5_000_000,
+          maxFramerate: 30,
+        },
       },
       ...(e2eeConfig && { e2ee: e2eeConfig }),
       videoCaptureDefaults: {

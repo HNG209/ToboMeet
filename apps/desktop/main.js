@@ -12,7 +12,11 @@ const {
   disconnectSocket,
 } = require("./src/socketManager");
 const { setupScreenShareHandler } = require("./src/screenShare");
-const { setupRecordingIpc } = require("./src/recording");
+const {
+  setupRecordingIpc,
+  hasPendingRecordingExports,
+  waitForRecordingExports,
+} = require("./src/recording");
 const {
   registerProtocolClient,
   setupDesktopAuthIpc,
@@ -60,8 +64,20 @@ if (!gotTheLock) {
 // ==========================================
 // APPLICATION LIFECYCLE
 // ==========================================
-function handleQuit() {
+async function handleQuit() {
   isQuitting = true;
+  if (hasPendingRecordingExports()) {
+    console.log("[Main] Waiting for background recording exports to finish before quitting...");
+    const win = getMainWindow();
+    if (win && !win.isDestroyed()) {
+      win.hide();
+    }
+    try {
+      await waitForRecordingExports();
+    } catch (err) {
+      console.warn("[Main] Error while waiting for recording exports:", err);
+    }
+  }
   cleanupDesktopAuth();
   destroyTray();
   disconnectSocket();
@@ -137,8 +153,19 @@ app.whenReady().then(() => {
   });
 });
 
-app.on("before-quit", () => {
+let isWaitingForExportsOnQuit = false;
+
+app.on("before-quit", (event) => {
   isQuitting = true;
+  if (hasPendingRecordingExports() && !isWaitingForExportsOnQuit) {
+    event.preventDefault();
+    isWaitingForExportsOnQuit = true;
+    console.log("[Main] Waiting for background recording exports before quitting...");
+    waitForRecordingExports().finally(() => {
+      app.quit();
+    });
+    return;
+  }
   cleanupDesktopAuth();
   disconnectSocket();
 });
