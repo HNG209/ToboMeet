@@ -1,220 +1,189 @@
 {
   "header": {
     "features": "Tính năng",
-    "solutions": "Giải pháp",
-    "platform": "Nền tảng",
-    "pricing": "Bảng giá",
+    "solutions": "Cách hoạt động",
+    "platform": "Đa nền tảng",
+    "download": "Tải ứng dụng",
     "login": "Đăng nhập",
-    "register": "Đăng ký miễn phí",
+    "register": "Bắt đầu ngay",
     "lang_vi": "Tiếng Việt",
     "lang_en": "English"
   },
   "hero": {
-    "badge": "✨ Nền tảng họp trực tuyến thế hệ mới",
-    "title_line1": "Kết nối không",
-    "title_line1_accent": "giới hạn",
-    "title_line2": "Họp thông minh hơn.",
-    "description": "Giải pháp video call chất lượng cao, độ trễ thấp — dành cho doanh nghiệp, trường học và mọi đội nhóm. Kết nối mượt mà, bảo mật tuyệt đối.",
-    "create_meeting": "Tạo cuộc họp mới",
+    "title_line1": "Họp trực tuyến",
+    "title_line1_accent": "rõ nét",
+    "title_line2": "Làm việc nhóm đơn giản.",
+    "description": "Gọi video mượt mà, chia sẻ màn hình, vẽ chung trên bảng trắng và theo dõi nội dung cuộc họp dễ dàng — dành cho học tập và làm việc nhóm mỗi ngày.",
+    "create_meeting": "Bắt đầu ngay",
     "join_placeholder": "Nhập mã phòng...",
     "join_button": "Tham gia",
-    "mockup_title": "Q4 Team Kickoff 2025",
+    "download_desktop_cta": "Tải ứng dụng ToboMeet cho máy tính",
+    "mockup_title": "Cuộc họp nhóm tuần này",
     "mockup_live": "LIVE",
     "mockup_leave": "Rời phòng",
-    "social_proof_number": "50.000+",
-    "social_proof": "đội nhóm tin tưởng mỗi ngày",
-    "security_badge": "E2E Encrypted",
-    "participants_badge": "người tham gia"
-  },
-  "stats": {
-    "users_value": "50K+",
-    "users_label": "Người dùng hoạt động",
-    "meetings_value": "1M+",
-    "meetings_label": "Cuộc họp mỗi ngày",
-    "countries_value": "150+",
-    "countries_label": "Quốc gia kết nối",
-    "uptime_value": "99.99%",
-    "uptime_label": "Uptime SLA đảm bảo"
+    "highlights": [
+      "Gọi video rõ nét",
+      "Trợ lý tóm tắt cuộc họp",
+      "Bảng trắng vẽ chung",
+      "Dùng trên Web & Máy tính"
+    ]
   },
   "features": {
-    "section_badge": "⚡ Tính năng nổi bật",
-    "section_title": "Mọi thứ bạn cần để",
-    "section_title_gradient": "kết nối",
-    "section_desc": "Mọi công cụ bạn cần để kết nối, học tập và làm việc hiệu quả hơn — trong một nền tảng duy nhất.",
-    "uptime_label": "Global Uptime SLA",
-    "security_title": "Bảo mật doanh nghiệp",
-    "security_desc": "Mã hóa E2E cấp ngân hàng",
+    "section_title": "Mọi công cụ bạn cần để",
+    "section_title_gradient": "họp và học cùng nhau",
+    "section_desc": "Đơn giản, dễ làm quen và gom đủ mọi tiện ích trao đổi nhóm trong cùng một không gian.",
+    "video_tags": [
+      "Video rõ nét",
+      "Chia sẻ màn hình",
+      "Ghi hình cuộc họp",
+      "Phụ đề trực tiếp"
+    ],
     "items": [
       {
-        "title": "Gọi Video HD độ trễ thấp",
-        "description": "Chất lượng hình ảnh lên đến 4K, độ trễ dưới 100ms. Trải nghiệm cuộc họp như gặp mặt trực tiếp dù cách xa ngàn dặm."
+        "title": "Gọi video và chia sẻ mượt mà",
+        "description": "Trò chuyện với hình ảnh rõ nét, âm thanh dễ nghe, chia sẻ màn hình nhanh chóng và lưu lại bản ghi cuộc họp khi cần xem lại."
       },
       {
-        "title": "Quản lý lớp học trực quan",
-        "description": "Bảng trắng tương tác, chia nhóm thảo luận, điểm danh tự động. Giáo viên dễ dàng kiểm soát lớp học từ xa."
+        "title": "Trợ lý ghi chép thông minh",
+        "description": "Hiển thị phụ đề, hỗ trợ dịch nhanh khi trao đổi và tự động tóm tắt các ý chính cùng đầu việc cần làm sau buổi họp."
       },
       {
-        "title": "Bảo mật dữ liệu tuyệt đối",
-        "description": "Mã hoá đầu cuối E2E, tuân thủ GDPR. Mọi cuộc họp đều được bảo vệ bằng công nghệ mã hoá cấp doanh nghiệp."
+        "title": "Học tập và làm việc nhóm tiện lợi",
+        "description": "Vẽ chung trên bảng trắng trực tiếp, tạo bình chọn nhanh, giao bài tập, xếp lịch họp và nhắn tin ngay trong cùng một nơi."
+      },
+      {
+        "title": "Riêng tư và dễ kiểm soát",
+        "description": "Chủ phòng chủ động duyệt người vào từ phòng chờ, quản lý quyền phát biểu và giữ các buổi trao đổi luôn gọn gàng, riêng tư."
       }
     ]
   },
   "how_it_works": {
-    "section_badge": "🚀 Đơn giản & Nhanh chóng",
-    "section_title": "Bắt đầu họp trong",
-    "section_title_accent": "30 giây",
-    "section_desc": "Không cần cài đặt phức tạp. Tạo phòng họp và kết nối với đội nhóm ngay lập tức.",
-    "cta_btn": "Thử ngay — Miễn phí",
+    "section_title": "Bắt đầu cuộc họp chỉ với",
+    "section_title_accent": "3 bước đơn giản",
+    "section_desc": "Tạo phòng, gửi mã mời và bắt đầu trao đổi cùng mọi người mà không cần thao tác rườm rà.",
+    "cta_btn": "Tạo tài khoản và bắt đầu",
     "steps": [
       {
         "step": "01",
         "title": "Tạo phòng họp",
-        "description": "Nhấn một nút để tạo phòng họp mới. Nhận ngay link và mã phòng để chia sẻ với mọi người."
+        "description": "Tạo một phòng họp hoặc lớp học mới chỉ với một lần nhấn, nhận ngay đường dẫn và mã phòng."
       },
       {
         "step": "02",
-        "title": "Mời thành viên",
-        "description": "Chia sẻ link hoặc mã phòng với đồng nghiệp. Họ tham gia chỉ với một click, không cần cài đặt."
+        "title": "Gửi lời mời",
+        "description": "Chia sẻ mã phòng hoặc đường dẫn cho thành viên trong nhóm để mọi người tham gia nhanh chóng."
       },
       {
         "step": "03",
-        "title": "Kết nối ngay",
-        "description": "Họp trực tiếp với video HD, âm thanh rõ ràng và đầy đủ công cụ cộng tác nhóm."
-      }
-    ]
-  },
-  "testimonials": {
-    "section_badge": "💬 Đánh giá từ người dùng",
-    "section_title": "Được tin dùng bởi",
-    "section_title_accent": "hàng nghìn đội nhóm",
-    "items": [
-      {
-        "name": "Nguyễn Văn Minh",
-        "role": "CTO, TechVN Solutions",
-        "content": "Tobo đã thay đổi hoàn toàn cách đội ngũ của chúng tôi làm việc từ xa. Chất lượng video tuyệt vời và không bao giờ bị ngắt kết nối."
-      },
-      {
-        "name": "Trần Thị Hoa",
-        "role": "Giáo viên, Trường THPT Lê Hồng Phong",
-        "content": "Tính năng quản lý lớp học của Tobo giúp tôi dễ dàng điểm danh và theo dõi học sinh hơn bao giờ hết. Thực sự rất ấn tượng!"
-      },
-      {
-        "name": "Lê Quang Huy",
-        "role": "Product Manager, Vingroup",
-        "content": "Giao diện đẹp, dễ dùng và cực kỳ ổn định. Đây là giải pháp tốt nhất tôi từng dùng cho cuộc họp trực tuyến."
-      },
-      {
-        "name": "Phạm Thu Hằng",
-        "role": "HR Director, FPT Software",
-        "content": "Từ khi dùng Tobo, năng suất làm việc của team tăng rõ rệt. Tính năng chia nhóm thảo luận Breakout Room cực kỳ hữu ích."
-      },
-      {
-        "name": "David Nguyen",
-        "role": "Engineering Lead, Axon Enterprise",
-        "content": "We switched from Teams to Tobo and never looked back. The latency is incredibly low even for our global distributed team."
-      },
-      {
-        "name": "Sarah Kim",
-        "role": "Head of Education, EdTech Korea",
-        "content": "Tobo's classroom management features are unmatched. Our student engagement increased by 40% after switching."
+        "title": "Trao đổi trực tiếp",
+        "description": "Bắt đầu buổi họp với gọi video, chia sẻ màn hình, bảng trắng và đầy đủ công cụ cộng tác."
       }
     ]
   },
   "platforms": {
-    "section_badge": "🌐 Đa nền tảng",
-    "section_title": "Trải nghiệm đồng bộ trên mọi thiết bị",
-    "section_desc": "Hệ thống hỗ trợ hoàn hảo trên mọi nền tảng. Dù bạn đang ở văn phòng hay đang di chuyển, kết nối luôn được giữ vững.",
+    "section_title": "Thuận tiện trên thiết bị bạn đang dùng",
+    "section_desc": "Mở nhanh trên trình duyệt hoặc cài đặt ứng dụng trên máy tính để có trải nghiệm ổn định và gọn gàng hơn.",
     "one_account": "Một tài khoản duy nhất",
-    "one_account_desc": "đăng nhập và đồng bộ liền mạch trên mọi thiết bị, mọi lúc mọi nơi.",
+    "one_account_desc": "giúp bạn đăng nhập và đồng bộ phòng họp, lịch hẹn và tin nhắn xuyên suốt mọi thiết bị.",
+    "download_desktop_btn": "Đi tới trang tải ứng dụng",
     "tab_web": "Trình duyệt Web",
-    "tab_desktop": "Desktop App",
-    "tab_mobile": "Di động",
+    "tab_desktop": "Ứng dụng Máy tính",
+    "tab_mobile": "Điện thoại",
     "items": [
       {
         "name": "Trình duyệt Web",
-        "description": "Không cần cài đặt, mở trình duyệt là họp ngay",
+        "description": "Không cần cài đặt, chỉ cần mở trình duyệt và tham gia cuộc họp ngay lập tức.",
         "badges": [
           "Chrome",
+          "Edge",
           "Safari",
-          "Firefox",
-          "Edge"
+          "Firefox"
         ]
       },
       {
-        "name": "Desktop App",
-        "description": "Ứng dụng native hiệu năng cao, tích hợp hệ thống",
+        "name": "Ứng dụng Máy tính",
+        "description": "Cài đặt riêng trên máy tính Windows giúp mở họp nhanh hơn, nhận thông báo kịp thời và lưu bản ghi cuộc họp tiện lợi.",
         "badges": [
-          "Windows",
-          "macOS",
-          "Linux"
+          "Windows 10 / 11"
         ]
       },
       {
-        "name": "Di động",
-        "description": "Họp mọi lúc mọi nơi, tối ưu cho màn hình nhỏ",
+        "name": "Điện thoại",
+        "description": "Theo dõi lịch họp, nhắn tin và tham gia cuộc họp thuận tiện khi bạn đang di chuyển.",
         "badges": [
-          "iOS",
-          "Android"
-        ]
-      }
-    ]
-  },
-  "pricing": {
-    "section_badge": "💰 Bảng giá",
-    "section_title": "Gói phù hợp",
-    "section_title_accent": "với mọi nhu cầu",
-    "section_desc": "Bắt đầu miễn phí, nâng cấp bất cứ lúc nào. Không cam kết dài hạn.",
-    "toggle_monthly": "Hàng tháng",
-    "toggle_yearly": "Hàng năm",
-    "save_badge": "Tiết kiệm 20%",
-    "per_month": "/tháng",
-    "save_amount": "Tiết kiệm ${amount}/năm",
-    "free_label": "Miễn phí",
-    "popular_badge": "Phổ biến nhất",
-    "contact_text": "Liên hệ",
-    "footer_note": "Tất cả các gói đều bao gồm SSL, E2E encryption và hỗ trợ kỹ thuật cơ bản.",
-    "tiers": [
-      {
-        "name": "Free",
-        "description": "Dành cho cá nhân và nhóm nhỏ khởi đầu",
-        "cta": "Bắt đầu miễn phí",
-        "features": [
-          "Tối đa 100 người tham gia",
-          "Cuộc họp tối đa 60 phút",
-          "Chat trong cuộc họp",
-          "Chia sẻ màn hình cơ bản",
-          "Phụ đề trực tiếp"
-        ]
-      },
-      {
-        "name": "Pro",
-        "description": "Dành cho đội nhóm chuyên nghiệp cần mạnh hơn",
-        "cta": "Dùng thử 14 ngày",
-        "features": [
-          "Không giới hạn người tham gia",
-          "Cuộc họp không giới hạn thời gian",
-          "Ghi âm & lưu trữ cuộc họp",
-          "Phòng chờ và quản lý quyền truy cập",
-          "Bảng trắng cộng tác (Whiteboard)",
-          "Phụ đề thời gian thực",
-          "Dịch thời gian thực",
-          "Tóm tắt cuộc họp",
-          "Tạo biên bản và Action Items tự động",
-          "Khảo sát và Hỏi đáp"
+          "Android",
+          "iOS"
         ]
       }
     ]
   },
   "cta": {
-    "badge": "🎉 Miễn phí · Không cần thẻ tín dụng",
-    "title": "Sẵn sàng kết nối",
-    "title_accent": "không giới hạn?",
-    "description": "Hơn 50.000 đội nhóm đã tin dùng Tobo để kết nối và cộng tác mỗi ngày. Hãy bắt đầu ngay hôm nay.",
-    "email_placeholder": "Nhập email của bạn...",
-    "cta_button": "Bắt đầu miễn phí",
-    "or_text": "hoặc",
-    "create_meeting": "Tạo cuộc họp ngay →",
-    "no_credit_card": "✓ Không cần thẻ tín dụng  ✓ Miễn phí 14 ngày  ✓ Hủy bất cứ lúc nào"
+    "title": "Sẵn sàng cho buổi họp",
+    "title_accent": "tiếp theo của bạn?",
+    "description": "Sử dụng ngay trên trình duyệt hoặc tải ứng dụng ToboMeet về máy tính Windows để trải nghiệm trọn vẹn hơn.",
+    "cta_button": "Bắt đầu trên trình duyệt",
+    "download_button": "Tải ứng dụng máy tính"
+  },
+  "download": {
+    "meta_title": "Tải ToboMeet cho máy tính Windows",
+    "meta_description": "Tải và cài đặt ứng dụng ToboMeet trên máy tính Windows để họp trực tuyến gọn nhẹ, ổn định và nhận thông báo kịp thời.",
+    "title": "Tải ToboMeet cho",
+    "title_accent": "máy tính",
+    "subtitle": "Họp trực tuyến gọn nhẹ, ổn định hơn trên máy tính Windows — mở nhanh chỉ với một lần nhấn và không bỏ lỡ thông báo cuộc họp.",
+    "windows_badge": "Dành cho máy tính Windows",
+    "card_title": "ToboMeet cho Windows",
+    "card_desc": "Tải bộ cài đặt chính thức để sử dụng đầy đủ tính năng họp nhóm, ghi hình cuộc họp và nhận thông báo trực tiếp trên máy tính.",
+    "download_button": "Tải xuống cho Windows",
+    "download_fallback_button": "Mở trang tải bản mới nhất",
+    "use_web_instead": "Dùng ngay trên trình duyệt",
+    "os_requirement": "Hỗ trợ Windows 10 và Windows 11",
+    "version_label": "Phiên bản:",
+    "size_label": "Dung lượng:",
+    "updated_label": "Cập nhật:",
+    "fallback_note": "Bản cài đặt trực tiếp đang được cập nhật. Bạn vẫn có thể tải bản phát hành mới nhất từ trang lưu trữ dự phòng.",
+    "preview_caption": "Giao diện gọn gàng, tập trung hoàn toàn vào cuộc họp của bạn.",
+    "benefits_title": "Vì sao nên dùng ứng dụng trên máy tính?",
+    "benefits_desc": "Mọi thứ quen thuộc như trên trình duyệt, nhưng thuận tiện và ổn định hơn cho công việc hằng ngày.",
+    "benefits": [
+      {
+        "title": "Mở nhanh, tập trung hơn",
+        "description": "Có biểu tượng riêng trên màn hình máy tính, không bị lẫn giữa hàng chục thẻ trình duyệt đang mở."
+      },
+      {
+        "title": "Không bỏ lỡ cuộc họp",
+        "description": "Nhận thông báo khi có tin nhắn mới hoặc buổi họp sắp bắt đầu ngay cả khi bạn thu gọn cửa sổ."
+      },
+      {
+        "title": "Chia sẻ và ghi hình tiện lợi",
+        "description": "Chọn nhanh cửa sổ muốn chia sẻ và lưu bản ghi cuộc họp trực tiếp về máy tính của bạn."
+      },
+      {
+        "title": "Vào phòng nhanh từ liên kết",
+        "description": "Nhấn vào đường dẫn mời họp để mở thẳng ứng dụng mà không cần mở thêm nhiều bước."
+      }
+    ],
+    "guide_title": "Cài đặt nhanh trong 3 bước",
+    "guide_desc": "Bạn không cần thiết lập gì phức tạp — chỉ mất vài phút để sẵn sàng sử dụng.",
+    "steps": [
+      {
+        "step": "BƯỚC 01",
+        "title": "Tải bộ cài đặt",
+        "description": "Nhấn nút tải xuống ở phía trên và chờ tệp cài đặt được lưu về máy tính."
+      },
+      {
+        "step": "BƯỚC 02",
+        "title": "Mở tệp và cài đặt",
+        "description": "Nhấn đúp vào tệp vừa tải và làm theo hướng dẫn đơn giản trên màn hình để hoàn tất."
+      },
+      {
+        "step": "BƯỚC 03",
+        "title": "Đăng nhập và họp ngay",
+        "description": "Mở ToboMeet từ màn hình chính, đăng nhập tài khoản của bạn và bắt đầu cuộc họp."
+      }
+    ],
+    "install_tip_title": "Lưu ý nhỏ khi cài đặt trên Windows",
+    "install_tip_desc": "Nếu Windows hiện màn hình thông báo bảo vệ máy tính khi mở tệp cài đặt lần đầu, bạn chỉ cần chọn \"Thông tin thêm\" (More info) rồi nhấn \"Vẫn chạy\" (Run anyway) để tiếp tục cài đặt bình thường.",
+    "back_home": "Quay lại trang chủ"
   },
   "footer": {
     "thesis_title": "Khóa luận tốt nghiệp: Nền tảng họp trực tuyến thời gian thực hỗ trợ cộng tác nhóm",

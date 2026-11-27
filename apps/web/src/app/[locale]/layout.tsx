@@ -33,25 +33,25 @@ const plusJakartaSans = Plus_Jakarta_Sans({
 // ─── SEO Metadata (per locale) ────────────────────────────────────────────────
 const metadataMap: Record<string, Metadata> = {
   vi: {
-    title: 'Tobo — Kết nối không giới hạn | Họp trực tuyến HD',
+    title: 'ToboMeet — Họp trực tuyến và học tập nhóm đơn giản',
     description:
-      'Nền tảng họp trực tuyến thế hệ mới — Video HD, độ trễ thấp, bảo mật E2E. Dành cho doanh nghiệp, trường học và mọi đội nhóm.',
-    keywords: ['họp trực tuyến', 'video call', 'học online', 'hội nghị trực tuyến', 'Tobo'],
+      'Nền tảng họp trực tuyến rõ nét, dễ dùng với bảng trắng vẽ chung, ghi chép thông minh và hỗ trợ cả trình duyệt lẫn máy tính.',
+    keywords: ['họp trực tuyến', 'gọi video', 'học online', 'làm việc nhóm', 'ToboMeet'],
     openGraph: {
-      title: 'Tobo — Kết nối không giới hạn',
-      description: 'Giải pháp video call chất lượng cao cho doanh nghiệp và giáo dục.',
+      title: 'ToboMeet — Họp trực tuyến và học tập nhóm đơn giản',
+      description: 'Gọi video rõ nét, chia sẻ màn hình, bảng trắng vẽ chung và làm việc nhóm hiệu quả.',
       type: 'website',
       locale: 'vi_VN',
     },
   },
   en: {
-    title: 'Tobo — Connect Without Limits | HD Online Meetings',
+    title: 'ToboMeet — Simple Online Meetings & Group Learning',
     description:
-      'Next-generation online meeting platform — HD video, ultra-low latency, E2E security. Built for enterprises, schools, and every team.',
-    keywords: ['online meeting', 'video call', 'e-learning', 'conference', 'Tobo'],
+      'A clear, easy-to-use online meeting platform with shared whiteboards, smart meeting notes, and web plus desktop support.',
+    keywords: ['online meeting', 'video call', 'online learning', 'team collaboration', 'ToboMeet'],
     openGraph: {
-      title: 'Tobo — Connect Without Limits',
-      description: 'High-quality video call solution for enterprises and education.',
+      title: 'ToboMeet — Simple Online Meetings & Group Learning',
+      description: 'Clear video calls, screen sharing, shared whiteboards, and smooth team collaboration.',
       type: 'website',
       locale: 'en_US',
     },

@@ -54,6 +54,9 @@ export async function middleware(request: NextRequest) {
     pathWithoutLocale.startsWith("/auth/desktop-callback");
   const isRoomJoinPage = pathWithoutLocale.startsWith("/room/join");
   const isMeetingPage = pathWithoutLocale.startsWith("/meeting");
+  const isDownloadPage =
+    pathWithoutLocale === "/download" ||
+    pathWithoutLocale.startsWith("/download/");
   const isDesktopApp = (request.headers.get("user-agent") || "").includes(
     "ToboMeetDesktop",
   );
@@ -62,7 +65,8 @@ export async function middleware(request: NextRequest) {
     isHomePage ||
     isCallbackPage ||
     isRoomJoinPage ||
-    isMeetingPage;
+    isMeetingPage ||
+    isDownloadPage;
 
   // Nếu đang mở trên Electron Desktop khi chưa đăng nhập và vào trang chủ (/) -> chuyển thẳng vào /login (hiển thị DesktopAuthGate)
   if (!user && isHomePage && isDesktopApp) {

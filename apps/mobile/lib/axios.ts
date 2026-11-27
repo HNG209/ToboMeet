@@ -10,7 +10,7 @@ try {
   console.warn("Failed to load expo-device native module:", err);
 }
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || "https://dolphin-paternity-estrogen.ngrok-free.dev/api";
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
 console.log("[axios] API baseURL:", API_BASE_URL);
 
 export const axiosInstance = axios.create({
@@ -89,7 +89,7 @@ axiosInstance.interceptors.request.use(
         config.headers["x-device-model"] = Device?.modelName || defaultModel;
         config.headers["x-device-brand"] = Device?.brand || defaultBrand;
         config.headers["x-device-os"] = Device?.osName || defaultOS;
-        
+
         // Bypass ngrok warning page
         config.headers["ngrok-skip-browser-warning"] = "true";
       }
@@ -122,11 +122,27 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config as any;
     const responseData = error.response?.data as any;
 
-    // Kiểm tra nếu lỗi do Token hết hạn/không hợp lệ (mã 1003 hoặc status 401)
+    const status = error.response?.status;
+    const errorCode = responseData?.code;
+
+    // Tài khoản bị khóa (403 / 4031) -> đăng xuất ngay không cần thử gia hạn token
+    const isAccountLocked = status === 403 && errorCode === 4031;
+    if (isAccountLocked) {
+      console.log("[axios] Tài khoản đã bị khóa. Tiến hành đăng xuất trên Mobile...");
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch (err) {
+        console.error("[axios] Lỗi khi đăng xuất trên Mobile:", err);
+      }
+      return Promise.reject(responseData);
+    }
+
+    // Chỉ coi là lỗi phiên/Token khi đúng mã lỗi xác thực (4011, 401 thuần hoặc 1003),
+    // tránh đăng xuất nhầm khi gặp các lỗi nghiệp vụ khác (VD: 4012, 4013, 4014)
     const isTokenError =
-      error.response?.status === 401 ||
-      responseData?.code === 1003 ||
-      (typeof responseData?.message === "string" && responseData.message.includes("Token"));
+      (status === 401 &&
+        (errorCode === 4011 || errorCode === 401 || errorCode === undefined)) ||
+      errorCode === 1003;
 
     if (isTokenError) {
       if (originalRequest && !originalRequest._retry) {

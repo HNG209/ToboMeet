@@ -1,4 +1,4 @@
-import React, { useState, useEffect, lazy, Suspense } from "react";
+import React, { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import {
   View,
   Text,
@@ -43,12 +43,63 @@ export default function MeetingRoomContent({
   // Lắng nghe các sự kiện đồng bộ breakout
   useBreakoutSync();
 
-  const { roomName, roomType, breakoutStartedAt, breakoutDuration, isHost } =
-    useRoomSettings({
-      meetingCode,
-    });
+  const {
+    roomName,
+    roomType,
+    meetingType,
+    channelName,
+    ownerName,
+    isE2EE,
+    breakoutStartedAt,
+    breakoutDuration,
+    isHost,
+  } = useRoomSettings({
+    meetingCode,
+  });
 
   const isBreakoutRoom = roomType === "breakout";
+
+  // Đồng bộ tên phòng hiển thị trên header giống bên Web
+  const displayTitle = useMemo(() => {
+    if (isBreakoutRoom) {
+      return roomName || "Breakout Room";
+    }
+    const effectiveMeetingType = meetingType || meetingData?.meetingType;
+    const effectiveOwnerName = ownerName || meetingData?.ownerName;
+    const effectiveChannelName = channelName || meetingData?.channelName;
+    const effectiveRoomName = roomName || meetingData?.roomName;
+
+    if (effectiveMeetingType === "personal") {
+      const name =
+        effectiveOwnerName ||
+        (effectiveRoomName
+          ? effectiveRoomName.replace(/^Cuộc họp cá nhân của\s*/i, "")
+          : "");
+      if (name) {
+        return t("meeting.personal_meeting_title", {
+          name,
+          defaultValue: `Cuộc họp cá nhân của ${name}`,
+        });
+      }
+      return t("meeting.personal_meeting_default", {
+        defaultValue: "Cuộc họp cá nhân",
+      });
+    }
+
+    return (
+      effectiveChannelName ||
+      effectiveRoomName ||
+      t("meeting.channel_meeting_default", { defaultValue: "Cuộc họp kênh" })
+    );
+  }, [
+    isBreakoutRoom,
+    roomName,
+    meetingType,
+    ownerName,
+    channelName,
+    meetingData,
+    t,
+  ]);
 
   const timeDisplay = useBreakoutTimer({
     startedAt: breakoutStartedAt,
@@ -298,32 +349,38 @@ export default function MeetingRoomContent({
   // GIAO DIỆN KHI ĐÃ ĐƯỢC DUYỆT VÀO PHÒNG
   return (
     <View className="flex-1 bg-[#0d0d10]">
-      {/* Header bar */}
-      <View className="h-[70px] justify-center items-center bg-[#111113] border-b border-[#232328] px-4">
+      {/* Header bar — hiển thị tên phòng đồng bộ với Web */}
+      <View className="h-[54px] justify-center items-center bg-[#111113] border-b border-[#232328] px-4">
         {isBreakoutRoom ? (
-          <View className="items-center">
-            <View className="flex-row items-center gap-1.5 mb-2">
-              <Feather name="grid" size={12} color="#60a5fa" />
-              <Text className="text-blue-400 text-[11px] font-bold uppercase tracking-wider">
-                {roomName || "Breakout Room"}
-              </Text>
-            </View>
+          <View className="flex-row items-center gap-2 max-w-full">
+            <Feather name="grid" size={14} color="#60a5fa" />
+            <Text
+              className="text-slate-100 text-sm font-semibold shrink"
+              numberOfLines={1}
+            >
+              {displayTitle}
+            </Text>
             {timeDisplay && (
-              <View className="flex-row items-center gap-1 bg-[#18181d] px-2.5 py-0.5 rounded-full border border-[#232328]">
-                <Feather name="clock" size={11} color="#f59e0b" />
-                <Text className="text-amber-400 font-mono font-bold text-xs">
+              <View className="flex-row items-center gap-1 bg-[#18181d] px-2 py-0.5 rounded-md border border-blue-500/20">
+                <Feather name="clock" size={11} color="#60a5fa" />
+                <Text className="text-blue-400 font-mono font-bold text-[11px]">
                   {timeDisplay}
                 </Text>
               </View>
             )}
           </View>
         ) : (
-          <>
-            <Text className="text-slate-400 text-xs uppercase font-bold">
-              {t("meeting.meeting_page.room_header")}
+          <View className="flex-row items-center justify-center gap-1.5 max-w-full">
+            <Text
+              className="text-slate-100 font-semibold text-[15px] tracking-tight shrink"
+              numberOfLines={1}
+            >
+              {displayTitle}
             </Text>
-            <Text className="text-slate-100 font-bold text-base">{meetingCode}</Text>
-          </>
+            {isE2EE && (
+              <Feather name="shield" size={14} color="#34d399" />
+            )}
+          </View>
         )}
       </View>
 

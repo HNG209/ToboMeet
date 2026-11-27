@@ -31,12 +31,10 @@ export default function MeetingMockup() {
             <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-blink" />
             <span className="text-[11px] font-bold text-red-400">{t('mockup_live')}</span>
           </div>
-          {/* Duration */}
-          <span className="text-[12px] font-mono text-slate-400">00:23:45</span>
-          {/* Participants count */}
+          {/* Participants count matching preview tiles */}
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-700/80 text-[11px] text-slate-300">
             <Users size={11} />
-            <span>12</span>
+            <span>{MOCK_PARTICIPANTS.length}</span>
           </div>
         </div>
       </div>

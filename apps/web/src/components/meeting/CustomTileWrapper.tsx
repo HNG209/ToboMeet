@@ -15,7 +15,7 @@ import {
   PinOff,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface CustomTileWrapperProps {
   trackRef: TrackReferenceOrPlaceholder;
@@ -46,12 +46,94 @@ export default function CustomTileWrapper({
   const [scale, setScale] = useState(1);
   const [pos, setPos] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const scaleRef = useRef(1);
+  const posRef = useRef({ x: 0, y: 0 });
+  const dragOriginRef = useRef({ x: 0, y: 0 });
 
-  // Zoom bằng lăn chuột (chỉ screen share)
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+
+  useEffect(() => {
+    posRef.current = pos;
+  }, [pos]);
+
+  /**
+   * Tính giới hạn kéo (maxX, maxY) dựa theo kích thước thực tế của khung hình video (object-contain)
+   * bên trong container để các cạnh video luôn áp sát/snap vào khung nhìn, không kéo trôi ra ngoài view.
+   */
+  const getPanBounds = useCallback(
+    (targetScale: number) => {
+      const container = containerRef.current;
+      if (!container || targetScale <= 1) {
+        return { maxX: 0, maxY: 0 };
+      }
+
+      const containerW = container.clientWidth;
+      const containerH = container.clientHeight;
+      if (containerW <= 0 || containerH <= 0) {
+        return { maxX: 0, maxY: 0 };
+      }
+
+      let renderedW = containerW;
+      let renderedH = containerH;
+
+      // Khi isMain && isScreenShare dùng object-contain -> tính kích thước hiển thị thật của video
+      if (isMain && isScreenShare) {
+        const videoEl = container.querySelector("video");
+        const vw = videoEl?.videoWidth || 0;
+        const vh = videoEl?.videoHeight || 0;
+        if (vw > 0 && vh > 0) {
+          const videoRatio = vw / vh;
+          const containerRatio = containerW / containerH;
+          if (videoRatio > containerRatio) {
+            renderedW = containerW;
+            renderedH = containerW / videoRatio;
+          } else {
+            renderedH = containerH;
+            renderedW = containerH * videoRatio;
+          }
+        }
+      }
+
+      const maxX = Math.max(0, (renderedW * targetScale - containerW) / 2);
+      const maxY = Math.max(0, (renderedH * targetScale - containerH) / 2);
+      return { maxX, maxY };
+    },
+    [isMain, isScreenShare],
+  );
+
+  const clampAndSnapPos = useCallback(
+    (
+      nextPos: { x: number; y: number },
+      targetScale: number,
+      snapEdgeThreshold = 0,
+    ) => {
+      if (targetScale <= 1) return { x: 0, y: 0 };
+      const { maxX, maxY } = getPanBounds(targetScale);
+
+      let x = Math.min(Math.max(nextPos.x, -maxX), maxX);
+      let y = Math.min(Math.max(nextPos.y, -maxY), maxY);
+
+      // Snap nhẹ các cạnh video sát khít vào viền khung nhìn khi thả chuột ở gần biên
+      if (snapEdgeThreshold > 0) {
+        if (maxX > 0 && maxX - Math.abs(x) <= snapEdgeThreshold) {
+          x = x >= 0 ? maxX : -maxX;
+        }
+        if (maxY > 0 && maxY - Math.abs(y) <= snapEdgeThreshold) {
+          y = y >= 0 ? maxY : -maxY;
+        }
+      }
+
+      return { x, y };
+    },
+    [getPanBounds],
+  );
+
+  // Zoom bằng lăn chuột theo vị trí con trỏ + tự động ép/snap các cạnh vào trong view
   useEffect(() => {
     const container = containerRef.current;
     if (!container || !isScreenShare) return;
@@ -61,16 +143,81 @@ export default function CustomTileWrapper({
       const zoomSensitivity = 0.002;
       const delta = -e.deltaY * zoomSensitivity;
 
-      setScale((prev) => {
-        const newScale = Math.min(Math.max(1, prev + delta), 5);
-        if (newScale === 1) setPos({ x: 0, y: 0 });
-        return newScale;
-      });
+      const prevScale = scaleRef.current;
+      const prevPos = posRef.current;
+      const newScale = Math.min(Math.max(1, prevScale + delta), 5);
+
+      if (newScale === prevScale) return;
+
+      let nextPos = { x: 0, y: 0 };
+      if (newScale > 1) {
+        const rect = container.getBoundingClientRect();
+        const cx = e.clientX - (rect.left + rect.width / 2);
+        const cy = e.clientY - (rect.top + rect.height / 2);
+        const ratio = newScale / prevScale;
+
+        const rawPos = {
+          x: cx - (cx - prevPos.x) * ratio,
+          y: cy - (cy - prevPos.y) * ratio,
+        };
+        nextPos = clampAndSnapPos(rawPos, newScale);
+      }
+
+      scaleRef.current = newScale;
+      posRef.current = nextPos;
+      setScale(newScale);
+      setPos(nextPos);
     };
 
     container.addEventListener("wheel", handleWheel, { passive: false });
     return () => container.removeEventListener("wheel", handleWheel);
-  }, [isScreenShare]);
+  }, [isScreenShare, clampAndSnapPos]);
+
+  // Tự động ép lại vị trí khi khung chứa thay đổi kích thước (mở/đóng sidebar, resize cửa sổ)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !isScreenShare) return;
+
+    const observer = new ResizeObserver(() => {
+      const clamped = clampAndSnapPos(posRef.current, scaleRef.current);
+      if (clamped.x !== posRef.current.x || clamped.y !== posRef.current.y) {
+        posRef.current = clamped;
+        setPos(clamped);
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [isScreenShare, clampAndSnapPos]);
+
+  // Theo dõi kéo toàn cục trên window để mượt và luôn snap cạnh khi thả chuột
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      const rawPos = {
+        x: e.clientX - dragOriginRef.current.x,
+        y: e.clientY - dragOriginRef.current.y,
+      };
+      const clamped = clampAndSnapPos(rawPos, scaleRef.current);
+      posRef.current = clamped;
+      setPos(clamped);
+    };
+
+    const handleWindowMouseUp = () => {
+      setIsDragging(false);
+      const snapped = clampAndSnapPos(posRef.current, scaleRef.current, 12);
+      posRef.current = snapped;
+      setPos(snapped);
+    };
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+    };
+  }, [isDragging, clampAndSnapPos]);
 
   // Đóng menu khi click ra ngoài
   useEffect(() => {
@@ -89,17 +236,25 @@ export default function CustomTileWrapper({
   }, [menuOpen]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    if (!isScreenShare || scale === 1) return;
+    if (!isScreenShare || scaleRef.current <= 1) return;
+    const { maxX, maxY } = getPanBounds(scaleRef.current);
+    if (maxX <= 0 && maxY <= 0) return;
+
+    e.preventDefault();
     setIsDragging(true);
-    setStartPos({ x: e.clientX - pos.x, y: e.clientY - pos.y });
+    dragOriginRef.current = {
+      x: e.clientX - posRef.current.x,
+      y: e.clientY - posRef.current.y,
+    };
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    setPos({ x: e.clientX - startPos.x, y: e.clientY - startPos.y });
+  const handleDoubleClick = () => {
+    if (!isScreenShare || scaleRef.current <= 1) return;
+    scaleRef.current = 1;
+    posRef.current = { x: 0, y: 0 };
+    setScale(1);
+    setPos({ x: 0, y: 0 });
   };
-
-  const handleMouseUp = () => setIsDragging(false);
 
   let avatarUrl = "";
   try {
@@ -140,15 +295,17 @@ export default function CustomTileWrapper({
             : "default",
       }}
       onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
+      onDoubleClick={handleDoubleClick}
     >
       {/* Video + ẩn hoàn toàn overlay mặc định của LiveKit */}
       <div
-        className="w-full h-full origin-center transition-transform duration-75 ease-out bg-[#0a0a0a]"
+        className={`w-full h-full origin-center bg-[#0a0a0a] ${
+          isDragging
+            ? "transition-none"
+            : "transition-transform duration-150 ease-out"
+        }`}
         style={{
-          transform: `translate(${pos.x}px, ${pos.y}px) scale(${scale})`,
+          transform: `translate3d(${pos.x}px, ${pos.y}px, 0) scale(${scale})`,
         }}
       >
         <ParticipantTile

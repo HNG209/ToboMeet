@@ -45,6 +45,7 @@ export function useRoomSettings({
     });
 
   const [roomType, setRoomType] = useState<"main" | "breakout">("main");
+  const [meetingType, setMeetingType] = useState<"personal" | "channel">("channel");
   const [breakoutRoomsList, setBreakoutRoomsList] = useState<
     LivekitBreakoutRoom[]
   >([]);
@@ -52,6 +53,9 @@ export function useRoomSettings({
   const [breakoutStartedAt, setBreakoutStartedAt] = useState<number>(0);
   const [breakoutDuration, setBreakoutDuration] = useState<number>(0);
   const [roomName, setRoomName] = useState<string>("");
+  const [channelName, setChannelName] = useState<string>("");
+  const [ownerName, setOwnerName] = useState<string>("");
+  const [isE2EE, setIsE2EE] = useState<boolean>(false);
 
   // Kiểm tra quyền Chủ phòng/Admin & Role của user
   let isHost = false;
@@ -105,12 +109,27 @@ export function useRoomSettings({
       const meta: LivekitRoomMetadata = JSON.parse(roomMetadata);
 
       setRoomName(meta.roomName || "");
+      if (meta.channelName) setChannelName(meta.channelName);
+      if (meta.ownerName) setOwnerName(meta.ownerName);
+      setIsE2EE(Boolean(meta.isE2EE));
+      if (meta.meetingType) {
+        setMeetingType(meta.meetingType);
+      }
 
       if (meta.roomType === "breakout") {
         setRoomType("breakout");
         if (meta.parentMetadata) {
           setIsChatEnabled(meta.parentMetadata.isChatEnabled);
           setApprovalPermission(meta.parentMetadata.approvalPermission);
+          if (meta.parentMetadata.meetingType) {
+            setMeetingType(meta.parentMetadata.meetingType);
+          }
+          if (meta.parentMetadata.channelName) {
+            setChannelName(meta.parentMetadata.channelName);
+          }
+          if (meta.parentMetadata.ownerName) {
+            setOwnerName(meta.parentMetadata.ownerName);
+          }
         }
 
         setBreakoutStartedAt(meta.startedAt || 0);
@@ -227,7 +246,11 @@ export function useRoomSettings({
     breakoutStartedAt,
     isHost,
     roomType,
+    meetingType,
     roomName,
+    channelName,
+    ownerName,
+    isE2EE,
     whiteboardSettings,
     canAccessWhiteboard,
 

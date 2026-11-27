@@ -78,12 +78,12 @@ export const ErrorCode: Record<string, ErrorDetail> = {
   ALREADY_IN_MEETING: {
     code: 4013,
     message: "Đã trong cuộc họp",
-    statusCode: 401,
+    statusCode: 409,
   },
   MEETING_NOT_STARTED_OR_ENDED: {
     code: 4014,
     message: "Cuộc họp chưa bắt đầu hoặc đã kết thúc",
-    statusCode: 401,
+    statusCode: 400,
   },
   USER_EXISTED: {
     code: 4001,

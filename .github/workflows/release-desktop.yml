@@ -45,6 +45,110 @@ jobs:
           cd apps/desktop
           npx electron-builder --win nsis --publish never
 
+      - name: Upload Installer & Manifest to Cloudflare R2
+        shell: pwsh
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+          AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+          R2_ENDPOINT_URL: ${{ secrets.R2_ENDPOINT_URL }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          R2_BUCKET_NAME: ${{ secrets.R2_BUCKET_NAME }}
+          R2_FOLDER: desktop-releases
+          RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+          RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $missing = @()
+          if (-not $env:AWS_ACCESS_KEY_ID) { $missing += "R2_ACCESS_KEY_ID" }
+          if (-not $env:AWS_SECRET_ACCESS_KEY) { $missing += "R2_SECRET_ACCESS_KEY" }
+          if (-not $env:R2_ENDPOINT_URL) { $missing += "R2_ENDPOINT_URL" }
+          if (-not $env:R2_PUBLIC_URL) { $missing += "R2_PUBLIC_URL" }
+
+          if ($missing.Count -gt 0) {
+            throw "Missing required GitHub Secrets for R2 upload: $($missing -join ', ')"
+          }
+
+          $bucket = if ($env:R2_BUCKET_NAME) { $env:R2_BUCKET_NAME } else { "tobomeet" }
+          $folder = $env:R2_FOLDER.Trim("/")
+          $version = $env:RELEASE_VERSION
+          $tag = $env:RELEASE_TAG
+          $publicBase = $env:R2_PUBLIC_URL.TrimEnd("/")
+
+          $distDir = Join-Path (Get-Location) "apps/desktop/dist"
+          $exeFile = Get-ChildItem -Path $distDir -Filter "*.exe" | Select-Object -First 1
+          if (-not $exeFile) {
+            throw "No .exe installer found in $distDir"
+          }
+
+          $fileName = $exeFile.Name
+          $versionPrefix = "$folder/v$version"
+          $latestPrefix = "$folder/latest"
+          $exeKey = "$versionPrefix/$fileName"
+          $downloadUrl = "$publicBase/$exeKey"
+
+          Write-Host "Uploading $fileName to s3://$bucket/$exeKey ..."
+          aws s3 cp $exeFile.FullName "s3://$bucket/$exeKey" `
+            --endpoint-url $env:R2_ENDPOINT_URL `
+            --content-type "application/octet-stream" `
+            --content-disposition "attachment; filename=`"$fileName`"" `
+            --cache-control "public, max-age=31536000, immutable"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload installer .exe to R2" }
+
+          $blockmapFile = Get-ChildItem -Path $distDir -Filter "*.blockmap" | Select-Object -First 1
+          if ($blockmapFile) {
+            $blockmapKey = "$versionPrefix/$($blockmapFile.Name)"
+            Write-Host "Uploading $($blockmapFile.Name) to s3://$bucket/$blockmapKey ..."
+            aws s3 cp $blockmapFile.FullName "s3://$bucket/$blockmapKey" `
+              --endpoint-url $env:R2_ENDPOINT_URL `
+              --cache-control "public, max-age=31536000, immutable"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to upload .blockmap to R2" }
+          }
+
+          $latestYml = Join-Path $distDir "latest.yml"
+          if (Test-Path $latestYml) {
+            aws s3 cp $latestYml "s3://$bucket/$versionPrefix/latest.yml" `
+              --endpoint-url $env:R2_ENDPOINT_URL `
+              --content-type "text/yaml; charset=utf-8" `
+              --cache-control "public, max-age=31536000, immutable"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to upload versioned latest.yml to R2" }
+
+            aws s3 cp $latestYml "s3://$bucket/$latestPrefix/latest.yml" `
+              --endpoint-url $env:R2_ENDPOINT_URL `
+              --content-type "text/yaml; charset=utf-8" `
+              --cache-control "public, max-age=60, must-revalidate"
+            if ($LASTEXITCODE -ne 0) { throw "Failed to upload latest.yml to R2" }
+          }
+
+          $sha256 = (Get-FileHash -Path $exeFile.FullName -Algorithm SHA256).Hash.ToLower()
+          $manifestObj = [ordered]@{
+            version     = $version
+            tag         = $tag
+            fileName    = $fileName
+            downloadUrl = $downloadUrl
+            fileSize    = [int64]$exeFile.Length
+            sha256      = $sha256
+            platform    = "windows"
+            releasedAt  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+          }
+          $manifestJson = $manifestObj | ConvertTo-Json -Depth 3
+          $manifestPath = Join-Path $distDir "latest.json"
+          [System.IO.File]::WriteAllText($manifestPath, $manifestJson, [System.Text.UTF8Encoding]::new($false))
+
+          Write-Host "Uploading manifest to s3://$bucket/$latestPrefix/latest.json ..."
+          aws s3 cp $manifestPath "s3://$bucket/$latestPrefix/latest.json" `
+            --endpoint-url $env:R2_ENDPOINT_URL `
+            --content-type "application/json; charset=utf-8" `
+            --cache-control "public, max-age=60, must-revalidate"
+          if ($LASTEXITCODE -ne 0) { throw "Failed to upload latest.json to R2" }
+
+          Write-Host "R2 upload completed successfully!"
+          Write-Host "Download URL: $downloadUrl"
+          Write-Host "Manifest URL: $publicBase/$latestPrefix/latest.json"
+
       - name: Publish to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
@@ -56,6 +160,6 @@ jobs:
             apps/desktop/dist/*.exe
             apps/desktop/dist/*.blockmap
             apps/desktop/dist/latest.yml
+            apps/desktop/dist/latest.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-

@@ -1,18 +1,14 @@
 // ─── Landing Page ─────────────────────────────────────────────────────────────────────
-// Trang chủ Tobo — Landing page với 9 sections.
-// Sections: Hero → Features → HowItWorks → Testimonials
-//          → CrossPlatform → Pricing → CTA → Footer
+// Trang chủ ToboMeet — Bố cục gọn gàng tập trung vào tính năng thực tế và tải ứng dụng.
+// Sections: Header → Hero → Features → HowItWorks → CrossPlatform → CTA → Footer
 
-import Header               from '@/components/landing/Header';
-import HeroSection          from '@/components/landing/HeroSection';
-
-import FeaturesSection      from '@/components/landing/FeaturesSection';
-import HowItWorksSection    from '@/components/landing/HowItWorksSection';
-import TestimonialsSection  from '@/components/landing/TestimonialsSection';
+import Header from '@/components/landing/Header';
+import HeroSection from '@/components/landing/HeroSection';
+import FeaturesSection from '@/components/landing/FeaturesSection';
+import HowItWorksSection from '@/components/landing/HowItWorksSection';
 import CrossPlatformSection from '@/components/landing/CrossPlatformSection';
-import PricingSection       from '@/components/landing/PricingSection';
-import CTASection           from '@/components/landing/CTASection';
-import Footer               from '@/components/landing/Footer';
+import CTASection from '@/components/landing/CTASection';
+import Footer from '@/components/landing/Footer';
 
 export default function LandingPage() {
   return (
@@ -23,21 +19,14 @@ export default function LandingPage() {
       {/* ── Above the Fold ── */}
       <HeroSection />
 
-
       {/* ── Product Features (Bento Grid) ── */}
       <FeaturesSection />
 
       {/* ── How It Works (3 Steps) ── */}
       <HowItWorksSection />
 
-      {/* ── Customer Testimonials ── */}
-      <TestimonialsSection />
-
-      {/* ── Multi-Platform Support ── */}
+      {/* ── Multi-Platform Support & Desktop Link ── */}
       <CrossPlatformSection />
-
-      {/* ── Pricing Tiers ── */}
-      <PricingSection />
 
       {/* ── Final Call-to-Action ── */}
       <CTASection />

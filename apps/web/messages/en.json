@@ -1,234 +1,189 @@
 {
   "header": {
     "features": "Features",
-    "solutions": "Solutions",
-    "platform": "Platform",
-    "pricing": "Pricing",
+    "solutions": "How It Works",
+    "platform": "Platforms",
+    "download": "Download",
     "login": "Sign In",
-    "register": "Get Started Free",
+    "register": "Get Started",
     "lang_vi": "Tiếng Việt",
     "lang_en": "English"
   },
   "hero": {
-    "badge": "Next-generation online meeting platform",
-    "title_line1": "Connect without",
-    "title_line1_accent": "limits",
-    "title_line2": "Meet smarter.",
-    "description": "High-quality, low-latency video calling — built for enterprises, schools, and every team. Seamless connection, absolute security.",
-    "create_meeting": "New Meeting",
+    "title_line1": "Clear online",
+    "title_line1_accent": "meetings",
+    "title_line2": "Simple teamwork.",
+    "description": "Smooth video calls, screen sharing, shared whiteboards, and helpful meeting summaries — made for everyday learning and teamwork.",
+    "create_meeting": "Get Started",
     "join_placeholder": "Enter room code...",
     "join_button": "Join",
-    "mockup_title": "Q4 Team Kickoff 2025",
+    "download_desktop_cta": "Download ToboMeet for Windows",
+    "mockup_title": "Weekly Team Sync",
     "mockup_live": "LIVE",
     "mockup_leave": "Leave",
-    "social_proof_number": "50,000+",
-    "social_proof": "teams trust us every day",
-    "security_badge": "E2E Encrypted",
-    "participants_badge": "participants"
-  },
-  "stats": {
-    "users_value": "50K+",
-    "users_label": "Active Users",
-    "meetings_value": "1M+",
-    "meetings_label": "Meetings per Day",
-    "countries_value": "150+",
-    "countries_label": "Countries Connected",
-    "uptime_value": "99.99%",
-    "uptime_label": "Uptime SLA Guaranteed"
+    "highlights": [
+      "Clear video calls",
+      "Smart meeting summaries",
+      "Shared whiteboard",
+      "Web & Desktop support"
+    ]
   },
   "features": {
-    "section_badge": " Key Features",
     "section_title": "Everything you need to",
-    "section_title_gradient": "connect",
-    "section_desc": "Every tool you need to connect, learn, and work more effectively — all in one platform.",
-    "uptime_label": "Global Uptime SLA",
-    "security_title": "Enterprise Security",
-    "security_desc": "Bank-grade E2E encryption",
+    "section_title_gradient": "meet and learn together",
+    "section_desc": "Simple to pick up and thoughtfully organized so your group can talk, share, and stay on track in one place.",
+    "video_tags": [
+      "Clear video",
+      "Screen sharing",
+      "Meeting recording",
+      "Live captions"
+    ],
     "items": [
       {
-        "title": "HD Video, Ultra-Low Latency",
-        "description": "Up to 4K video quality, under 100ms latency. Meetings that feel like being in the same room, no matter the distance."
+        "title": "Smooth video calls and sharing",
+        "description": "Talk with crisp video and clear sound, share your screen in seconds, and save meeting recordings whenever you want to review later."
       },
       {
-        "title": "Smart Classroom Management",
-        "description": "Interactive whiteboard, breakout rooms, auto attendance. Teachers can easily manage remote classes with full control."
+        "title": "Smart meeting notes assistant",
+        "description": "Follow along with live captions, quick translation, and automatic summaries of key points and follow-up tasks after each meeting."
       },
       {
-        "title": "Enterprise-Grade Security",
-        "description": "End-to-end E2E encryption, GDPR compliant. Every meeting protected with bank-grade security technology."
+        "title": "Built for teamwork and classes",
+        "description": "Draw together on a shared whiteboard, run quick polls, manage assignments, schedule meetings, and chat in one space."
+      },
+      {
+        "title": "Private and easy to manage",
+        "description": "Approve guests from the waiting room, manage who can speak or present, and keep every conversation focused and private."
       }
     ]
   },
   "how_it_works": {
-    "section_badge": "Simple & Fast",
-    "section_title": "Start meeting in",
-    "section_title_accent": "30 seconds",
-    "section_desc": "No complex setup required. Create a meeting room and connect with your team instantly.",
-    "cta_btn": "Try Now — Free",
+    "section_title": "Start your meeting in",
+    "section_title_accent": "3 simple steps",
+    "section_desc": "Create a room, share the invite, and start talking with everyone without any complicated setup.",
+    "cta_btn": "Create an account and start",
     "steps": [
       {
         "step": "01",
-        "title": "Create a Room",
-        "description": "Click one button to create a new meeting room. Get a link and room code to share with everyone instantly."
+        "title": "Create a room",
+        "description": "Open a new meeting or classroom with one click and get a shareable link and room code right away."
       },
       {
         "step": "02",
-        "title": "Invite Members",
-        "description": "Share the link or room code with colleagues. They join with just one click — no installation needed."
+        "title": "Share the invite",
+        "description": "Send the room code or link to your teammates or classmates so they can join smoothly."
       },
       {
         "step": "03",
-        "title": "Connect Instantly",
-        "description": "Meet in real-time with HD video, crystal-clear audio, and a full suite of team collaboration tools."
-      }
-    ]
-  },
-  "testimonials": {
-    "section_badge": " What Users Say",
-    "section_title": "Trusted by",
-    "section_title_accent": "thousands of teams",
-    "items": [
-      {
-        "name": "Nguyen Van Minh",
-        "role": "CTO, TechVN Solutions",
-        "content": "Tobo has completely changed how our remote team works. The video quality is outstanding and we've never experienced a dropped connection."
-      },
-      {
-        "name": "Tran Thi Hoa",
-        "role": "Teacher, Le Hong Phong High School",
-        "content": "Tobo's classroom management features help me easily take attendance and monitor students better than ever. Truly impressive!"
-      },
-      {
-        "name": "Le Quang Huy",
-        "role": "Product Manager, Vingroup",
-        "content": "Beautiful interface, easy to use, and extremely stable. This is the best online meeting solution I've ever used."
-      },
-      {
-        "name": "Pham Thu Hang",
-        "role": "HR Director, FPT Software",
-        "content": "Since using Tobo, our team's productivity has noticeably increased. The Breakout Room feature is incredibly useful for workshops."
-      },
-      {
-        "name": "David Nguyen",
-        "role": "Engineering Lead, Axon Enterprise",
-        "content": "We switched from Teams to Tobo and never looked back. The latency is incredibly low even for our global distributed team."
-      },
-      {
-        "name": "Sarah Kim",
-        "role": "Head of Education, EdTech Korea",
-        "content": "Tobo's classroom management features are unmatched. Our student engagement increased by 40% after switching platforms."
+        "title": "Meet and collaborate",
+        "description": "Talk over clear video, share screens, sketch on the whiteboard, and work together in real time."
       }
     ]
   },
   "platforms": {
-    "section_badge": " Cross-Platform",
-    "section_title": "Seamless Experience Across All Devices",
-    "section_desc": "Full support across every platform. Whether you're at the office or on the go, your connection stays strong.",
+    "section_title": "Comfortable on the device you use",
+    "section_desc": "Open straight in your browser or install the desktop app for a cleaner, steadier meeting experience.",
     "one_account": "One account",
-    "one_account_desc": "sign in and sync seamlessly across all your devices, anytime anywhere.",
+    "one_account_desc": "keeps your rooms, schedule, and messages synced across all of your devices.",
+    "download_desktop_btn": "Go to Download Page",
     "tab_web": "Web Browser",
     "tab_desktop": "Desktop App",
     "tab_mobile": "Mobile",
     "items": [
       {
         "name": "Web Browser",
-        "description": "No installation needed — just open and start meeting",
+        "description": "No installation needed — just open your browser and join right away.",
         "badges": [
           "Chrome",
+          "Edge",
           "Safari",
-          "Firefox",
-          "Edge"
+          "Firefox"
         ]
       },
       {
         "name": "Desktop App",
-        "description": "Native app with high performance and deep system integration",
+        "description": "Install on your Windows computer for quicker access, timely meeting notifications, and convenient local recording.",
         "badges": [
-          "Windows",
-          "macOS",
-          "Linux"
+          "Windows 10 / 11"
         ]
       },
       {
         "name": "Mobile",
-        "description": "Meet anytime, anywhere — optimized for small screens",
+        "description": "Check your schedule, reply to messages, and join meetings while on the go.",
         "badges": [
-          "iOS",
-          "Android"
-        ]
-      }
-    ]
-  },
-  "pricing": {
-    "section_badge": "💰 Pricing",
-    "section_title": "Plans for",
-    "section_title_accent": "every need",
-    "section_desc": "Start for free, upgrade anytime. No long-term commitment required.",
-    "toggle_monthly": "Monthly",
-    "toggle_yearly": "Yearly",
-    "save_badge": "Save 20%",
-    "per_month": "/mo",
-    "save_amount": "Save ${amount}/year",
-    "free_label": "Free",
-    "popular_badge": "Most Popular",
-    "contact_text": "Contact us",
-    "footer_note": "All plans include SSL, E2E encryption, and basic technical support.",
-    "tiers": [
-      {
-        "name": "Free",
-        "description": "Perfect for individuals and small teams getting started",
-        "cta": "Get Started Free",
-        "features": [
-          "Up to 100 Participants",
-          "Meetings up to 60 Minutes",
-          "In-Meeting Chat",
-          "Live Captions"
-        ]
-      },
-      {
-        "name": "Pro",
-        "description": "For professional teams that need more power",
-        "cta": "Start 14-day Trial",
-        "features": [
-          "Unlimited Participants",
-          "Unlimited Meeting Duration",
-          "Meeting Recording & Storage",
-          "Waiting Room & Access Control",
-          "Collaborative Whiteboard",
-          "Real-Time Captions",
-          "Real-Time Translation",
-          "Meeting Summary",
-          "Automated Meeting Minutes & Action Items",
-          "Polls & Q&A"
-        ]
-      },
-      {
-        "name": "Enterprise",
-        "description": "For large organizations and enterprise deployments",
-        "cta": "Contact Sales",
-        "features": [
-          "Everything in Pro",
-          "SSO & Active Directory integration",
-          "SOC2, GDPR, HIPAA compliance",
-          "Centralized admin panel",
-          "99.99% uptime SLA guarantee",
-          "On-premise or private cloud deployment",
-          "Full API & Webhook integration",
-          "Dedicated Customer Success Manager"
+          "Android",
+          "iOS"
         ]
       }
     ]
   },
   "cta": {
-    "badge": "🎉 Free · No credit card required",
-    "title": "Ready to connect",
-    "title_accent": "without limits?",
-    "description": "Over 50,000 teams trust Tobo to connect and collaborate every day. Start your journey today.",
-    "email_placeholder": "Enter your email...",
-    "cta_button": "Get Started Free",
-    "or_text": "or",
-    "create_meeting": "Create a meeting now →",
-    "no_credit_card": "✓ No credit card  ✓ 14-day free trial  ✓ Cancel anytime"
+    "title": "Ready for your",
+    "title_accent": "next meeting?",
+    "description": "Start right away in your browser or download ToboMeet for your Windows computer.",
+    "cta_button": "Start in Browser",
+    "download_button": "Download Desktop App"
+  },
+  "download": {
+    "meta_title": "Download ToboMeet for Windows",
+    "meta_description": "Download and install ToboMeet on Windows for cleaner, steadier online meetings and timely notifications.",
+    "title": "Download ToboMeet for",
+    "title_accent": "Desktop",
+    "subtitle": "A clean, steady meeting app for Windows — open meetings quickly and stay notified whenever a session is about to start.",
+    "windows_badge": "For Windows Computers",
+    "card_title": "ToboMeet for Windows",
+    "card_desc": "Get the official installer for smooth group calls, convenient meeting recordings, and timely desktop notifications.",
+    "download_button": "Download for Windows",
+    "download_fallback_button": "Open Latest Download Page",
+    "use_web_instead": "Use in Browser Instead",
+    "os_requirement": "Supports Windows 10 and Windows 11",
+    "version_label": "Version:",
+    "size_label": "Size:",
+    "updated_label": "Updated:",
+    "fallback_note": "The direct download package is currently being updated. You can still get the latest release from our backup download page.",
+    "preview_caption": "A tidy workspace that keeps your focus on the conversation.",
+    "benefits_title": "Why use the desktop app?",
+    "benefits_desc": "Everything you know from the web version, made even handier for daily meetings and classes.",
+    "benefits": [
+      {
+        "title": "Quick access, fewer distractions",
+        "description": "Launch from its own icon on your computer instead of searching through dozens of open browser tabs."
+      },
+      {
+        "title": "Never miss a meeting",
+        "description": "Receive alerts for new messages and upcoming meetings even when the window is minimized."
+      },
+      {
+        "title": "Easy sharing and recording",
+        "description": "Pick the exact window you want to share and save meeting recordings directly to your computer."
+      },
+      {
+        "title": "Open rooms straight from links",
+        "description": "Click a meeting invite link to jump straight into the app without extra steps."
+      }
+    ],
+    "guide_title": "Install in 3 simple steps",
+    "guide_desc": "No complicated setup required — you will be ready to meet in just a couple of minutes.",
+    "steps": [
+      {
+        "step": "STEP 01",
+        "title": "Download the installer",
+        "description": "Click the download button above and wait for the installer file to finish saving."
+      },
+      {
+        "step": "STEP 02",
+        "title": "Run and install",
+        "description": "Double-click the downloaded file and follow the simple on-screen steps."
+      },
+      {
+        "step": "STEP 03",
+        "title": "Sign in and start",
+        "description": "Open ToboMeet from your desktop, sign in to your account, and join your meeting."
+      }
+    ],
+    "install_tip_title": "Helpful tip when installing on Windows",
+    "install_tip_desc": "If Windows shows a protection notice the first time you open the installer, simply click \"More info\" and then \"Run anyway\" to continue installing normally.",
+    "back_home": "Back to Home"
   },
   "footer": {
     "thesis_title": "Graduation Thesis: Real-Time Online Meeting and Team Collaboration Platform",

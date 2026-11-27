@@ -1,10 +1,10 @@
 // ─── HowItWorksSection ────────────────────────────────────────────────────────
-// 3-step visual guide showing how easy it is to start meeting with Tobo.
+// 3-step visual guide showing how simple it is to start meeting with ToboMeet.
 
 import { PlusCircle, Share2, Zap, LucideIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { HOW_IT_WORKS_CONFIG } from "@/lib/constants";
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 
 const ICON_MAP: Record<string, LucideIcon> = { PlusCircle, Share2, Zap };
 
@@ -55,7 +55,6 @@ export default function HowItWorksSection() {
                   <div
                     className={`relative w-[100px] h-[100px] rounded-full ${config.bgLight} ${config.ring} ring-1 flex items-center justify-center mb-7 group-hover:scale-105 transition-transform duration-300 shadow-sm`}
                   >
-                    {/* Icon with gradient */}
                     <div
                       className={`w-12 h-12 rounded-full bg-gradient-to-br ${config.gradient} flex items-center justify-center shadow-lg`}
                     >
@@ -92,7 +91,7 @@ export default function HowItWorksSection() {
         {/* ── Bottom CTA ── */}
         <div className="mt-16 text-center">
           <Link
-            href="/meeting/new"
+            href="/signup"
             className="btn-enterprise h-12 px-8 text-[15px] inline-flex"
           >
             <Zap size={18} />

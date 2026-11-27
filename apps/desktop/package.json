@@ -52,6 +52,7 @@
       "icon": "assets/icon.png"
     },
     "nsis": {
+      "artifactName": "ToboMeet-Setup-${version}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,

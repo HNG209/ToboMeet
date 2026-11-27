@@ -184,7 +184,7 @@ export default function MobileToolbar({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerClassName="items-center"
+          contentContainerStyle={{ flexGrow: 1, justifyContent: "space-around", alignItems: "center" }}
         >
           {/* Nút Camera */}
           <TouchableOpacity
@@ -283,65 +283,6 @@ export default function MobileToolbar({
               </Text>
             </TouchableOpacity>
           )}
-
-          {/* Nút Bảng trắng (Whiteboard) */}
-          <TouchableOpacity
-            onPress={() => {
-              if (canAccessWhiteboard === false) {
-                toast.error(
-                  t("meeting.toolbar.whiteboard_no_permission", {
-                    defaultValue: "Bạn không có quyền truy cập bảng trắng",
-                  }),
-                );
-                return;
-              }
-              onOpenWhiteboard?.();
-            }}
-            className="min-w-[60px] h-14 justify-center items-center"
-          >
-            <Feather
-              name="edit-3"
-              size={20}
-              color={canAccessWhiteboard === false ? "#6b7280" : "#60a5fa"}
-            />
-            <Text
-              className={`text-[10px] mt-1 font-medium ${
-                canAccessWhiteboard === false ? "text-gray-500" : "text-blue-400"
-              }`}
-            >
-              {t("meeting.toolbar.whiteboard", { defaultValue: "Bảng trắng" })}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Nút Phụ đề (Live Captions) */}
-          <TouchableOpacity
-            onPress={onToggleLiveCaption}
-            className="min-w-[60px] h-14 justify-center items-center"
-          >
-            <MaterialCommunityIcons
-              name={isLiveCaptionEnabled ? "subtitles" : "subtitles-outline"}
-              size={20}
-              color={isLiveCaptionEnabled ? "#60a5fa" : "#d1d5db"}
-            />
-            <Text
-              className={`text-[10px] mt-1 font-medium ${
-                isLiveCaptionEnabled ? "text-blue-400 font-bold" : "text-gray-300"
-              }`}
-            >
-              {t("meeting.toolbar.captions", { defaultValue: "Phụ đề" })}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Nút Bình chọn (Polls) */}
-          <TouchableOpacity
-            onPress={onOpenPolls}
-            className="min-w-[60px] h-14 justify-center items-center"
-          >
-            <Feather name="bar-chart-2" size={20} color="#60a5fa" />
-            <Text className="text-blue-400 text-[10px] mt-1 font-medium">
-              {t("meeting.toolbar.polls", { defaultValue: "Bình chọn" })}
-            </Text>
-          </TouchableOpacity>
 
           {/* Nút Quản lý/Tùy chọn */}
           <TouchableOpacity

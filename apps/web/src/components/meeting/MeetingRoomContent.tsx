@@ -248,16 +248,16 @@ export default function MeetingRoomContent({
     >
       {/* MAIN MEETING COLUMN (Header, Video Grid, Toolbar) */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden transition-all duration-300">
-        <header className="relative z-50 h-16 shrink-0 px-5 flex items-center justify-between bg-[#111113] border-b border-[#232328]">
-          <div className="flex items-center gap-2.5 min-w-0">
-            {isBreakoutRoom && <Grid2X2 size={18} className="text-blue-400 shrink-0" />}
+        <header className="relative z-50 h-12 shrink-0 px-4 flex items-center justify-between bg-[#111113] border-b border-[#232328]">
+          <div className="flex items-center gap-2 min-w-0">
+            {isBreakoutRoom && <Grid2X2 size={16} className="text-blue-400 shrink-0" />}
 
             {/* Cụm tên phòng / kênh và biểu tượng khiên an toàn */}
             <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[15px] font-semibold tracking-wide flex items-center gap-1.5 text-slate-100 truncate">
+              <span className="text-sm font-semibold tracking-tight flex items-center gap-1.5 text-slate-100 truncate">
                 {displayTitle}
                 {isBreakoutRoom && timeDisplay && (
-                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs">
+                  <span className="ml-1 px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[11px]">
                     {timeDisplay}
                   </span>
                 )}
@@ -273,7 +273,7 @@ export default function MeetingRoomContent({
                       defaultValue: "Mã hoá đầu cuối an toàn",
                     })}
                   >
-                    <ShieldCheck size={16} className="text-emerald-400" />
+                    <ShieldCheck size={15} className="text-emerald-400" />
                   </button>
 
                   {/* Tooltip hiển thị khi hover */}
@@ -291,7 +291,7 @@ export default function MeetingRoomContent({
             {/* Trạng thái ghi hình cạnh tên phòng chính */}
             {isRecording && !isBreakoutRoom && (
               <div
-                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-600 text-white text-[11px] font-bold select-none shadow-sm shadow-red-600/30 tracking-wider animate-fade-in ml-1"
+                className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-red-600 text-white text-[10px] font-bold select-none shadow-sm shadow-red-600/30 tracking-wider animate-fade-in ml-1"
                 title={t("toolbar.recording_in_progress")}
               >
                 <span className="h-1.5 w-1.5 rounded-full bg-white shrink-0"></span>
@@ -378,19 +378,19 @@ export default function MeetingRoomContent({
       {/* SIDEBAR CỤM CHAT, PARTICIPANTS & POLLS NẰM NGOÀI CÙNG */}
       {isSidebarOpen && (
         <aside className="fixed inset-0 z-50 flex flex-col bg-[#111113] lg:static lg:w-[360px] xl:w-[380px] lg:z-auto lg:border-l lg:border-[#232328] shadow-2xl transition-all duration-300 ease-in-out shrink-0 h-full">
-          {/* Header đồng bộ chiều cao (h-16) và cỡ chữ với header chính của MeetingRoomContent & thanh toolbar */}
-          <div className="h-16 px-5 flex items-center justify-between border-b border-[#232328] bg-[#111113] shrink-0">
-            <div className="flex items-center gap-2.5 text-slate-100 min-w-0">
+          {/* Header đồng bộ chiều cao (h-12) và cỡ chữ (text-sm) liền mạch với header chính của MeetingRoomContent */}
+          <div className="h-12 px-4 flex items-center justify-between border-b border-[#232328] bg-[#111113] shrink-0">
+            <div className="flex items-center gap-2 text-slate-100 min-w-0">
               {sidebarTab === "chat" ? (
-                <MessageSquare size={18} className="text-slate-100 shrink-0" />
+                <MessageSquare size={16} className="text-slate-100 shrink-0" />
               ) : sidebarTab === "people" ? (
-                <Users size={18} className="text-slate-100 shrink-0" />
+                <Users size={16} className="text-slate-100 shrink-0" />
               ) : sidebarTab === "polls" ? (
-                <BarChart2 size={18} className="text-slate-100 shrink-0" />
+                <BarChart2 size={16} className="text-slate-100 shrink-0" />
               ) : (
-                <Captions size={18} className="text-slate-100 shrink-0" />
+                <Captions size={16} className="text-slate-100 shrink-0" />
               )}
-              <h2 className="text-[15px] font-semibold text-slate-100 tracking-wide truncate">
+              <h2 className="text-sm font-semibold text-slate-100 tracking-tight truncate">
                 {sidebarTab === "chat"
                   ? t("chat_header")
                   : sidebarTab === "people"
@@ -403,10 +403,10 @@ export default function MeetingRoomContent({
 
             <button
               onClick={() => setIsSidebarOpen(false)}
-              className="p-1.5 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
+              className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-slate-200 transition-colors cursor-pointer shrink-0"
               title={t("close")}
             >
-              <X size={18} />
+              <X size={16} />
             </button>
           </div>
 

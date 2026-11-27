@@ -397,17 +397,6 @@ export default function UserDrawerModal({
                   {t("dashboard.logout", "Đăng xuất")}
                 </Text>
               </TouchableOpacity>
-
-              <Text
-                style={{
-                  fontSize: 10,
-                  color: "#94A3B8",
-                  textAlign: "center",
-                  marginTop: 10,
-                }}
-              >
-                ToboMeet v1.0.0
-              </Text>
             </View>
           </View>
         </Animated.View>
