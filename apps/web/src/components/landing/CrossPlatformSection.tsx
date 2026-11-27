@@ -1,10 +1,11 @@
 // ─── CrossPlatformSection ─────────────────────────────────────────────────────
-// Tabbed interface showing platform support: Web, Desktop, Mobile,
-// with a direct link to the dedicated Desktop download page.
+// Tabbed interface showing real app screenshots for Web, Desktop, and Mobile.
+// Shows the desktop download button only when the Desktop tab is selected.
 
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import {
   Globe,
   Monitor,
@@ -20,11 +21,12 @@ import { Link } from "@/i18n/navigation";
 
 const ICON_MAP: Record<string, LucideIcon> = { Globe, Monitor, Smartphone };
 
-// ─── Device Mockups ───────────────────────────────────────────────────────────
-function WebMockup() {
+// ─── Real Screenshot Previews ─────────────────────────────────────────────────
+function WebPreview({ alt }: { alt: string }) {
   return (
-    <div className="rounded-[16px] border border-slate-200 bg-white shadow-md overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-3 bg-slate-100 border-b border-slate-200">
+    <div className="rounded-[18px] border border-slate-200 bg-white shadow-xl shadow-slate-200/60 overflow-hidden">
+      {/* Subtle browser address bar */}
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 border-b border-slate-200">
         <div className="flex gap-1.5">
           <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
           <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
@@ -34,144 +36,51 @@ function WebMockup() {
           tobomeet.app
         </div>
       </div>
-      <div className="bg-slate-900 px-6 py-8 flex items-center justify-center">
-        <div className="grid grid-cols-2 gap-2 w-full max-w-xs">
-          {["NH", "HL", "PH", "TH"].map((init, i) => (
-            <div
-              key={i}
-              className="aspect-video bg-slate-800 rounded-lg flex items-center justify-center"
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold
-                ${
-                  i === 0
-                    ? "bg-gradient-to-br from-blue-500 to-cyan-400"
-                    : i === 1
-                      ? "bg-gradient-to-br from-violet-500 to-purple-600"
-                      : i === 2
-                        ? "bg-gradient-to-br from-emerald-500 to-teal-500"
-                        : "bg-gradient-to-br from-orange-500 to-rose-500"
-                }`}
-              >
-                {init}
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="bg-[#111214]">
+        <Image
+          src="/meeting.png"
+          alt={alt}
+          width={1920}
+          height={972}
+          sizes="(max-width: 1024px) 100vw, 50vw"
+          className="w-full h-auto block"
+        />
       </div>
     </div>
   );
 }
 
-function DesktopMockup() {
+function DesktopPreview({ alt }: { alt: string }) {
   return (
-    <div className="rounded-[16px] border border-slate-200 bg-slate-800 shadow-md overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-700">
-        <div className="flex gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-red-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
-          <div className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-        </div>
-        <span className="text-[11px] text-slate-400 font-medium">
-          ToboMeet Desktop
-        </span>
-        <div className="w-16" />
-      </div>
-      <div className="flex">
-        <div className="w-12 bg-slate-900/80 flex flex-col items-center py-4 gap-3">
-          {["H", "C", "T", "S"].map((icon, i) => (
-            <div
-              key={i}
-              className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold
-              ${i === 0 ? "bg-brand-500 text-white" : "bg-slate-700 text-slate-400"}`}
-            >
-              {icon}
-            </div>
-          ))}
-        </div>
-        <div className="flex-1 bg-slate-800 p-4">
-          <div className="grid grid-cols-2 gap-2">
-            {["NH", "HL", "PH", "TH"].map((init, i) => (
-              <div
-                key={i}
-                className="aspect-video bg-slate-700/80 rounded-lg flex items-center justify-center"
-              >
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-[9px] font-bold
-                  ${
-                    i === 0
-                      ? "bg-gradient-to-br from-blue-500 to-cyan-400"
-                      : i === 1
-                        ? "bg-gradient-to-br from-violet-500 to-purple-600"
-                        : i === 2
-                          ? "bg-gradient-to-br from-emerald-500 to-teal-500"
-                          : "bg-gradient-to-br from-orange-500 to-rose-500"
-                  }`}
-                >
-                  {init}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+    <div className="rounded-[18px] border border-slate-200/90 bg-white shadow-xl shadow-slate-200/70 overflow-hidden">
+      <Image
+        src="/desktop_rooms.png"
+        alt={alt}
+        width={1920}
+        height={1080}
+        sizes="(max-width: 1024px) 100vw, 50vw"
+        className="w-full h-auto block"
+      />
     </div>
   );
 }
 
-function MobileMockup() {
+function MobilePreview({ alt }: { alt: string }) {
   return (
-    <div className="max-w-[220px] mx-auto rounded-[28px] border-[6px] border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
-      <div className="flex justify-center pt-2 pb-1">
-        <div className="w-20 h-4 bg-slate-800 rounded-full" />
-      </div>
-      <div className="px-3 pb-3">
-        <div className="text-[9px] font-bold text-slate-400 text-center mb-2">
-          ToboMeet
-        </div>
-        <div className="grid grid-cols-2 gap-1.5 mb-3">
-          {["NH", "HL", "PH", "TH"].map((init, i) => (
-            <div
-              key={i}
-              className="aspect-square bg-slate-800 rounded-xl flex items-center justify-center"
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold
-                ${
-                  i === 0
-                    ? "bg-gradient-to-br from-blue-500 to-cyan-400"
-                    : i === 1
-                      ? "bg-gradient-to-br from-violet-500 to-purple-600"
-                      : i === 2
-                        ? "bg-gradient-to-br from-emerald-500 to-teal-500"
-                        : "bg-gradient-to-br from-orange-500 to-rose-500"
-                }`}
-              >
-                {init}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-center gap-2">
-          {["🎤", "📷", "💬", "🔴"].map((icon, i) => (
-            <div
-              key={i}
-              className={`w-8 h-8 rounded-full flex items-center justify-center text-[14px]
-              ${i === 3 ? "bg-red-500" : "bg-slate-700"}`}
-            >
-              {icon}
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="flex justify-center py-2">
-        <div className="w-16 h-1 bg-slate-600 rounded-full" />
-      </div>
+    <div className="max-w-[250px] sm:max-w-[270px] mx-auto rounded-[34px] border-[7px] border-slate-900 bg-slate-900 shadow-2xl overflow-hidden">
+      <Image
+        src="/mobile_rooms.jpg"
+        alt={alt}
+        width={720}
+        height={1464}
+        sizes="270px"
+        className="w-full h-auto block rounded-[26px]"
+      />
     </div>
   );
 }
 
-const MOCKUPS = [WebMockup, DesktopMockup, MobileMockup];
+const PREVIEWS = [WebPreview, DesktopPreview, MobilePreview];
 
 // ─── CrossPlatformSection Component ──────────────────────────────────────────
 export default function CrossPlatformSection() {
@@ -185,7 +94,7 @@ export default function CrossPlatformSection() {
   // Mặc định mở tab Desktop để người dùng thấy ngay ứng dụng máy tính
   const [activeTab, setActiveTab] = useState(1);
 
-  const ActiveMockup = MOCKUPS[activeTab];
+  const ActivePreview = PREVIEWS[activeTab];
   const isDesktopTab = PLATFORMS_CONFIG[activeTab].key === "desktop";
 
   return (
@@ -231,9 +140,9 @@ export default function CrossPlatformSection() {
 
         {/* ── Tab Content ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Mockup */}
-          <div className="animate-scale-in">
-            <ActiveMockup />
+          {/* Real Screenshot Preview */}
+          <div key={activeTab} className="animate-scale-in">
+            <ActivePreview alt={items[activeTab].name} />
           </div>
 
           {/* Info */}
@@ -260,22 +169,20 @@ export default function CrossPlatformSection() {
               ))}
             </div>
 
-            {/* Action button to dedicated Download page */}
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                id="platform-download-link"
-                href="/download"
-                className={
-                  isDesktopTab
-                    ? "btn-enterprise h-12 px-7 text-[15px]"
-                    : "btn-enterprise-outline h-12 px-6 text-[14px]"
-                }
-              >
-                <Download size={17} />
-                {t("download_desktop_btn")}
-                <ArrowRight size={15} />
-              </Link>
-            </div>
+            {/* Show download button ONLY on Desktop tab */}
+            {isDesktopTab && (
+              <div className="flex flex-wrap items-center gap-3">
+                <Link
+                  id="platform-download-link"
+                  href="/download"
+                  className="btn-enterprise h-12 px-7 text-[15px]"
+                >
+                  <Download size={17} />
+                  {t("download_desktop_btn")}
+                  <ArrowRight size={15} />
+                </Link>
+              </div>
+            )}
 
             {/* One-account note */}
             <div className="flex items-start gap-3 p-4 rounded-[16px] bg-slate-50 border border-slate-200/80">

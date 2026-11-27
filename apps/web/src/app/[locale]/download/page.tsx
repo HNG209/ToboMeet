@@ -3,6 +3,7 @@
 // Tự động lấy đường dẫn và thông tin bản cài đặt mới nhất từ Cloudflare R2.
 
 import type { Metadata } from "next";
+import Image from "next/image";
 import {
   Download,
   Monitor,
@@ -179,50 +180,19 @@ export default async function DownloadPage({
                 </div>
               </div>
 
-              {/* Right: Clean Desktop Visual Preview */}
-              <div className="lg:col-span-5 bg-slate-900 p-8 sm:p-10 flex flex-col justify-center relative overflow-hidden">
+              {/* Right: Real Desktop App Preview */}
+              <div className="lg:col-span-5 bg-slate-900 p-6 sm:p-8 flex flex-col justify-center relative overflow-hidden">
                 <div className="absolute -top-20 -right-20 w-64 h-64 bg-brand-500/20 rounded-full blur-3xl pointer-events-none" />
-                <div className="relative z-10 rounded-[16px] border border-slate-700/80 bg-slate-800 shadow-2xl overflow-hidden">
-                  {/* Window Title Bar */}
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-950/80 border-b border-slate-700/70">
-                    <div className="flex gap-1.5">
-                      <div className="w-2.5 h-2.5 rounded-full bg-red-400/90" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-amber-400/90" />
-                      <div className="w-2.5 h-2.5 rounded-full bg-emerald-400/90" />
-                    </div>
-                    <span className="text-[11px] font-semibold text-slate-300">
-                      ToboMeet
-                    </span>
-                    <div className="w-10" />
-                  </div>
-
-                  {/* Mini App Grid */}
-                  <div className="p-4 bg-slate-800/90">
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {[
-                        { init: "NH", bg: "from-blue-500 to-cyan-400" },
-                        { init: "HL", bg: "from-violet-500 to-purple-600" },
-                        { init: "PH", bg: "from-emerald-500 to-teal-500" },
-                        { init: "TH", bg: "from-orange-500 to-rose-500" },
-                      ].map((tile) => (
-                        <div
-                          key={tile.init}
-                          className="aspect-video rounded-xl bg-slate-700/80 flex items-center justify-center"
-                        >
-                          <div
-                            className={`w-9 h-9 rounded-full bg-gradient-to-br ${tile.bg} flex items-center justify-center text-white text-[11px] font-bold shadow`}
-                          >
-                            {tile.init}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-3.5 flex items-center justify-center gap-2">
-                      <span className="h-2 w-10 rounded-full bg-slate-600" />
-                      <span className="h-2 w-6 rounded-full bg-brand-500" />
-                      <span className="h-2 w-10 rounded-full bg-slate-600" />
-                    </div>
-                  </div>
+                <div className="relative z-10 rounded-[16px] border border-slate-700/80 bg-white shadow-2xl overflow-hidden">
+                  <Image
+                    src="/desktop_small.png"
+                    alt={t("card_title")}
+                    width={1058}
+                    height={905}
+                    sizes="(max-width: 1024px) 100vw, 42vw"
+                    className="w-full h-auto block"
+                    priority
+                  />
                 </div>
 
                 <p className="relative z-10 mt-5 text-center text-[13px] text-slate-400">

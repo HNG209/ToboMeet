@@ -6,14 +6,6 @@ export const NAV_LINKS = [
   { labelKey: 'header.download', href: '/download' },
 ] as const;
 
-// ─── Mock Meeting Participants (Meeting UI Preview) ───────────────────────────
-export const MOCK_PARTICIPANTS = [
-  { id: 1, name: 'Ngọc Huệ', initials: 'NH', gradient: 'from-blue-500 to-cyan-400', isMuted: false, isSpeaking: true },
-  { id: 2, name: 'Hoa Lan', initials: 'HL', gradient: 'from-violet-500 to-purple-600', isMuted: true, isSpeaking: false },
-  { id: 3, name: 'Trần Phúc Hưng', initials: 'PH', gradient: 'from-emerald-500 to-teal-500', isMuted: false, isSpeaking: false },
-  { id: 4, name: 'Thu Hằng', initials: 'TH', gradient: 'from-orange-500 to-rose-500', isMuted: true, isSpeaking: false },
-] as const;
-
 // ─── Features ─────────────────────────────────────────────────────────────────
 export const FEATURES_CONFIG = [
   { icon: 'Video', gradient: 'from-blue-500 to-cyan-500', messageKey: 0 },

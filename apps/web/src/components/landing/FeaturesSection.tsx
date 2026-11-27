@@ -1,6 +1,7 @@
 // ─── FeaturesSection ──────────────────────────────────────────────────────────
-// Bento grid showcasing real ToboMeet capabilities in plain, everyday language.
+// Bento grid showcasing real ToboMeet capabilities with a real meeting screenshot.
 
+import Image from "next/image";
 import {
   Video,
   Sparkles,
@@ -11,7 +12,6 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { FEATURES_CONFIG } from "@/lib/constants";
-import MeetingMockup from "./MeetingMockup";
 
 const ICON_MAP: Record<string, LucideIcon> = {
   Video,
@@ -81,9 +81,19 @@ export default function FeaturesSection() {
             </div>
           </div>
 
-          {/* Mockup Card — Large card (50% width) */}
-          <div className="md:col-span-3 bg-slate-900 overflow-hidden flex flex-col justify-between relative group">
-            <MeetingMockup />
+          {/* Real Meeting Screenshot Card (50% width) */}
+          <div className="md:col-span-3 bg-[#111214] p-4 sm:p-6 flex items-center justify-center overflow-hidden relative">
+            <div className="w-full rounded-[14px] overflow-hidden border border-white/10 shadow-2xl">
+              <Image
+                src="/meeting.png"
+                alt={items[0].title}
+                width={1920}
+                height={972}
+                sizes="(max-width: 768px) 100vw, 50vw"
+                className="w-full h-auto block"
+                priority
+              />
+            </div>
           </div>
 
           {/* Feature 2 — Smart Meeting Notes & Summary (33.3% width) */}
